@@ -5,16 +5,16 @@ target_link_libraries(pg_monitor PUBLIC utils)
 
 find_package(PkgConfig QUIET)
 
-if(PKG_CONFIG_FOUND)
+if (PKG_CONFIG_FOUND)
     pkg_check_modules(LIBPQ libpq QUIET)
-endif()
+endif ()
 
-if(NOT LIBPQ_FOUND)
-    if(APPLE)
+if (NOT LIBPQ_FOUND)
+    if (APPLE)
         set(HOMEBREW_PREFIX "/opt/homebrew") # ARM
-        if(NOT EXISTS "${HOMEBREW_PREFIX}/opt/libpq/lib/libpq.dylib")
+        if (NOT EXISTS "${HOMEBREW_PREFIX}/opt/libpq/lib/libpq.dylib")
             set(HOMEBREW_PREFIX "/usr/local") # Intel
-        endif()
+        endif ()
 
         find_path(LIBPQ_INCLUDE_DIR libpq-fe.h
                 HINTS
@@ -29,9 +29,9 @@ if(NOT LIBPQ_FOUND)
                 ${HOMEBREW_PREFIX}/lib
                 /usr/lib
         )
-    endif()
+    endif ()
 
-    if(UNIX AND NOT APPLE)
+    if (UNIX AND NOT APPLE)
         find_path(LIBPQ_INCLUDE_DIR libpq-fe.h
                 HINTS
                 /usr/include
@@ -44,16 +44,16 @@ if(NOT LIBPQ_FOUND)
                 /usr/lib/x86_64-linux-gnu
                 /usr/local/lib
         )
-    endif()
+    endif ()
 
-    if(LIBPQ_INCLUDE_DIR AND LIBPQ_LIBRARY)
+    if (LIBPQ_INCLUDE_DIR AND LIBPQ_LIBRARY)
         set(LIBPQ_FOUND TRUE)
-    endif()
-endif()
+    endif ()
+endif ()
 
-if(NOT LIBPQ_FOUND)
+if (NOT LIBPQ_FOUND)
     message(FATAL_ERROR "libpq not found!")
-endif()
+endif ()
 
 target_include_directories(pg_monitor PRIVATE ${LIBPQ_INCLUDE_DIR})
 target_link_libraries(pg_monitor PRIVATE ${LIBPQ_LIBRARY})

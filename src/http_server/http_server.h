@@ -20,21 +20,22 @@ typedef struct PSHTTPConnection {
 
 
 typedef MHD_Result (*ps_create_response_not_found_call_back)(PSHTTPResponse *response);
+
 typedef MHD_Result (*ps_create_response_error_call_back)(PSHTTPResponse *response);
 
 void ps_MHD_start_daemon(unsigned int port, MHD_AccessHandlerCallback dh);
 
 MHD_Result ps_queue_response(
-  MHD_Connection *connection,
-  const PSHTTPResponse *response,
-  const char *url, const char *method
+    MHD_Connection *connection,
+    const PSHTTPResponse *response,
+    const char *url, const char *method
 );
 
 MHD_Result ps_create_response_from_file(
-  const char *path,
-  PSHTTPResponse *response,
-  const ps_create_response_not_found_call_back not_found_call_back,
-  const ps_create_response_error_call_back error_call_back
+    const char *path,
+    PSHTTPResponse *response,
+    const ps_create_response_not_found_call_back not_found_call_back,
+    const ps_create_response_error_call_back error_call_back
 );
 
 
