@@ -11,7 +11,4 @@ target_link_libraries(main
         pg_monitor
 )
 
-target_include_directories(main
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-)
+target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

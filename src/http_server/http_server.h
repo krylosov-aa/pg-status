@@ -2,6 +2,8 @@
 #define PG_STATUS_HTTP_SERVER_H
 
 #include <microhttpd.h>
+
+
 typedef struct MHD_Daemon MHD_Daemon;
 typedef struct MHD_Connection MHD_Connection;
 typedef struct MHD_Response MHD_Response;
@@ -12,6 +14,15 @@ typedef struct PSHTTPResponse {
     MHD_Response *mhd_response;
     unsigned int status_code;
 } PSHTTPResponse;
+
+typedef MHD_Result (*request_handler_t)(PSHTTPResponse *response);
+
+typedef struct PS_Route {
+    const char *method;
+    const char *path;
+    request_handler_t handler;
+} PS_Route;
+
 
 typedef struct PSHTTPConnection {
     PSHTTPResponse response;
@@ -24,7 +35,11 @@ typedef MHD_Result (*ps_create_response_not_found_call_back)(PSHTTPResponse *res
 
 typedef MHD_Result (*ps_create_response_error_call_back)(PSHTTPResponse *response);
 
-void ps_MHD_start_daemon(uint16_t port, MHD_AccessHandlerCallback dh);
+void ps_MHD_start_daemon(
+    const uint16_t port,
+    PS_Route *routes,
+    const unsigned int cnt_routes
+) ;
 
 MHD_Result ps_queue_response(
     MHD_Connection *connection,
