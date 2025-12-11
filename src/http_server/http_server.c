@@ -4,32 +4,15 @@
 #include <microhttpd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 
-MHD_Result ps_create_response_from_file(
-    const char *path,
-    PSHTTPResponse *response,
-    const ps_create_response_not_found_call_back not_found_call_back,
-    const ps_create_response_error_call_back error_call_back
-) {
-    const PSFileDescriptor mfd = ps_open(path);
-    if (mfd.fd < 0) {
-        if (not_found_call_back) {
-            return not_found_call_back(response);
-        }
-        return MHD_NO;
-    }
-
-    MHD_Response *mhd_response = MHD_create_response_from_fd(mfd.st.st_size, mfd.fd);
-    if (mhd_response == NULL) {
-        ps_printf_error("Failed to MHD_create_response_from_fd for: %s", path);
-        if (error_call_back) {
-            return error_call_back(response);
-        }
-        return MHD_NO;
-    }
+MHD_Result ps_not_found(PSHTTPResponse *response) {
+    MHD_Response *mhd_response = MHD_create_response_from_buffer(
+        0, (void*)"", MHD_RESPMEM_PERSISTENT
+    );
     response->mhd_response = mhd_response;
-    response->status_code = MHD_HTTP_OK;
+    response->status_code = MHD_HTTP_NOT_FOUND;
     return MHD_YES;
 }
 
@@ -41,6 +24,11 @@ MHD_Result ps_queue_response(
 ) {
     MHD_Result ret = MHD_NO;
     if (response->mhd_response) {
+        MHD_add_response_header(
+            response->mhd_response,
+            "Content-Type",
+            "application/json"
+        );
         ret = MHD_queue_response(
             connection, response->status_code, response->mhd_response
         );
@@ -103,27 +91,17 @@ void ps_mhd_notify_connection_callback(
     }
 }
 
-// void ps_mh_log_callback(
-//   void *cls, const char *fm, ...
-// ) {
-//   // TODO Note that MHD will not generate any log messages if it was compiled without the "--enable-messages"
-//   printf("MHD log msg start: \n");
-//   va_list ap;
-//   va_start(ap, fm);
-//     vprintf(fm, ap);
-//   va_end(ap);
-//   printf("MHD log msg end: \n");
-// }
-
 void ps_MHD_start_daemon(
-    const unsigned int port,
+    uint16_t port,
     const MHD_AccessHandlerCallback dh
 ) {
     MHD_Daemon *daemon = MHD_start_daemon(
-        MHD_USE_AUTO_INTERNAL_THREAD | MHD_USE_ERROR_LOG,
+        MHD_USE_AUTO_INTERNAL_THREAD
+        // | MHD_USE_EPOLL_INTERNAL_THREAD
+        | MHD_USE_ERROR_LOG,
         port, NULL, NULL,
         dh, NULL,
-        // MHD_OPTION_EXTERNAL_LOGGER, ps_mh_log_callback, NULL,
+        MHD_OPTION_THREAD_POOL_SIZE, 4,
         MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
         MHD_OPTION_NOTIFY_CONNECTION, ps_mhd_notify_connection_callback, NULL,
         MHD_OPTION_CONNECTION_MEMORY_LIMIT, 131072, // 128*1024

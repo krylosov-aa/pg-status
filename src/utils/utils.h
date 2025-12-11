@@ -22,7 +22,7 @@ char *ps_copy_string(const char *str);
 
 bool ps_is_equal_strings(const char *first, const char *second);
 
-char *ps_format_string(const char *format, ...);
+char *ps_format_string(const char *format, ...) __attribute__((format(printf, 1, 2)));
 
 char *ps_ulong_to_str(const unsigned long value);
 

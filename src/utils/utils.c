@@ -29,7 +29,7 @@ PSFileDescriptor ps_open(const char *path) {
 }
 
 /*Prints the message in red with \n and also adds the error text from errno*/
-void ps_printf_error(const char *format, ...) __printflike(1, 2) {
+void ps_printf_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -39,7 +39,7 @@ void ps_printf_error(const char *format, ...) __printflike(1, 2) {
 }
 
 /*Prints the message in red with \n and also adds the error text from errno and exit(1)*/
-void ps_raise_error(const char *format, ...) __printflike(1, 2) {
+void ps_raise_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -71,7 +71,7 @@ bool ps_is_equal_strings(const char *first, const char *second) {
 char *ps_format_string(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char *string = "\0";
+    char *string = NULL;
     if (vasprintf(&string, format, args) < 0) {
         ps_printf_error("Unable to format_string %s", format);
         exit(1);
@@ -81,25 +81,29 @@ char *ps_format_string(const char *format, ...) {
 }
 
 char *ps_ulong_to_str(const unsigned long value) {
-    char *str = malloc(snprintf(NULL, 0, "%lu", value) + 1);
+    int len = snprintf(NULL, 0, "%lu", value);
+    char *str = malloc((size_t)len + 1);
     sprintf(str, "%lu", value);
     return str;
 }
 
 char *ps_long_to_str(const long value) {
-    char *str = malloc(snprintf(NULL, 0, "%l", value) + 1);
+    int len = snprintf(NULL, 0, "%ld", value);
+    char *str = malloc((size_t)len + 1);
     sprintf(str, "%ld", value);
     return str;
 }
 
 char *ps_int_to_str(const int value) {
-    char *str = malloc(snprintf(NULL, 0, "%d", value) + 1);
+    int len = snprintf(NULL, 0, "%d", value);
+    char *str = malloc((size_t)len + 1);
     sprintf(str, "%d", value);
     return str;
 }
 
 char *ps_uint_to_str(const int value) {
-    char *str = malloc(snprintf(NULL, 0, "%u", value) + 1);
+    int len = snprintf(NULL, 0, "%u", value);
+    char *str = malloc((size_t)len + 1);
     sprintf(str, "%u", value);
     return str;
 }
