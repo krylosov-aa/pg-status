@@ -15,9 +15,7 @@ PS_Routes *routes_list = NULL;
 
 
 MHD_Result ps_not_found(PSHTTPResponse *response) {
-    MHD_Response *mhd_response = MHD_create_response_from_buffer(
-        0, (void *) "", MHD_RESPMEM_PERSISTENT
-    );
+    MHD_Response *mhd_response = MHD_create_response_empty(MHD_RF_NONE);
     response->mhd_response = mhd_response;
     response->status_code = MHD_HTTP_NOT_FOUND;
     return MHD_YES;
