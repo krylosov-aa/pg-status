@@ -40,7 +40,9 @@ MHD_Result ps_queue_response(
         if (ret == MHD_YES) {
             printf("%s %s\n", method, path);
         } else {
-            ps_printf_error("Failed to MHD_queue_response %s %s", method, path);
+            ps_printf_error(
+                "Failed to MHD_queue_response %s %s", method, path
+            );
         }
         MHD_destroy_response(response->mhd_response);
     } else {
@@ -71,7 +73,9 @@ void request_completed(
             ps_printf_error("request completed with MHD shutdown\n");
             break;
         case MHD_REQUEST_TERMINATED_READ_ERROR:
-            ps_printf_error("request completed with terminated read error\n");
+            ps_printf_error(
+                "request completed with terminated read error\n"
+            );
             break;
         case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
             ps_printf_error("request completed with client abort\n");
@@ -135,6 +139,8 @@ MHD_Result process_get(
   void **req_cls
 ) {
     PSHTTPResponse *response = malloc(sizeof(PSHTTPResponse));
+    *req_cls = (void *) response;
+
     return process_handler(path, method, response, connection);
 }
 
@@ -193,7 +199,7 @@ void ps_MHD_start_daemon(
         | MHD_USE_ERROR_LOG,
         port, NULL, NULL,
         answer_to_connection, NULL,
-        MHD_OPTION_THREAD_POOL_SIZE, 4,
+        // MHD_OPTION_THREAD_POOL_SIZE, 2,
         MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
         // MHD_OPTION_NOTIFY_CONNECTION, ps_mhd_notify_connection_callback, NULL,
         MHD_OPTION_CONNECTION_MEMORY_LIMIT, 131072, // 128*1024
