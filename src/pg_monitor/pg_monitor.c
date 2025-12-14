@@ -10,11 +10,11 @@
 
 
 bool is_f(const char *pg_val) {
-    return ps_is_equal_strings(pg_val, "f");
+    return is_equal_strings(pg_val, "f");
 }
 
 bool is_t(const char *pg_val) {
-    return ps_is_equal_strings(pg_val, "t");
+    return is_equal_strings(pg_val, "t");
 }
 
 
@@ -22,7 +22,7 @@ PGconn *db_connect(const char *connection_str) {
     // printf("connection_str %s\n", connection_str);
     PGconn *conn = PQconnectdb(connection_str);
     if (PQstatus(conn) != CONNECTION_OK) {
-        ps_printf_error("\033[0;31m connect error: \033[0m %s \n ",PQerrorMessage(conn));
+        printf_error("\033[0;31m connect error: \033[0m %s \n ",PQerrorMessage(conn));
         PQfinish(conn);
         return nullptr;
     }
@@ -34,7 +34,7 @@ int check_exec_result(const PGconn *conn, const PGresult *result) {
     const ExecStatusType resStatus = PQresultStatus(result);
     int exit_value = 0;
     if (resStatus != PGRES_TUPLES_OK && resStatus != PGRES_COMMAND_OK) {
-        ps_printf_error(
+        printf_error(
             "\033[0;31m execute sql error: \033[0m %s \n ",
             PQerrorMessage(conn)
         );
@@ -114,7 +114,7 @@ void replace_from_env(const char *env_name, char **result) {
 void replace_from_env_copy(const char *env_name, char **result) {
     char *env_val = getenv(env_name);
     if (env_val && *env_val) {
-        char *env_val_copy = ps_copy_string(env_val);
+        char *env_val_copy = copy_string(env_val);
         *result = env_val_copy;
     }
 }
@@ -134,8 +134,8 @@ ConnectionStrings get_connection_strings(void) {
 
     char *save_hosts = nullptr;
     char *save_ports = nullptr;
-    char *hosts = ps_copy_string(parameters.hosts);
-    char *ports = ps_copy_string(parameters.ports);
+    char *hosts = copy_string(parameters.hosts);
+    char *ports = copy_string(parameters.ports);
     char *host = strtok_r(hosts, parameters.hosts_delimiter, &save_hosts);
     char *port = strtok_r(ports, parameters.hosts_delimiter, &save_ports);
     ConnectionStrings result = {
@@ -148,14 +148,14 @@ ConnectionStrings get_connection_strings(void) {
         && port != nullptr
         && result.cnt < MAX_HOSTS
     ) {
-        char *connection_str = ps_format_string(
+        char *connection_str = format_string(
             "user=%s password=%s host=%s port=%s "
             "dbname=%s connect_timeout=%s",
             parameters.user, parameters.password, host, port,
             parameters.database, parameters.connect_timeout
         );
         result.connection_str[result.cnt] = connection_str;
-        result.hosts[result.cnt] = ps_copy_string(host);
+        result.hosts[result.cnt] = copy_string(host);
         result.cnt = result.cnt + 1;
         host = strtok_r(nullptr, parameters.hosts_delimiter, &save_hosts);
         port = strtok_r(nullptr, parameters.hosts_delimiter, &save_ports);

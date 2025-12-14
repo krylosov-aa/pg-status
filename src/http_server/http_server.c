@@ -40,13 +40,13 @@ MHD_Result queue_response(
         if (ret == MHD_YES) {
             printf("%s %s\n", method, path);
         } else {
-            ps_printf_error(
+            printf_error(
                 "Failed to MHD_queue_response %s %s", method, path
             );
         }
         MHD_destroy_response(response->mhd_response);
     } else {
-        ps_printf_error(
+        printf_error(
             "mhd_response wasn't provided for MHD_queue_response %s %s",
             method, path);
     }
@@ -64,21 +64,21 @@ void request_completed(
             // printf("request completed\n");
             break;
         case MHD_REQUEST_TERMINATED_WITH_ERROR:
-            ps_printf_error("request completed with error\n");
+            printf_error("request completed with error\n");
             break;
         case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
-            ps_printf_error("request completed with timeout\n");
+            printf_error("request completed with timeout\n");
             break;
         case MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
-            ps_printf_error("request completed with MHD shutdown\n");
+            printf_error("request completed with MHD shutdown\n");
             break;
         case MHD_REQUEST_TERMINATED_READ_ERROR:
-            ps_printf_error(
+            printf_error(
                 "request completed with terminated read error\n"
             );
             break;
         case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
-            ps_printf_error("request completed with client abort\n");
+            printf_error("request completed with client abort\n");
             break;
     }
     if (*req_cls) {
@@ -205,7 +205,7 @@ void start_daemon(
         MHD_OPTION_END
     );
     if (!daemon) {
-        ps_raise_error("Failed to start mhd daemon");
+        raise_error("Failed to start mhd daemon");
     }
     printf("Daemon started at 127.0.0.1:%d\n", port);
 
