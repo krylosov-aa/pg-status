@@ -6,15 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct PS_Routes {
-    PS_Route *routes;
+typedef struct Routes {
+    Route *routes;
     unsigned int cnt;
-} PS_Routes;
+} Routes;
 
-PS_Routes *routes_list = nullptr;
+Routes *routes_list = nullptr;
 
 
-MHD_Result ps_not_found(PSHTTPResponse *response) {
+MHD_Result not_found(HTTPResponse *response) {
     MHD_Response *mhd_response = MHD_create_response_empty(MHD_RF_NONE);
     response->mhd_response = mhd_response;
     response->status_code = MHD_HTTP_NOT_FOUND;
@@ -22,9 +22,9 @@ MHD_Result ps_not_found(PSHTTPResponse *response) {
 }
 
 
-MHD_Result ps_queue_response(
+MHD_Result queue_response(
     MHD_Connection *connection,
-    const PSHTTPResponse *response,
+    const HTTPResponse *response,
     const char *path, const char *method
 ) {
     MHD_Result ret = MHD_NO;
@@ -86,7 +86,7 @@ void request_completed(
     }
 }
 
-void ps_mhd_notify_connection_callback(
+void notify_connection_callback(
     void *cls,
     MHD_Connection *connection,
     void **socket_context,
@@ -104,19 +104,19 @@ void ps_mhd_notify_connection_callback(
 
 request_handler_t find_handler(const char *method, const char *path) {
     for (unsigned int i = 0; i < routes_list -> cnt; i++) {
-        PS_Route *routes = routes_list -> routes;
+        Route *routes = routes_list -> routes;
 
         if (strcmp(routes[i].method, method) == 0 &&
             strcmp(routes[i].path, path) == 0)
             return routes[i].handler;
     }
-    return ps_not_found;
+    return not_found;
 }
 
 MHD_Result process_handler(
   const char *path,
   const char *method,
-  PSHTTPResponse *response,
+  HTTPResponse *response,
   MHD_Connection *connection
 ) {
     MHD_Result result = MHD_NO;
@@ -124,7 +124,7 @@ MHD_Result process_handler(
     result = handler(response);
 
     if (response -> mhd_response) {
-        result = ps_queue_response(connection, response, path, method);
+        result = queue_response(connection, response, path, method);
     }
     return result;
 }
@@ -138,7 +138,7 @@ MHD_Result process_get(
   const char *upload_data,
   void **req_cls
 ) {
-    PSHTTPResponse *response = malloc(sizeof(PSHTTPResponse));
+    HTTPResponse *response = malloc(sizeof(HTTPResponse));
     *req_cls = (void *) response;
 
     return process_handler(path, method, response, connection);
@@ -154,13 +154,13 @@ MHD_Result process_post(
   size_t *upload_data_size,
   void **req_cls
 ) {
-    PSHTTPResponse *response = nullptr;
+    HTTPResponse *response;
     if (*req_cls == nullptr) {
-        response = malloc(sizeof(PSHTTPResponse));
+        response = malloc(sizeof(HTTPResponse));
         *req_cls = (void *) response;
         return MHD_YES;
     }
-    response = (PSHTTPResponse *) *req_cls;
+    response = (HTTPResponse *) *req_cls;
 
     return process_handler(path, method, response, connection);
 }
@@ -183,13 +183,13 @@ MHD_Result answer_to_connection(
 }
 
 
-void ps_MHD_start_daemon(
+void start_daemon(
     const uint16_t port,
-    PS_Route *routes,
+    Route *routes,
     const unsigned int cnt_routes
 ) {
 
-    routes_list = malloc(sizeof(PS_Routes));
+    routes_list = malloc(sizeof(Routes));
     routes_list -> routes = routes;
     routes_list -> cnt = cnt_routes;
 
@@ -200,7 +200,7 @@ void ps_MHD_start_daemon(
         answer_to_connection, nullptr,
         // MHD_OPTION_THREAD_POOL_SIZE, 2,
         MHD_OPTION_NOTIFY_COMPLETED, request_completed, nullptr,
-        // MHD_OPTION_NOTIFY_CONNECTION, ps_mhd_notify_connection_callback, nullptr,
+        // MHD_OPTION_NOTIFY_CONNECTION, notify_connection_callback, nullptr,
         MHD_OPTION_CONNECTION_MEMORY_LIMIT, 131072, // 128*1024
         MHD_OPTION_END
     );

@@ -10,41 +10,23 @@ typedef struct MHD_Response MHD_Response;
 typedef enum MHD_Result MHD_Result;
 typedef enum MHD_RequestTerminationCode MHD_RequestTerminationCode;
 
-typedef struct PSHTTPResponse {
+typedef struct HTTPResponse {
     MHD_Response *mhd_response;
     unsigned int status_code;
-} PSHTTPResponse;
+} HTTPResponse;
 
-typedef MHD_Result (*request_handler_t)(PSHTTPResponse *response);
+typedef MHD_Result (*request_handler_t)(HTTPResponse *response);
 
-typedef struct PS_Route {
+typedef struct Route {
     const char *method;
     const char *path;
     request_handler_t handler;
-} PS_Route;
+} Route;
 
-
-typedef struct PSHTTPConnection {
-    PSHTTPResponse response;
-    char *payload;
-} PSHTTPConnection;
-
-MHD_Result ps_not_found(PSHTTPResponse *response);
-
-typedef MHD_Result (*ps_create_response_not_found_call_back)(PSHTTPResponse *response);
-
-typedef MHD_Result (*ps_create_response_error_call_back)(PSHTTPResponse *response);
-
-void ps_MHD_start_daemon(
+void start_daemon(
     const uint16_t port,
-    PS_Route *routes,
+    Route *routes,
     const unsigned int cnt_routes
-) ;
-
-MHD_Result ps_queue_response(
-    MHD_Connection *connection,
-    const PSHTTPResponse *response,
-    const char *url, const char *method
 );
 
 

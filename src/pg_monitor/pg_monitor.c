@@ -240,11 +240,6 @@ void *monitor_thread(
             printf("replica: %s\n", cur_stat -> replicas[i].host);
         }
         printf("\n");
-        // pthread_mutex_lock(&state_mutex);
-        // snprintf(state.masterHost, sizeof(state.masterHost), "pg-master.example.com");
-        // snprintf(state.replicaHost, sizeof(state.replicaHost), "pg-replica.example.com");
-        // pthread_mutex_unlock(&state_mutex);
-        //
         sleep(1);
     }
     return nullptr;
