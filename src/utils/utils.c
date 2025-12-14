@@ -71,7 +71,7 @@ bool ps_is_equal_strings(const char *first, const char *second) {
 char *ps_format_string(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char *string = NULL;
+    char *string = nullptr;
     if (vasprintf(&string, format, args) < 0) {
         ps_printf_error("Unable to format_string %s", format);
         exit(1);
@@ -81,41 +81,41 @@ char *ps_format_string(const char *format, ...) {
 }
 
 char *ps_ulong_to_str(const unsigned long value) {
-    int len = snprintf(NULL, 0, "%lu", value);
+    int len = snprintf(nullptr, 0, "%lu", value);
     char *str = malloc((size_t)len + 1);
     sprintf(str, "%lu", value);
     return str;
 }
 
 char *ps_long_to_str(const long value) {
-    int len = snprintf(NULL, 0, "%ld", value);
+    int len = snprintf(nullptr, 0, "%ld", value);
     char *str = malloc((size_t)len + 1);
     sprintf(str, "%ld", value);
     return str;
 }
 
 char *ps_int_to_str(const int value) {
-    int len = snprintf(NULL, 0, "%d", value);
+    int len = snprintf(nullptr, 0, "%d", value);
     char *str = malloc((size_t)len + 1);
     sprintf(str, "%d", value);
     return str;
 }
 
 char *ps_uint_to_str(const int value) {
-    int len = snprintf(NULL, 0, "%u", value);
+    int len = snprintf(nullptr, 0, "%u", value);
     char *str = malloc((size_t)len + 1);
     sprintf(str, "%u", value);
     return str;
 }
 
 long ps_str_to_long(const char *value) {
-    return strtol(value, NULL, 10);
+    return strtol(value, nullptr, 10);
 }
 
 unsigned long ps_str_to_ulong(const char *value) {
-    return strtoul(value, NULL, 10);
+    return strtoul(value, nullptr, 10);
 }
 
 int ps_str_to_int(const char *value) {
-    return (int) strtol(value, NULL, 10);
+    return (int) strtol(value, nullptr, 10);
 }

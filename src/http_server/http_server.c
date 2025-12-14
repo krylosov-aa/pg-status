@@ -11,7 +11,7 @@ typedef struct PS_Routes {
     unsigned int cnt;
 } PS_Routes;
 
-PS_Routes *routes_list = NULL;
+PS_Routes *routes_list = nullptr;
 
 
 MHD_Result ps_not_found(PSHTTPResponse *response) {
@@ -154,8 +154,8 @@ MHD_Result process_post(
   size_t *upload_data_size,
   void **req_cls
 ) {
-    PSHTTPResponse *response = NULL;
-    if (*req_cls == NULL) {
+    PSHTTPResponse *response = nullptr;
+    if (*req_cls == nullptr) {
         response = malloc(sizeof(PSHTTPResponse));
         *req_cls = (void *) response;
         return MHD_YES;
@@ -195,13 +195,12 @@ void ps_MHD_start_daemon(
 
     MHD_Daemon *daemon = MHD_start_daemon(
         MHD_USE_AUTO_INTERNAL_THREAD
-        // | MHD_USE_EPOLL_INTERNAL_THREAD
         | MHD_USE_ERROR_LOG,
-        port, NULL, NULL,
-        answer_to_connection, NULL,
+        port, nullptr, nullptr,
+        answer_to_connection, nullptr,
         // MHD_OPTION_THREAD_POOL_SIZE, 2,
-        MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
-        // MHD_OPTION_NOTIFY_CONNECTION, ps_mhd_notify_connection_callback, NULL,
+        MHD_OPTION_NOTIFY_COMPLETED, request_completed, nullptr,
+        // MHD_OPTION_NOTIFY_CONNECTION, ps_mhd_notify_connection_callback, nullptr,
         MHD_OPTION_CONNECTION_MEMORY_LIMIT, 131072, // 128*1024
         MHD_OPTION_END
     );
