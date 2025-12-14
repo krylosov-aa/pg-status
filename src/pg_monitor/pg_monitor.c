@@ -22,7 +22,9 @@ PGconn *db_connect(const char *connection_str) {
     // printf("connection_str %s\n", connection_str);
     PGconn *conn = PQconnectdb(connection_str);
     if (PQstatus(conn) != CONNECTION_OK) {
-        printf_error("\033[0;31m connect error: \033[0m %s \n ",PQerrorMessage(conn));
+        printf_error(
+            "\033[0;31m connect error: \033[0m %s \n ", PQerrorMessage(conn)
+        );
         PQfinish(conn);
         return nullptr;
     }
@@ -32,16 +34,15 @@ PGconn *db_connect(const char *connection_str) {
 
 int check_exec_result(const PGconn *conn, const PGresult *result) {
     const ExecStatusType resStatus = PQresultStatus(result);
-    int exit_value = 0;
     if (resStatus != PGRES_TUPLES_OK && resStatus != PGRES_COMMAND_OK) {
         printf_error(
             "\033[0;31m execute sql error: \033[0m %s \n ",
             PQerrorMessage(conn)
         );
 
-        exit_value = 1;
+        return 1;
     }
-    return exit_value;
+    return 0;
 }
 
 PGresult *execute_sql(PGconn *conn, const char *query) {
@@ -49,26 +50,22 @@ PGresult *execute_sql(PGconn *conn, const char *query) {
     const int check_result = check_exec_result(conn, res);
     if (check_result == 1) {
         PQclear(res);
-        res = nullptr;
+        return nullptr;
     }
     return res;
 }
-
 
 int extract_bool_value(PGresult *q_res, bool *result) {
     if (q_res == nullptr)
         return 1;
 
-    int exit_val = 0;
-
-    if (PQntuples(q_res) > 0 && PQnfields(q_res) > 0) {
+    if (PQntuples(q_res) > 0 && PQnfields(q_res) > 0)
         *result = is_t(PQgetvalue(q_res, 0, 0));
-    }
     else
-        exit_val = 1;
+        return 1;
 
     PQclear(q_res);
-    return exit_val;
+    return 0;
 }
 
 
@@ -84,12 +81,11 @@ int is_host_in_recovery(const char* connection_str, bool* result) {
     PGconn *conn = db_connect(connection_str);
     if (conn == nullptr)
         return 1;
+
     const int exit_val = execute_sql_bool(conn, in_recovery_query, result);
     PQfinish(conn);
     return exit_val;
 }
-
-int running = 1;
 
 char default_hosts_str[] = "localhost,127.0.0.1";
 
@@ -105,14 +101,13 @@ MonitorParameters parameters = {
 
 void replace_from_env(const char *env_name, char **result) {
     char *env_val = getenv(env_name);
-    if (env_val && *env_val) {
+    if (env_val && *env_val)
         *result = env_val;
-    }
 }
 
 void replace_from_env_copy(const char *env_name, char **result) {
-    char *env_val = getenv(env_name);
-    if (env_val && *env_val) {
+    const char *env_val = getenv(env_name);
+    if (env_val != nullptr && *env_val) {
         char *env_val_copy = copy_string(env_val);
         *result = env_val_copy;
     }
@@ -123,9 +118,10 @@ void get_values_from_env(void) {
     replace_from_env("pg_status__pg_database", &parameters.database);
     replace_from_env("pg_status__pg_password", &parameters.password);
     replace_from_env("pg_status__delimiter", &parameters.hosts_delimiter);
-    replace_from_env_copy("pg_status__hosts", &parameters.hosts);
     replace_from_env("pg_status__port", &parameters.port);
     replace_from_env("pg_status__connect_timeout", &parameters.connect_timeout);
+
+    replace_from_env_copy("pg_status__hosts", &parameters.hosts);
 }
 
 ConnectionStrings get_connection_strings(void) {
@@ -180,13 +176,20 @@ void init_buffers(const unsigned int replicas_count) {
 
 void reset_inactive(MonitorStatus *inactive) {
     inactive -> master = nullptr;
-    memset(inactive->replicas, 0, inactive->replicas_cnt * sizeof(ReplicaStatus));
+    memset(
+        inactive->replicas, 0, inactive->replicas_cnt * sizeof(ReplicaStatus)
+    );
+}
+
+MonitorStatus *prep_inactive(void) {
+    const MonitorStatus *active = atomic_load(&status);
+    MonitorStatus *inactive = active == &buffers[0] ? &buffers[1] : &buffers[0];
+    reset_inactive(inactive);
+    return inactive;
 }
 
 void check_hosts(const ConnectionStrings con_str_list) {
-    MonitorStatus *active = atomic_load(&status);
-    MonitorStatus *inactive = active == &buffers[0] ? &buffers[1] : &buffers[0];
-    reset_inactive(inactive);
+    MonitorStatus *inactive = prep_inactive();
 
     ReplicaStatus *replicas_cursor = inactive -> replicas;
 
@@ -213,9 +216,10 @@ void check_hosts(const ConnectionStrings con_str_list) {
         }
     }
 
-    atomic_thread_fence(memory_order_release);
-    atomic_store(&status, inactive);
+    atomic_store_explicit(&status, inactive, memory_order_release);
 }
+
+int running = 1;
 
 void *monitor_thread(
     // void *arg
@@ -228,7 +232,9 @@ void *monitor_thread(
     while (running) {
         check_hosts(con_str_list);
 
-        MonitorStatus *cur_stat = atomic_load(&status);
+        const MonitorStatus *cur_stat = atomic_load_explicit(
+            &status, memory_order_acquire
+        );
         printf("master: %s\n", cur_stat -> master);
         for (uint i = 0; i < cur_stat->replicas_cnt; i++) {
             printf("replica: %s\n", cur_stat -> replicas[i].host);

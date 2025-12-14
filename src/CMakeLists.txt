@@ -6,8 +6,8 @@ add_executable(main main.c)
 
 target_link_libraries(main
         PRIVATE
-        http_server
         utils
+        http_server
         pg_monitor
 )
 
