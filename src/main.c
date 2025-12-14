@@ -8,7 +8,7 @@
 #include "pg_monitor.h"
 
 
-MHD_Result ps_index_get(HTTPResponse *response) {
+MHD_Result index_get(HTTPResponse *response) {
     char *resp = "{\"Hello\": \"world\"}";
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         strlen(resp),
@@ -25,7 +25,7 @@ int main(void) {
     // monitor_thread();
 
     Route routes[] = {
-        { "GET", "/index", ps_index_get }
+        { "GET", "/index", index_get }
     };
 
     start_daemon(8000, routes, 1);
