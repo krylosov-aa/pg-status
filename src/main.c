@@ -22,12 +22,12 @@ MHD_Result index_get(HTTPResponse *response) {
 
 
 int main(void) {
-    // monitor_thread();
+    monitor_thread();
 
-    Route routes[] = {
-        { "GET", "/index", index_get }
-    };
-
-    start_daemon(8000, routes, 1);
+    // Route routes[] = {
+    //     { "GET", "/index", index_get }
+    // };
+    //
+    // start_daemon(8000, routes, 1);
     return 0;
 }

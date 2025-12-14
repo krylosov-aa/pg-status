@@ -20,7 +20,7 @@ typedef struct MonitorParameters {
     char *database;
     char *hosts_delimiter;
     char *hosts;
-    char *ports;
+    char *port;
     char *connect_timeout;
 } MonitorParameters;
 

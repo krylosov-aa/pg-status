@@ -58,8 +58,15 @@ char *concatenate_strings(const char *first, const char *second) {
 }
 
 char *copy_string(const char *str) {
-    char *new_str = malloc(strlen(str) + 1);
-    strcpy(new_str, str);
+    if (str == nullptr)
+        return nullptr;
+
+    const size_t size = strlen(str) + 1;
+    char *new_str = malloc(size);
+    if (new_str == nullptr)
+        return nullptr;
+
+    memcpy(new_str, str, size);
     return new_str;
 }
 

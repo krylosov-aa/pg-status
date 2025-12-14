@@ -92,7 +92,6 @@ int is_host_in_recovery(const char* connection_str, bool* result) {
 int running = 1;
 
 char default_hosts_str[] = "localhost,127.0.0.1";
-char default_ports_str[] = "6432,6432";
 
 MonitorParameters parameters = {
     .user = "postgres",
@@ -100,7 +99,7 @@ MonitorParameters parameters = {
     .database = "postgres",
     .hosts_delimiter = ",",
     .hosts = default_hosts_str,
-    .ports = default_ports_str,
+    .port = "6432",
     .connect_timeout = "2",
 };
 
@@ -125,7 +124,7 @@ void get_values_from_env(void) {
     replace_from_env("pg_status__pg_password", &parameters.password);
     replace_from_env("pg_status__delimiter", &parameters.hosts_delimiter);
     replace_from_env_copy("pg_status__hosts", &parameters.hosts);
-    replace_from_env("pg_status__ports", &parameters.ports);
+    replace_from_env("pg_status__port", &parameters.port);
     replace_from_env("pg_status__connect_timeout", &parameters.connect_timeout);
 }
 
@@ -133,35 +132,30 @@ ConnectionStrings get_connection_strings(void) {
     get_values_from_env();
 
     char *save_hosts = nullptr;
-    char *save_ports = nullptr;
     char *hosts = copy_string(parameters.hosts);
-    char *ports = copy_string(parameters.ports);
     char *host = strtok_r(hosts, parameters.hosts_delimiter, &save_hosts);
-    char *port = strtok_r(ports, parameters.hosts_delimiter, &save_ports);
+
     ConnectionStrings result = {
         .cnt = 0
     };
 
 
-    while (
-          host != nullptr
-        && port != nullptr
-        && result.cnt < MAX_HOSTS
-    ) {
+    while (host != nullptr && result.cnt < MAX_HOSTS) {
         char *connection_str = format_string(
             "user=%s password=%s host=%s port=%s "
             "dbname=%s connect_timeout=%s",
-            parameters.user, parameters.password, host, port,
+            parameters.user, parameters.password, host, parameters.port,
             parameters.database, parameters.connect_timeout
         );
         result.connection_str[result.cnt] = connection_str;
         result.hosts[result.cnt] = copy_string(host);
         result.cnt = result.cnt + 1;
         host = strtok_r(nullptr, parameters.hosts_delimiter, &save_hosts);
-        port = strtok_r(nullptr, parameters.hosts_delimiter, &save_ports);
     }
+    if (host != nullptr && result.cnt == MAX_HOSTS)
+        raise_error("Too many hosts. Maximum value = %d", MAX_HOSTS);
+
     free(hosts);
-    free(ports);
 
     return result;
 }
