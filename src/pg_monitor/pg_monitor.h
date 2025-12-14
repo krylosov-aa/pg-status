@@ -24,6 +24,7 @@ typedef struct MonitorParameters {
     char *connect_timeout;
 } MonitorParameters;
 
+
 typedef struct ReplicaStatus {
     char *host;
 } ReplicaStatus;
@@ -32,14 +33,15 @@ typedef struct MonitorStatus {
     char *master;
     ReplicaStatus *replicas;
     unsigned int replicas_cnt;
+    // TODO may be need refcounter
 } MonitorStatus;
 
 ConnectionStrings get_connection_strings(void);
 
 void check_hosts(ConnectionStrings con_str_list);
 
-void *monitor_thread(
-    // void *arg
-);
+const MonitorStatus *get_cur_stat(void);
+
+void *pg_monitor_thread(void *arg);
 
 #endif //PG_STATUS_PG_MONITOR_H

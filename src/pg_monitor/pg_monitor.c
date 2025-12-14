@@ -157,32 +157,33 @@ ConnectionStrings get_connection_strings(void) {
 }
 
 
-_Atomic(MonitorStatus *) status = nullptr;
+_Atomic(MonitorStatus *) monitor_status = nullptr;
 
 MonitorStatus buffers[2];
 
 void init_buffers(const unsigned int replicas_count) {
     for (int i = 0; i < 2; i++) {
-        buffers[i].master = nullptr;
+        buffers[i].master = "null";
         buffers[i].replicas_cnt = replicas_count;
-        buffers[i].replicas = malloc(
-            replicas_count * sizeof(ReplicaStatus)
+        buffers[i].replicas = calloc(
+            replicas_count, sizeof(ReplicaStatus)
         );
     }
 
-    atomic_thread_fence(memory_order_release);
-    atomic_store(&status, &buffers[0]);
+    atomic_store_explicit(&monitor_status, &buffers[0], memory_order_release);
 }
 
 void reset_inactive(MonitorStatus *inactive) {
-    inactive -> master = nullptr;
+    inactive -> master = "null";
     memset(
         inactive->replicas, 0, inactive->replicas_cnt * sizeof(ReplicaStatus)
     );
 }
 
 MonitorStatus *prep_inactive(void) {
-    const MonitorStatus *active = atomic_load(&status);
+    const MonitorStatus *active = atomic_load_explicit(
+        &monitor_status, memory_order_acquire
+    );
     MonitorStatus *inactive = active == &buffers[0] ? &buffers[1] : &buffers[0];
     reset_inactive(inactive);
     return inactive;
@@ -204,43 +205,43 @@ void check_hosts(const ConnectionStrings con_str_list) {
             if (is_replica) {
                 replicas_cursor -> host = con_str_list.hosts[i];
                 replicas_cursor++;
-                // printf("%s: replica\n", con_str_list.hosts[i]);
             }
-            else {
+            else
                 inactive -> master = con_str_list.hosts[i];
-                // printf("%s: master\n", con_str_list.hosts[i]);
-            }
         }
-        else {
+        else
             printf("%s: dead\n", con_str_list.hosts[i]);
-        }
     }
 
-    atomic_store_explicit(&status, inactive, memory_order_release);
+    atomic_store_explicit(&monitor_status, inactive, memory_order_release);
 }
 
-int running = 1;
+const MonitorStatus *get_cur_stat(void) {
+    return atomic_load_explicit(
+        &monitor_status, memory_order_acquire
+    );
+}
 
-void *monitor_thread(
-    // void *arg
-) {
-    // (void)arg;
+atomic_uint pg_monitor_running = 1;
+
+void *pg_monitor_thread(void *arg) {
+    (void)arg;
 
     const ConnectionStrings con_str_list = get_connection_strings();
     init_buffers(con_str_list.cnt - 1);
 
-    while (running) {
+    while (atomic_load(&pg_monitor_running)) {
         check_hosts(con_str_list);
 
-        const MonitorStatus *cur_stat = atomic_load_explicit(
-            &status, memory_order_acquire
-        );
-        printf("master: %s\n", cur_stat -> master);
-        for (uint i = 0; i < cur_stat->replicas_cnt; i++) {
-            printf("replica: %s\n", cur_stat -> replicas[i].host);
-        }
-        printf("\n");
-        sleep(1);
+        // const MonitorStatus *cur_stat = atomic_load_explicit(
+        //     &monitor_status, memory_order_acquire
+        // );
+        // printf("master: %s\n", cur_stat -> master);
+        // for (uint i = 0; i < cur_stat->replicas_cnt; i++) {
+        //     printf("replica: %s\n", cur_stat -> replicas[i].host);
+        // }
+        // printf("\n");
+        sleep(5);
     }
     return nullptr;
 }
