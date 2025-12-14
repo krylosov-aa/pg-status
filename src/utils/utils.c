@@ -81,30 +81,34 @@ char *format_string(const char *format, ...) {
 }
 
 char *ulong_to_str(const unsigned long value) {
-    int len = snprintf(nullptr, 0, "%lu", value);
-    char *str = malloc((size_t)len + 1);
-    sprintf(str, "%lu", value);
+    const int len = snprintf(nullptr, 0, "%lu", value);
+    const size_t size = (size_t)len + 1;
+    char *str = malloc(size);
+    snprintf(str, size, "%lu", value);
     return str;
 }
 
 char *long_to_str(const long value) {
-    int len = snprintf(nullptr, 0, "%ld", value);
-    char *str = malloc((size_t)len + 1);
-    sprintf(str, "%ld", value);
+    const int len = snprintf(nullptr, 0, "%ld", value);
+    const size_t size = (size_t)len + 1;
+    char *str = malloc(size);
+    snprintf(str, size, "%ld", value);
     return str;
 }
 
 char *int_to_str(const int value) {
-    int len = snprintf(nullptr, 0, "%d", value);
-    char *str = malloc((size_t)len + 1);
-    sprintf(str, "%d", value);
+    const int len = snprintf(nullptr, 0, "%d", value);
+    const size_t size = (size_t)len + 1;
+    char *str = malloc(size);
+    snprintf(str, size, "%d", value);
     return str;
 }
 
-char *uint_to_str(const int value) {
-    int len = snprintf(nullptr, 0, "%u", value);
-    char *str = malloc((size_t)len + 1);
-    sprintf(str, "%u", value);
+char *uint_to_str(const unsigned int value) {
+    const int len = snprintf(nullptr, 0, "%u", value);
+    const size_t size = (size_t)len + 1;
+    char *str = malloc(size);
+    snprintf(str, size, "%u", value);
     return str;
 }
 

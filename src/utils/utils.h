@@ -30,7 +30,7 @@ char *long_to_str(const long value);
 
 char *int_to_str(const int value);
 
-char *uint_to_str(const int value);
+char *uint_to_str(const unsigned int value);
 
 long str_to_long(const char *value);
 
