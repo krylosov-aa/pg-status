@@ -2,6 +2,7 @@
 #define PG_STATUS_PG_MONITOR_H
 
 # define MAX_HOSTS 10
+#include <sys/_pthread/_pthread_t.h>
 
 typedef struct Hosts {
     char *hosts[MAX_HOSTS];
@@ -43,6 +44,8 @@ void check_hosts(ConnectionStrings con_str_list);
 
 const MonitorStatus *get_cur_stat(void);
 
-void *pg_monitor_thread(void *arg);
+pthread_t start_pg_monitor();
+
+void stop_pg_monitor(void);
 
 #endif //PG_STATUS_PG_MONITOR_H

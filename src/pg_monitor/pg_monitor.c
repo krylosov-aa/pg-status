@@ -2,6 +2,7 @@
 #include "utils.h"
 
 #include <libpq-fe.h>
+#include <pthread.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -209,11 +210,14 @@ void check_hosts(const ConnectionStrings con_str_list) {
 
         if (exit_val == 0) {
             if (is_replica) {
+                printf("%s: relica\n", con_str_list.hosts[i]);
                 replicas_cursor -> host = con_str_list.hosts[i];
                 replicas_cursor++;
             }
-            else
+            else {
+                printf("%s: master\n", con_str_list.hosts[i]);
                 inactive -> master = con_str_list.hosts[i];
+            }
         }
         else
             printf("%s: dead\n", con_str_list.hosts[i]);
@@ -230,6 +234,11 @@ const MonitorStatus *get_cur_stat(void) {
 
 atomic_uint pg_monitor_running = 1;
 
+void stop_pg_monitor(void) {
+    atomic_store(&pg_monitor_running, true);
+    printf("pg_monitor stopped\n");
+}
+
 void *pg_monitor_thread(void *arg) {
     (void)arg;
 
@@ -241,4 +250,17 @@ void *pg_monitor_thread(void *arg) {
         sleep(parameters.sleep);
     }
     return nullptr;
+}
+
+pthread_t start_pg_monitor() {
+    pthread_t pg_monitor_tid;
+    const int started = pthread_create(
+        &pg_monitor_tid, nullptr, pg_monitor_thread, nullptr
+    );
+
+    if (started != 0)
+        raise_error("Failed to start pg_monitor");
+
+    printf("pg_monitor started\n");
+    return pg_monitor_tid;
 }

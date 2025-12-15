@@ -23,11 +23,12 @@ typedef struct Route {
     request_handler_t handler;
 } Route;
 
-void start_daemon(
+MHD_Daemon *start_http_server(
     const uint16_t port,
     Route *routes,
     const unsigned int cnt_routes
 );
 
+void stop_http_server(MHD_Daemon *daemon);
 
 #endif //PG_STATUS_HTTP_SERVER_H

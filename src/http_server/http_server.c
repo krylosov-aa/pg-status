@@ -183,7 +183,7 @@ MHD_Result answer_to_connection(
 }
 
 
-void start_daemon(
+MHD_Daemon *start_http_server(
     const uint16_t port,
     Route *routes,
     const unsigned int cnt_routes
@@ -207,15 +207,12 @@ void start_daemon(
     if (!daemon) {
         raise_error("Failed to start mhd daemon");
     }
-    printf("Daemon started at 127.0.0.1:%d\n", port);
+    printf("http server started at 127.0.0.1:%d\n", port);
+    return daemon;
 
-    // const union MHD_DaemonInfo *daemon_info = MHD_get_daemon_info(
-    //   daemon, MHD_DAEMON_INFO_CURRENT_CONNECTIONS
-    // );
-    // while (1) {
-    //   printf("Current num_connections: %d\n", daemon_info -> num_connections);
-    // }
+}
 
-    getchar();
+void stop_http_server(MHD_Daemon *daemon) {
     MHD_stop_daemon(daemon);
+    printf("http server stopped\n");
 }
