@@ -38,5 +38,7 @@ unsigned long str_to_ulong(const char *value);
 
 int str_to_int(const char *value);
 
+unsigned int str_to_uint(const char *value);
+
 
 #endif //PG_STATUS_UTILS_H

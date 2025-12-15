@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -120,13 +121,43 @@ char *uint_to_str(const unsigned int value) {
 }
 
 long str_to_long(const char *value) {
-    return strtol(value, nullptr, 10);
+    char *end_ptr = nullptr;
+    errno = 0;
+
+    const long result = strtol(value, &end_ptr, 10);
+
+    if (
+        end_ptr == value ||
+        *end_ptr != '\0' ||
+        errno == ERANGE ||
+        result > UINT_MAX
+    )
+        raise_error("Failed to convert '%s' to uint", value);
+
+    return result;
 }
 
 unsigned long str_to_ulong(const char *value) {
-    return strtoul(value, nullptr, 10);
+    char *end_ptr = nullptr;
+    errno = 0;
+
+    const unsigned long result = strtoul(value, &end_ptr, 10);
+
+    if (
+        end_ptr == value ||
+        *end_ptr != '\0' ||
+        errno == ERANGE ||
+        result > UINT_MAX
+    )
+        raise_error("Failed to convert '%s' to uint", value);
+
+    return result;
 }
 
 int str_to_int(const char *value) {
-    return (int) strtol(value, nullptr, 10);
+    return (int) str_to_long(value);
+}
+
+unsigned int str_to_uint(const char *value) {
+    return (unsigned int) str_to_ulong(value);
 }

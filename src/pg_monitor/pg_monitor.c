@@ -97,6 +97,7 @@ MonitorParameters parameters = {
     .hosts = default_hosts_str,
     .port = "6432",
     .connect_timeout = "2",
+    .sleep = 5,
 };
 
 void replace_from_env(const char *env_name, char **result) {
@@ -122,6 +123,11 @@ void get_values_from_env(void) {
     replace_from_env("pg_status__connect_timeout", &parameters.connect_timeout);
 
     replace_from_env_copy("pg_status__hosts", &parameters.hosts);
+
+    const char *env_val = getenv("pg_status__sleep");
+    if (env_val != nullptr && *env_val) {
+        parameters.sleep = str_to_uint(env_val);
+    }
 }
 
 ConnectionStrings get_connection_strings(void) {
@@ -232,16 +238,7 @@ void *pg_monitor_thread(void *arg) {
 
     while (atomic_load(&pg_monitor_running)) {
         check_hosts(con_str_list);
-
-        // const MonitorStatus *cur_stat = atomic_load_explicit(
-        //     &monitor_status, memory_order_acquire
-        // );
-        // printf("master: %s\n", cur_stat -> master);
-        // for (uint i = 0; i < cur_stat->replicas_cnt; i++) {
-        //     printf("replica: %s\n", cur_stat -> replicas[i].host);
-        // }
-        // printf("\n");
-        sleep(5);
+        sleep(parameters.sleep);
     }
     return nullptr;
 }

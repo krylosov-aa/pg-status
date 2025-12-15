@@ -22,6 +22,7 @@ typedef struct MonitorParameters {
     char *hosts;
     char *port;
     char *connect_timeout;
+    unsigned int sleep;
 } MonitorParameters;
 
 
