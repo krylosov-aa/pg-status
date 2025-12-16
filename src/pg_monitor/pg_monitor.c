@@ -168,13 +168,12 @@ _Atomic(MonitorStatus *) monitor_status = nullptr;
 
 MonitorStatus buffers[2];
 
-void init_buffers(const unsigned int replicas_count) {
+void init_buffers(const unsigned int hosts_cnt) {
     for (int i = 0; i < 2; i++) {
         buffers[i].master = "null";
-        buffers[i].replicas_cnt = replicas_count;
-        buffers[i].replicas = calloc(
-            replicas_count, sizeof(ReplicaStatus)
-        );
+        buffers[i].replicas = calloc(hosts_cnt, sizeof(char *));
+        buffers[i].liveness = calloc(hosts_cnt, sizeof(HostLiveness));
+        buffers[i].cnt = hosts_cnt;
     }
 
     atomic_store_explicit(&monitor_status, &buffers[0], memory_order_release);
@@ -183,7 +182,14 @@ void init_buffers(const unsigned int replicas_count) {
 void reset_inactive(MonitorStatus *inactive) {
     inactive -> master = "null";
     memset(
-        inactive->replicas, 0, inactive->replicas_cnt * sizeof(ReplicaStatus)
+        inactive -> replicas,
+        0,
+        inactive -> cnt * sizeof(char *)
+    );
+    memset(
+        inactive -> liveness,
+        0,
+        inactive -> cnt * sizeof(HostLiveness)
     );
 }
 
@@ -199,29 +205,40 @@ MonitorStatus *prep_inactive(void) {
 void check_hosts(const ConnectionStrings con_str_list) {
     MonitorStatus *inactive = prep_inactive();
 
-    ReplicaStatus *replicas_cursor = inactive -> replicas;
+    char **replicas_cursor = inactive -> replicas;
+    HostLiveness *liveness_cursor = inactive -> liveness;
 
     for (uint i = 0; i < con_str_list.cnt; i++) {
         bool is_replica = true;
+        char *host = con_str_list.hosts[i];
         const int exit_val = is_host_in_recovery(
             con_str_list.connection_str[i],
             &is_replica
         );
 
         if (exit_val == 0) {
+            liveness_cursor -> host = host;
+            liveness_cursor -> alive = true;
+            liveness_cursor++;
+
             if (is_replica) {
-                printf("%s: relica\n", con_str_list.hosts[i]);
-                replicas_cursor -> host = con_str_list.hosts[i];
+                printf("%s: replica\n", host);
+                *replicas_cursor = host;
                 replicas_cursor++;
             }
             else {
-                printf("%s: master\n", con_str_list.hosts[i]);
-                inactive -> master = con_str_list.hosts[i];
+                printf("%s: master\n", host);
+                inactive -> master = host;
             }
         }
-        else
-            printf("%s: dead\n", con_str_list.hosts[i]);
+        else {
+            printf("%s: dead\n", host);
+            liveness_cursor -> host = host;
+            liveness_cursor -> alive = false;
+            liveness_cursor++;
+        }
     }
+    printf("\n");
 
     atomic_store_explicit(&monitor_status, inactive, memory_order_release);
 }
@@ -243,7 +260,7 @@ void *pg_monitor_thread(void *arg) {
     (void)arg;
 
     const ConnectionStrings con_str_list = get_connection_strings();
-    init_buffers(con_str_list.cnt - 1);
+    init_buffers(con_str_list.cnt);
 
     while (atomic_load(&pg_monitor_running)) {
         check_hosts(con_str_list);

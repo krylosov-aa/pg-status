@@ -27,14 +27,16 @@ typedef struct MonitorParameters {
 } MonitorParameters;
 
 
-typedef struct ReplicaStatus {
+typedef struct HostLiveness {
     char *host;
-} ReplicaStatus;
+    bool alive;
+} HostLiveness;
 
 typedef struct MonitorStatus {
     char *master;
-    ReplicaStatus *replicas;
-    unsigned int replicas_cnt;
+    char **replicas;
+    HostLiveness *liveness;
+    unsigned int cnt;
     // TODO may be need refcounter
 } MonitorStatus;
 
