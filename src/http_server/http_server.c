@@ -21,6 +21,15 @@ MHD_Result not_found(HTTPResponse *response) {
     return MHD_YES;
 }
 
+void set_content_type_header(const HTTPResponse *response) {
+    if (response != nullptr && response -> content_type != nullptr) {
+        MHD_add_response_header(
+            response->mhd_response,
+            "Content-Type",
+            response -> content_type
+        );
+    }
+}
 
 MHD_Result queue_response(
     MHD_Connection *connection,
@@ -29,11 +38,7 @@ MHD_Result queue_response(
 ) {
     MHD_Result ret = MHD_NO;
     if (response->mhd_response) {
-        MHD_add_response_header(
-            response->mhd_response,
-            "Content-Type",
-            "application/json"
-        );
+        set_content_type_header(response);
         ret = MHD_queue_response(
             connection, response->status_code, response->mhd_response
         );
@@ -129,6 +134,17 @@ MHD_Result process_handler(
     return result;
 }
 
+
+HTTPResponse *allocate_response(void) {
+    HTTPResponse *response = malloc(sizeof(HTTPResponse));
+    if (response != nullptr) {
+        response -> mhd_response = nullptr;
+        response -> content_type = nullptr;
+        response -> status_code = 200;
+    }
+    return response;
+}
+
 MHD_Result process_get(
   void *cls,
   MHD_Connection *connection,
@@ -138,7 +154,7 @@ MHD_Result process_get(
   const char *upload_data,
   void **req_cls
 ) {
-    HTTPResponse *response = malloc(sizeof(HTTPResponse));
+    HTTPResponse *response = allocate_response();
     *req_cls = (void *) response;
 
     return process_handler(path, method, response, connection);
@@ -156,7 +172,7 @@ MHD_Result process_post(
 ) {
     HTTPResponse *response;
     if (*req_cls == nullptr) {
-        response = malloc(sizeof(HTTPResponse));
+        response = allocate_response();
         *req_cls = (void *) response;
         return MHD_YES;
     }

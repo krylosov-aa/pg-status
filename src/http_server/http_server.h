@@ -12,6 +12,7 @@ typedef enum MHD_RequestTerminationCode MHD_RequestTerminationCode;
 
 typedef struct HTTPResponse {
     MHD_Response *mhd_response;
+    char *content_type;
     unsigned int status_code;
 } HTTPResponse;
 

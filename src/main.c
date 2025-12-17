@@ -7,13 +7,27 @@
 
 
 
-MHD_Result get_master(HTTPResponse *response) {
+MHD_Result get_master_json(HTTPResponse *response) {
     const MonitorStatus *cur_stat = get_cur_stat();
     char *resp = format_string("{\"host\": \"%s\"}", cur_stat -> master);
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         strlen(resp),
         (void*) resp,
         MHD_RESPMEM_MUST_FREE
+    );
+    response->mhd_response = mhd_response;
+    response->status_code = MHD_HTTP_OK;
+    response->content_type = "application/json";
+    return MHD_YES;
+}
+
+MHD_Result get_master_plain(HTTPResponse *response) {
+    const MonitorStatus *cur_stat = get_cur_stat();
+    char *resp = cur_stat -> master;
+    MHD_Response *mhd_response = MHD_create_response_from_buffer(
+        strlen(resp),
+        (void*) resp,
+        MHD_RESPMEM_MUST_COPY
     );
     response->mhd_response = mhd_response;
     response->status_code = MHD_HTTP_OK;
@@ -25,9 +39,10 @@ int main(void) {
     start_pg_monitor();
 
     Route routes[] = {
-        { "GET", "/master", get_master }
+        { "GET", "/master_json", get_master_json },
+        { "GET", "/master_plain", get_master_plain },
     };
-    MHD_Daemon *daemon = start_http_server(8000, routes, 1);
+    MHD_Daemon *daemon = start_http_server(8000, routes, 2);
 
     getchar();
 
