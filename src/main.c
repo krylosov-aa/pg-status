@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <signal.h>
 
 
 MHD_Result get_master_json(HTTPResponse *response) {
@@ -36,6 +36,17 @@ MHD_Result get_master_plain(HTTPResponse *response) {
 
 
 int main(void) {
+    sigset_t sigset;
+    int sig;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGINT);
+    sigaddset(&sigset, SIGTERM);
+
+    if (pthread_sigmask(SIG_BLOCK, &sigset, nullptr) != 0) {
+        perror("pthread_sigmask");
+        return 1;
+    }
+
     start_pg_monitor();
 
     Route routes[] = {
@@ -44,7 +55,12 @@ int main(void) {
     };
     MHD_Daemon *daemon = start_http_server(8000, routes, 2);
 
-    getchar();
+    if (sigwait(&sigset, &sig) == 0) {
+        if (sig == SIGINT)
+            printf("SIGINT\n");
+        else if (sig == SIGTERM)
+            printf("SIGTERM\n");
+    }
 
     stop_pg_monitor();
     stop_http_server(daemon);

@@ -12,6 +12,14 @@ typedef struct FileDescriptor {
 
 FileDescriptor open_file(const char *path);
 
+#ifndef __printflike
+#  ifdef __GNUC__
+#    define __printflike(fmtpos, argpos) __attribute__((format(printf, fmtpos, argpos)))
+#  else
+#    define __printflike(fmtpos, argpos)
+#  endif
+#endif
+
 void printf_error(const char *format, ...) __printflike(1, 2);
 
 void raise_error(const char *format, ...) __printflike(1, 2);

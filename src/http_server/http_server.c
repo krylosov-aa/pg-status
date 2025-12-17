@@ -15,7 +15,9 @@ Routes *routes_list = nullptr;
 
 
 MHD_Result not_found(HTTPResponse *response) {
-    MHD_Response *mhd_response = MHD_create_response_empty(MHD_RF_NONE);
+    MHD_Response *mhd_response = MHD_create_response_from_buffer(
+        0, NULL, MHD_RESPMEM_PERSISTENT
+    );
     response->mhd_response = mhd_response;
     response->status_code = MHD_HTTP_NOT_FOUND;
     return MHD_YES;
@@ -43,7 +45,7 @@ MHD_Result queue_response(
             connection, response->status_code, response->mhd_response
         );
         if (ret == MHD_YES) {
-            printf("%s %s\n", method, path);
+            // printf("%s %s\n", method, path);
         } else {
             printf_error(
                 "Failed to MHD_queue_response %s %s", method, path
@@ -210,14 +212,13 @@ MHD_Daemon *start_http_server(
     routes_list -> cnt = cnt_routes;
 
     MHD_Daemon *daemon = MHD_start_daemon(
-        MHD_USE_AUTO_INTERNAL_THREAD
-        | MHD_USE_ERROR_LOG,
+        MHD_USE_AUTO_INTERNAL_THREAD |
+        MHD_USE_ERROR_LOG,
         port, nullptr, nullptr,
         answer_to_connection, nullptr,
-        // MHD_OPTION_THREAD_POOL_SIZE, 2,
         MHD_OPTION_NOTIFY_COMPLETED, request_completed, nullptr,
         // MHD_OPTION_NOTIFY_CONNECTION, notify_connection_callback, nullptr,
-        MHD_OPTION_CONNECTION_MEMORY_LIMIT, 131072, // 128*1024
+        MHD_OPTION_CONNECTION_MEMORY_LIMIT, 16 * 1024,
         MHD_OPTION_END
     );
     if (!daemon) {

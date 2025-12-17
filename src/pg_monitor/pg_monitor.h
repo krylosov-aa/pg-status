@@ -2,7 +2,7 @@
 #define PG_STATUS_PG_MONITOR_H
 
 # define MAX_HOSTS 10
-#include <sys/_pthread/_pthread_t.h>
+#include <pthread.h>
 
 typedef struct Hosts {
     char *hosts[MAX_HOSTS];

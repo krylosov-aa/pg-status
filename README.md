@@ -19,7 +19,7 @@ It always serves data directly from memory and responds extremely quickly, so it
 
 ## Performance
 
-The measurements were taken inside a Docker container running the latest version of Alpine.
+The measurements were taken inside a Docker container running the 3.20 version of alpine.
 
 The load was generated from the host machine using `hey` for 30 seconds with 2 threads.
 

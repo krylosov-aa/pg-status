@@ -1,7 +1,12 @@
 #include "pg_monitor.h"
 #include "utils.h"
 
-#include <libpq-fe.h>
+#if __APPLE__
+    #include <libpq-fe.h>
+#else
+    #include <postgresql/libpq-fe.h>
+#endif
+
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdlib.h>

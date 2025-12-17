@@ -11,4 +11,8 @@ target_link_libraries(main
         pg_monitor
 )
 
+if(UNIX AND NOT APPLE)
+    target_link_libraries(main PRIVATE pq microhttpd)
+endif()
+
 target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
