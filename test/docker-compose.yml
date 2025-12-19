@@ -1,0 +1,66 @@
+services:
+  pg-status:
+    image: pg-status:latest
+    ports:
+      - 8001:8000
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 6M
+        reservations:
+          cpus: "0.1"
+          memory: 6M
+    restart: unless-stopped
+    environment:
+      - pg_status__connect_timeout=2
+      - pg_status__hosts=postgres_master,postgres_replica
+      - pg_status__pg_database=postgres
+      - pg_status__pg_password=postgres
+      - pg_status__pg_user=postgres
+      - pg_status__port=5432
+      - pg_status__sleep=5
+    networks:
+      - net
+  postgres_master:
+    build:
+      context: ./master
+    ports:
+      - 5433:5432
+    container_name: postgres_master
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - REPLICATION_ROLE=master
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+    networks:
+      - net
+
+  postgres_replica:
+    build:
+      context: ./replica
+    ports:
+      - 5434:5432
+    container_name: postgres_replica
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - REPLICATION_ROLE=replica
+      - MASTER_HOST=postgres_master
+      - MASTER_USER=replicator
+      - MASTER_PASSWORD=postgres
+    depends_on:
+      - postgres_master
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+    networks:
+        - net
+networks:
+  net:
