@@ -23,4 +23,5 @@ add_compile_options(
         -Wno-unused-parameter
 )
 
+find_package(PkgConfig REQUIRED)
 add_subdirectory(src)
