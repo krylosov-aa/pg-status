@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
     environment:
       - pg_status__connect_timeout=2
-      - pg_status__hosts=postgres_master,postgres_replica
+      - pg_status__hosts=pg-proxy-1,pg-proxy-2
       - pg_status__pg_database=postgres
       - pg_status__pg_password=postgres
       - pg_status__pg_user=postgres
@@ -22,6 +22,7 @@ services:
       - pg_status__sleep=5
     networks:
       - net
+
   postgres_master:
     build:
       context: ./master
@@ -62,5 +63,40 @@ services:
       retries: 10
     networks:
         - net
+
+  pg-proxy-1:
+    build:
+      context: ./haproxy-master
+    container_name: pg-proxy-1
+    ports:
+      - "5435:5432"
+    networks:
+      - net
+    depends_on:
+      - postgres_master
+      - postgres_replica
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy-master.sock || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  pg-proxy-2:
+    build:
+      context: ./haproxy-replica
+    container_name: pg-proxy-2
+    ports:
+      - "5436:5432"
+    networks:
+      - net
+    depends_on:
+      - postgres_master
+      - postgres_replica
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy-master.sock || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 networks:
   net:
