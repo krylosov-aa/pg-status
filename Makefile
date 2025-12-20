@@ -15,3 +15,9 @@ down:
 build_up:
 	make build
 	make up
+
+1-master:
+	./test/pg-proxy-1_is_master.sh
+
+2-master:
+	./test/pg-proxy-2_is_master.sh
