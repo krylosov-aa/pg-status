@@ -1,9 +1,6 @@
 add_library(pg_monitor pg_monitor.c)
 
-
 target_link_libraries(pg_monitor PUBLIC utils)
-
-find_package(PkgConfig QUIET)
 
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(LIBPQ libpq QUIET)

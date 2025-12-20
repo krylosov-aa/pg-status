@@ -4,11 +4,14 @@ add_subdirectory(pg_monitor)
 
 add_executable(main main.c)
 
+pkg_check_modules(CJSON REQUIRED IMPORTED_TARGET libcjson)
+
 target_link_libraries(main
         PRIVATE
         utils
         http_server
         pg_monitor
+        PkgConfig::CJSON
 )
 
 if(UNIX AND NOT APPLE)
