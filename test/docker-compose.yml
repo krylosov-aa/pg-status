@@ -11,6 +11,8 @@ services:
         reservations:
           cpus: "0.1"
           memory: 6M
+    networks:
+      - net
     restart: unless-stopped
     environment:
       - pg_status__connect_timeout=2
@@ -20,8 +22,6 @@ services:
       - pg_status__pg_user=postgres
       - pg_status__port=5432
       - pg_status__sleep=5
-    networks:
-      - net
 
   postgres_master:
     build:
@@ -29,6 +29,8 @@ services:
     ports:
       - 5433:5432
     container_name: postgres_master
+    networks:
+      - net
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -38,8 +40,6 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       retries: 10
-    networks:
-      - net
 
   postgres_replica:
     build:
@@ -47,6 +47,10 @@ services:
     ports:
       - 5434:5432
     container_name: postgres_replica
+    depends_on:
+      - postgres_master
+    networks:
+        - net
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -55,14 +59,10 @@ services:
       - MASTER_HOST=postgres_master
       - MASTER_USER=replicator
       - MASTER_PASSWORD=postgres
-    depends_on:
-      - postgres_master
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       retries: 10
-    networks:
-        - net
 
   pg-proxy-1:
     build:
