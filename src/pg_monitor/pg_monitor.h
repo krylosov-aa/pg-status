@@ -4,6 +4,8 @@
 # define MAX_HOSTS 10
 #include <pthread.h>
 
+int is_host_in_recovery(const char* connection_str, bool* result);
+
 typedef struct Hosts {
     char *hosts[MAX_HOSTS];
     unsigned int cnt;
@@ -42,7 +44,7 @@ typedef struct MonitorStatus {
 
 ConnectionStrings get_connection_strings(void);
 
-void check_hosts(ConnectionStrings con_str_list);
+MonitorParameters parameters;
 
 const MonitorStatus *get_cur_stat(void);
 
