@@ -1,4 +1,6 @@
-add_library(pg_monitor pg_monitor.c)
+add_library(pg_monitor pg_monitor.c
+        sql_utils.c
+        sql_parameters.c)
 
 target_link_libraries(pg_monitor PUBLIC utils)
 
