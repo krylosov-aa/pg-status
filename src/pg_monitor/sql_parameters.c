@@ -122,3 +122,7 @@ ConnectionStrings get_connection_strings(void) {
 
     return result;
 }
+
+unsigned int get_sleep_time(void) {
+    return parameters.sleep;
+}

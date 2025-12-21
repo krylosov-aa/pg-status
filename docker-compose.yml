@@ -1,22 +1,25 @@
 services:
-    pg-status:
-        image: pg-status:latest
-        ports:
-          - 8000:8000
-        deploy:
-            resources:
-                limits:
-                    cpus: "0.1"
-                    memory: 6M
-                reservations:
-                    cpus: "0.1"
-                    memory: 6M
-        restart: unless-stopped
-        environment:
-            - pg_status__connect_timeout=${pg_status__connect_timeout}
-            - pg_status__hosts=${pg_status__hosts}
-            - pg_status__pg_database=${pg_status__pg_database}
-            - pg_status__pg_password=${pg_status__pg_password}
-            - pg_status__pg_user=${pg_status__pg_user}
-            - pg_status__port=${pg_status__port}
-            - pg_status__sleep=${pg_status__sleep}
+  pg-status:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pg-status:latest
+    ports:
+      - 8000:8000
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 6M
+        reservations:
+          cpus: "0.1"
+          memory: 6M
+    restart: unless-stopped
+    environment:
+      - pg_status__connect_timeout=${pg_status__connect_timeout}
+      - pg_status__hosts=${pg_status__hosts}
+      - pg_status__pg_database=${pg_status__pg_database}
+      - pg_status__pg_password=${pg_status__pg_password}
+      - pg_status__pg_user=${pg_status__pg_user}
+      - pg_status__port=${pg_status__port}
+      - pg_status__sleep=${pg_status__sleep}

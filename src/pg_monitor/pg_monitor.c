@@ -110,7 +110,7 @@ void *pg_monitor_thread(void *arg) {
 
     while (atomic_load(&pg_monitor_running)) {
         check_hosts(con_str_list);
-        sleep(parameters.sleep);
+        sleep(get_sleep_time());
     }
     return nullptr;
 }

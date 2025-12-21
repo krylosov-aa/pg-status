@@ -6,7 +6,8 @@ RUN apk add --no-cache \
         cmake \
         pkgconfig \
         libpq-dev \
-        libmicrohttpd-dev
+        libmicrohttpd-dev \
+        cjson-dev
 
 WORKDIR /app
 
@@ -21,7 +22,8 @@ FROM alpine:3.20
 
 RUN apk add --no-cache \
         libpq \
-        libmicrohttpd
+        libmicrohttpd \
+        cjson
 
 WORKDIR /app
 

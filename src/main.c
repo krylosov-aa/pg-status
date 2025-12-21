@@ -1,6 +1,5 @@
 #include "http_server.h"
 #include "pg_monitor.h"
-#include "utils.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>

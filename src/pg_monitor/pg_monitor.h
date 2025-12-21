@@ -44,7 +44,7 @@ typedef struct MonitorStatus {
 
 ConnectionStrings get_connection_strings(void);
 
-MonitorParameters parameters;
+unsigned int get_sleep_time(void);
 
 const MonitorStatus *get_cur_stat(void);
 
