@@ -27,7 +27,7 @@ void set_content_type_header(const HTTPResponse *response) {
     if (response != nullptr && response -> content_type != nullptr) {
         MHD_add_response_header(
             response->mhd_response,
-            "Content-Type",
+            MHD_HTTP_HEADER_CONTENT_TYPE,
             response -> content_type
         );
     }
@@ -89,7 +89,11 @@ void request_completed(
             break;
     }
     if (*req_cls) {
-        free(*req_cls);
+        HTTPResponse *response = *req_cls;
+        char *content_type = response -> content_type;
+        if (content_type != nullptr)
+            free(content_type);
+        free(response);
     }
 }
 
@@ -128,6 +132,13 @@ MHD_Result process_handler(
 ) {
     MHD_Result result = MHD_NO;
     const request_handler_t handler = find_handler(method, path);
+
+    const char *content_type = MHD_lookup_connection_value(
+        connection, MHD_HEADER_KIND, MHD_HTTP_HEADER_CONTENT_TYPE
+    );
+    if (content_type != nullptr)
+        response -> content_type = copy_string(content_type);
+
     result = handler(response);
 
     if (response -> mhd_response) {

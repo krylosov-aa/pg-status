@@ -1,11 +1,14 @@
 #include "http_server.h"
 #include "pg_monitor.h"
+#include "utils.h"
+
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <cjson/cJSON.h>
+
 
 cJSON *host_to_json(const char *host) {
     cJSON *obj = cJSON_CreateObject();
@@ -58,11 +61,16 @@ MHD_Result get_master_json(HTTPResponse *response) {
     );
     response->mhd_response = mhd_response;
     response->status_code = MHD_HTTP_OK;
-    response->content_type = "application/json";
     return MHD_YES;
 }
 
-MHD_Result get_master_plain(HTTPResponse *response) {
+MHD_Result get_master(HTTPResponse *response) {
+    if (
+        response -> content_type &&
+        is_equal_strings(response -> content_type, "application/json")
+    )
+        return get_master_json(response);
+
     const MonitorStatus *cur_stat = get_cur_stat();
     char *resp = cur_stat -> master;
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
@@ -87,7 +95,7 @@ MHD_Result get_replicas_json(HTTPResponse *response) {
     );
     response->mhd_response = mhd_response;
     response->status_code = MHD_HTTP_OK;
-    response->content_type = "application/json";
+    response->content_type = format_string("application/json");
     return MHD_YES;
 }
 
@@ -107,8 +115,7 @@ int main(void) {
     start_pg_monitor();
 
     Route routes[] = {
-        { "GET", "/master_json", get_master_json },
-        { "GET", "/master_plain", get_master_plain },
+        { "GET", "/master", get_master },
         { "GET", "/replicas_json", get_replicas_json },
     };
     MHD_Daemon *daemon = start_http_server(8000, routes, 3);

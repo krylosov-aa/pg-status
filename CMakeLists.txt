@@ -9,18 +9,17 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 add_compile_options(
-
-        -Wall
-        -Wextra
-        -Wpedantic
-#        -Werror
-        -Wconversion
-        -Wshadow
-        -Wpointer-arith
-        -Wstrict-prototypes
-        -Wformat=2
-        -Wundef
-        -Wno-unused-parameter
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Werror
+    -Wconversion
+    -Wshadow
+    -Wpointer-arith
+    -Wstrict-prototypes
+    -Wformat=2
+    -Wundef
+    -Wno-unused-parameter
 )
 
 find_package(PkgConfig REQUIRED)
