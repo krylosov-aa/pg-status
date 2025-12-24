@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <sys/fcntl.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 /*Opens file descriptor in blocking mode and gets fstat*/

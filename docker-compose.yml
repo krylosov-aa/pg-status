@@ -1,8 +1,5 @@
 services:
   pg-status:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: pg-status:latest
     ports:
       - 8000:8000

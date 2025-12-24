@@ -1,9 +1,8 @@
 services:
   pg-status:
-    build:
-      context: ..
+    image: pg-status:latest
     ports:
-      - 8001:8000
+      - 8000:8000
     deploy:
       resources:
         limits:

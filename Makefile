@@ -16,6 +16,10 @@ build_up:
 	make build
 	make up
 
+build_up_test:
+	make build
+	docker-compose -f test/docker-compose.yml up -d
+
 1-master:
 	./test/pg-proxy-1_is_master.sh
 
