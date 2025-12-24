@@ -3,19 +3,9 @@
 
 # define MAX_HOSTS 10
 #include <pthread.h>
+#include <stdatomic.h>
 
 int is_host_in_recovery(const char* connection_str, bool* result);
-
-typedef struct Hosts {
-    char *hosts[MAX_HOSTS];
-    unsigned int cnt;
-} Hosts;
-
-typedef struct ConnectionStrings {
-    char *connection_str[MAX_HOSTS];
-    char *hosts[MAX_HOSTS];
-    unsigned int cnt;
-} ConnectionStrings;
 
 typedef struct MonitorParameters {
     char *user;
@@ -26,30 +16,26 @@ typedef struct MonitorParameters {
     char *port;
     char *connect_timeout;
     unsigned int sleep;
+    unsigned int max_fails;
 } MonitorParameters;
 
-
-typedef struct HostLiveness {
-    char *host;
-    bool alive;
-} HostLiveness;
-
 typedef struct MonitorStatus {
-    char *master;
-    char **replicas;
-    HostLiveness *liveness;
-    unsigned int cnt;
-    // TODO may be need refcounter
+    char *host;
+    char *connection_str;
+    struct MonitorStatus *next;
+    unsigned int failed_connections;
+    atomic_bool is_master;
+    atomic_bool alive;
 } MonitorStatus;
-
-ConnectionStrings get_connection_strings(void);
-
-unsigned int get_sleep_time(void);
-
-const MonitorStatus *get_cur_stat(void);
 
 pthread_t start_pg_monitor();
 
 void stop_pg_monitor(void);
+
+char *get_master_host(void);
+
+MonitorStatus *get_monitor_status(void);
+
+bool get_bool_atomic(const atomic_bool *ptr);
 
 #endif //PG_STATUS_PG_MONITOR_H

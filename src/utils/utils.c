@@ -161,3 +161,23 @@ int str_to_int(const char *value) {
 unsigned int str_to_uint(const char *value) {
     return (unsigned int) str_to_ulong(value);
 }
+
+void replace_from_env(const char *env_name, char **result) {
+    char *env_val = getenv(env_name);
+    if (env_val && *env_val)
+        *result = env_val;
+}
+
+void replace_from_env_uint(const char *env_name, unsigned int *result) {
+    const char *env_val = getenv(env_name);
+    if (env_val && *env_val)
+        *result = str_to_uint(env_val);
+}
+
+void replace_from_env_copy(const char *env_name, char **result) {
+    const char *env_val = getenv(env_name);
+    if (env_val != nullptr && *env_val) {
+        char *env_val_copy = copy_string(env_val);
+        *result = env_val_copy;
+    }
+}

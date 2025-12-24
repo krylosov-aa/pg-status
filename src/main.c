@@ -9,39 +9,24 @@
 #include <stdlib.h>
 #include <cjson/cJSON.h>
 
-
-cJSON *host_to_json(const char *host) {
-    cJSON *obj = cJSON_CreateObject();
-    if (!obj) {
-        return nullptr;
-    }
-
-    if (!cJSON_AddStringToObject(obj, "host", host)) {
-        cJSON_Delete(obj);
-        return nullptr;
-    }
-    return obj;
-}
-
-cJSON *hosts_to_json(char **hosts, const size_t count) {
+cJSON *json_array(void) {
     cJSON *arr = cJSON_CreateArray();
     if (!arr)
-        return nullptr;
-
-    for (size_t i = 0; i < count; i++) {
-        if (!hosts[i])
-            continue;
-
-        cJSON *obj = host_to_json(hosts[i]);
-        if (!obj) {
-            cJSON_Delete(arr);
-            return nullptr;
-        }
-
-        cJSON_AddItemToArray(arr, obj);
-    }
-
+        raise_error("Can't create json array");
     return arr;
+}
+
+cJSON *json_object(void) {
+    cJSON *arr = cJSON_CreateObject();
+    if (!arr)
+        raise_error("Can't create json object");
+    return arr;
+}
+
+void add_str_to_json_object(cJSON * obj, const char *key, const char *val) {
+    if (!cJSON_AddStringToObject(obj, key, val)) {
+        raise_error("Can't add str to object");
+    }
 }
 
 char *json_to_str(cJSON *json) {
@@ -50,9 +35,31 @@ char *json_to_str(cJSON *json) {
     return result;
 }
 
+cJSON *host_to_json(const char *host) {
+    cJSON *obj = json_object();
+    add_str_to_json_object(obj, "host", host);
+    return obj;
+}
+
+cJSON *hosts_to_json(const MonitorStatus *cursor) {
+    cJSON *arr = json_array();
+
+    while (cursor) {
+        if (
+            get_bool_atomic(&cursor -> alive) &&
+            !get_bool_atomic(&cursor -> is_master)
+        ) {
+            cJSON_AddItemToArray(arr, host_to_json(cursor -> host));
+        }
+        cursor = cursor -> next;
+    }
+
+    return arr;
+}
+
 MHD_Result get_master_json(HTTPResponse *response) {
-    const MonitorStatus *cur_stat = get_cur_stat();
-    cJSON *json = host_to_json(cur_stat -> master);
+    char *master = get_master_host();
+    cJSON *json = host_to_json(master);
     char *resp = json_to_str(json);
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         strlen(resp),
@@ -71,8 +78,7 @@ MHD_Result get_master(HTTPResponse *response) {
     )
         return get_master_json(response);
 
-    const MonitorStatus *cur_stat = get_cur_stat();
-    char *resp = cur_stat -> master;
+    char *resp = get_master_host();
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         strlen(resp),
         (void*) resp,
@@ -85,8 +91,8 @@ MHD_Result get_master(HTTPResponse *response) {
 
 
 MHD_Result get_replicas_json(HTTPResponse *response) {
-    const MonitorStatus *cur_stat = get_cur_stat();
-    cJSON *json = hosts_to_json(cur_stat -> replicas, cur_stat -> cnt);
+    const MonitorStatus *stat = get_monitor_status();
+    cJSON *json = hosts_to_json(stat);
     char *resp = json_to_str(json);
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         strlen(resp),
@@ -116,9 +122,9 @@ int main(void) {
 
     Route routes[] = {
         { "GET", "/master", get_master },
-        { "GET", "/replicas_json", get_replicas_json },
+        { "GET", "/replicas", get_replicas_json },
     };
-    MHD_Daemon *daemon = start_http_server(8000, routes, 3);
+    MHD_Daemon *daemon = start_http_server(8000, routes, 2);
 
     if (sigwait(&sigset, &sig) == 0) {
         if (sig == SIGINT)

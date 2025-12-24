@@ -1,5 +1,4 @@
 add_library(pg_monitor
-        sql_parameters.c
         sql_utils.c
         pg_monitor.c
 )
