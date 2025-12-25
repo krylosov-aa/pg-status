@@ -38,4 +38,8 @@ MonitorStatus *get_monitor_status(void);
 
 bool get_bool_atomic(const atomic_bool *ptr);
 
+bool is_alive_replica(const MonitorStatus *host);
+
+char *round_robin_replica(void);
+
 #endif //PG_STATUS_PG_MONITOR_H

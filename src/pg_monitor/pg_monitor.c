@@ -101,6 +101,38 @@ MonitorStatus *get_monitor_status(void) {
     return monitor_status;
 }
 
+bool is_alive_replica(const MonitorStatus *host) {
+    return (
+        get_bool_atomic(&host -> alive) &&
+        !get_bool_atomic(&host -> is_master)
+    );
+}
+
+_Atomic (MonitorStatus *) last_random_replica = nullptr;
+
+char *round_robin_replica(void) {
+    MonitorStatus *cursor = atomic_load_explicit(
+        &last_random_replica, memory_order_acquire
+    );
+    if (!cursor || !cursor -> next)
+        cursor = get_monitor_status();
+    else
+        cursor = cursor -> next;
+
+    unsigned int i = 0;
+    while (!is_alive_replica(cursor)) {
+        cursor = cursor -> next;
+        if (!cursor)
+            cursor = get_monitor_status();
+        i++;
+        if (i == MAX_HOSTS)
+            break;
+    }
+    atomic_store_explicit(&last_random_replica, cursor, memory_order_release);
+
+    return i < MAX_HOSTS ? cursor -> host: "null";
+}
+
 void init_monitor_status(void) {
     get_values_from_env();
 
