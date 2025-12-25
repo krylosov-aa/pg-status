@@ -108,7 +108,7 @@ MHD_Result get_random_replica_json(HTTPResponse *response) {
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         strlen(resp),
         (void*) resp,
-        MHD_RESPMEM_PERSISTENT
+        MHD_RESPMEM_MUST_FREE
     );
     response->mhd_response = mhd_response;
     response->status_code = MHD_HTTP_OK;
