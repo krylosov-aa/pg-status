@@ -41,20 +41,96 @@ cJSON *host_to_json(const char *host) {
     return obj;
 }
 
-cJSON *hosts_to_json(const MonitorStatus *cursor) {
+bool is_alive_replica(const MonitorStatus *host) {
+    return (
+        get_bool_atomic(&host -> alive) &&
+        !get_bool_atomic(&host -> is_master)
+    );
+}
+
+cJSON *replicas_to_json(const MonitorStatus *cursor) {
     cJSON *arr = json_array();
 
     while (cursor) {
-        if (
-            get_bool_atomic(&cursor -> alive) &&
-            !get_bool_atomic(&cursor -> is_master)
-        ) {
+        if (is_alive_replica(cursor))
             cJSON_AddItemToArray(arr, host_to_json(cursor -> host));
-        }
         cursor = cursor -> next;
     }
 
     return arr;
+}
+
+
+MHD_Result get_replicas_json(HTTPResponse *response) {
+    const MonitorStatus *stat = get_monitor_status();
+    cJSON *json = replicas_to_json(stat);
+    char *resp = json_to_str(json);
+    MHD_Response *mhd_response = MHD_create_response_from_buffer(
+        strlen(resp),
+        (void*) resp,
+        MHD_RESPMEM_MUST_FREE
+    );
+    response->mhd_response = mhd_response;
+    response->status_code = MHD_HTTP_OK;
+    response->content_type = format_string("application/json");
+    return MHD_YES;
+}
+
+_Atomic (MonitorStatus *) last_random_replica = nullptr;
+
+char *round_robin_replica(void) {
+    MonitorStatus *cursor = atomic_load_explicit(
+        &last_random_replica, memory_order_acquire
+    );
+    if (!cursor || !cursor -> next)
+        cursor = get_monitor_status();
+    else
+        cursor = cursor -> next;
+
+    unsigned int i = 0;
+    while (!is_alive_replica(cursor)) {
+        cursor = cursor -> next;
+        if (!cursor)
+            cursor = get_monitor_status();
+        i++;
+        if (i == MAX_HOSTS)
+            break;
+    }
+    atomic_store_explicit(&last_random_replica, cursor, memory_order_release);
+
+    return i < MAX_HOSTS ? cursor -> host: "null";
+}
+
+MHD_Result get_random_replica_json(HTTPResponse *response) {
+    char *host = round_robin_replica();
+    cJSON *json = host_to_json(host);
+    char *resp = json_to_str(json);
+    MHD_Response *mhd_response = MHD_create_response_from_buffer(
+        strlen(resp),
+        (void*) resp,
+        MHD_RESPMEM_PERSISTENT
+    );
+    response->mhd_response = mhd_response;
+    response->status_code = MHD_HTTP_OK;
+    return MHD_YES;
+}
+
+MHD_Result get_random_replica(HTTPResponse *response) {
+    if (
+        response -> content_type &&
+        is_equal_strings(response -> content_type, "application/json")
+    )
+        return get_random_replica_json(response);
+
+    char *resp = round_robin_replica();
+    MHD_Response *mhd_response = MHD_create_response_from_buffer(
+        strlen(resp),
+        (void*) resp,
+        MHD_RESPMEM_PERSISTENT
+    );
+    response->mhd_response = mhd_response;
+    response->status_code = MHD_HTTP_OK;
+    return MHD_YES;
 }
 
 MHD_Result get_master_json(HTTPResponse *response) {
@@ -90,22 +166,6 @@ MHD_Result get_master(HTTPResponse *response) {
 }
 
 
-MHD_Result get_replicas_json(HTTPResponse *response) {
-    const MonitorStatus *stat = get_monitor_status();
-    cJSON *json = hosts_to_json(stat);
-    char *resp = json_to_str(json);
-    MHD_Response *mhd_response = MHD_create_response_from_buffer(
-        strlen(resp),
-        (void*) resp,
-        MHD_RESPMEM_MUST_FREE
-    );
-    response->mhd_response = mhd_response;
-    response->status_code = MHD_HTTP_OK;
-    response->content_type = format_string("application/json");
-    return MHD_YES;
-}
-
-
 int main(void) {
     sigset_t sigset;
     int sig;
@@ -123,8 +183,9 @@ int main(void) {
     Route routes[] = {
         { "GET", "/master", get_master },
         { "GET", "/replicas", get_replicas_json },
+        { "GET", "/replica", get_random_replica },
     };
-    MHD_Daemon *daemon = start_http_server(8000, routes, 2);
+    MHD_Daemon *daemon = start_http_server(8000, routes, 3);
 
     if (sigwait(&sigset, &sig) == 0) {
         if (sig == SIGINT)
