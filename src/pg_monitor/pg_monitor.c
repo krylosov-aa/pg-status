@@ -119,18 +119,18 @@ char *round_robin_replica(void) {
     else
         cursor = cursor -> next;
 
-    unsigned int i = 0;
+    const MonitorStatus *start = cursor;
     while (!is_alive_replica(cursor)) {
         cursor = cursor -> next;
         if (!cursor)
             cursor = get_monitor_status();
-        i++;
-        if (i == MAX_HOSTS)
-            break;
+
+        if (cursor == start)
+            return "null";
     }
     atomic_store_explicit(&last_random_replica, cursor, memory_order_release);
 
-    return i < MAX_HOSTS ? cursor -> host: "null";
+    return cursor -> host;
 }
 
 void init_monitor_status(void) {
