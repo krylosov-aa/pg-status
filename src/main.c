@@ -60,7 +60,9 @@ MHD_Result get_replicas_json(HTTPResponse *response) {
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
     response -> status_code = MHD_HTTP_OK;
-    response -> content_type = format_string("application/json");
+
+    if (!response -> content_type)
+        response -> content_type = format_string("application/json");
 
     return MHD_YES;
 }

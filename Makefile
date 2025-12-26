@@ -16,8 +16,11 @@ build_up:
 	make build
 	make up
 
-build_up_test:
+down_test:
 	docker-compose -f test/docker-compose.yml down --remove-orphans
+
+build_up_test:
+	make down_test
 	make build
 	docker-compose -f test/docker-compose.yml up -d
 
