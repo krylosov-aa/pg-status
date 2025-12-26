@@ -9,10 +9,13 @@ typedef struct MHD_Connection MHD_Connection;
 typedef struct MHD_Response MHD_Response;
 typedef enum MHD_Result MHD_Result;
 typedef enum MHD_RequestTerminationCode MHD_RequestTerminationCode;
+typedef enum MHD_ResponseMemoryMode MHD_ResponseMemoryMode;
 
 typedef struct HTTPResponse {
     MHD_Response *mhd_response;
+    char *response;
     char *content_type;
+    MHD_ResponseMemoryMode memory_mode;
     unsigned int status_code;
 } HTTPResponse;
 

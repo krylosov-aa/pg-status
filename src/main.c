@@ -4,7 +4,6 @@
 
 #include <pthread.h>
 #include <stdio.h>
-#include <string.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <cjson/cJSON.h>
@@ -57,29 +56,23 @@ cJSON *replicas_to_json(const MonitorStatus *cursor) {
 MHD_Result get_replicas_json(HTTPResponse *response) {
     const MonitorStatus *stat = get_monitor_status();
     cJSON *json = replicas_to_json(stat);
-    char *resp = json_to_str(json);
-    MHD_Response *mhd_response = MHD_create_response_from_buffer(
-        strlen(resp),
-        (void*) resp,
-        MHD_RESPMEM_MUST_FREE
-    );
-    response->mhd_response = mhd_response;
-    response->status_code = MHD_HTTP_OK;
-    response->content_type = format_string("application/json");
+
+    response -> response = json_to_str(json);
+    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
+    response -> status_code = MHD_HTTP_OK;
+    response -> content_type = format_string("application/json");
+
     return MHD_YES;
 }
 
 MHD_Result get_random_replica_json(HTTPResponse *response) {
     char *host = round_robin_replica();
     cJSON *json = host_to_json(host);
-    char *resp = json_to_str(json);
-    MHD_Response *mhd_response = MHD_create_response_from_buffer(
-        strlen(resp),
-        (void*) resp,
-        MHD_RESPMEM_MUST_FREE
-    );
-    response->mhd_response = mhd_response;
-    response->status_code = MHD_HTTP_OK;
+
+    response -> response = json_to_str(json);
+    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
+    response -> status_code = MHD_HTTP_OK;
+
     return MHD_YES;
 }
 
@@ -90,28 +83,21 @@ MHD_Result get_random_replica(HTTPResponse *response) {
     )
         return get_random_replica_json(response);
 
-    char *resp = round_robin_replica();
-    MHD_Response *mhd_response = MHD_create_response_from_buffer(
-        strlen(resp),
-        (void*) resp,
-        MHD_RESPMEM_PERSISTENT
-    );
-    response->mhd_response = mhd_response;
-    response->status_code = MHD_HTTP_OK;
+    response -> response = round_robin_replica();
+    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
+    response -> status_code = MHD_HTTP_OK;
+
     return MHD_YES;
 }
 
 MHD_Result get_master_json(HTTPResponse *response) {
     char *master = get_master_host();
     cJSON *json = host_to_json(master);
-    char *resp = json_to_str(json);
-    MHD_Response *mhd_response = MHD_create_response_from_buffer(
-        strlen(resp),
-        (void*) resp,
-        MHD_RESPMEM_MUST_FREE
-    );
-    response->mhd_response = mhd_response;
-    response->status_code = MHD_HTTP_OK;
+
+    response -> response = json_to_str(json);
+    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
+    response -> status_code = MHD_HTTP_OK;
+
     return MHD_YES;
 }
 
@@ -122,14 +108,10 @@ MHD_Result get_master(HTTPResponse *response) {
     )
         return get_master_json(response);
 
-    char *resp = get_master_host();
-    MHD_Response *mhd_response = MHD_create_response_from_buffer(
-        strlen(resp),
-        (void*) resp,
-        MHD_RESPMEM_PERSISTENT
-    );
-    response->mhd_response = mhd_response;
-    response->status_code = MHD_HTTP_OK;
+    response -> response = get_master_host();
+    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
+    response -> status_code = MHD_HTTP_OK;
+
     return MHD_YES;
 }
 
@@ -150,10 +132,12 @@ int main(void) {
 
     Route routes[] = {
         { "GET", "/master", get_master },
-        { "GET", "/replicas", get_replicas_json },
+        { "GET", "/replicas_info", get_replicas_json },
         { "GET", "/replica", get_random_replica },
     };
-    MHD_Daemon *daemon = start_http_server(8000, routes, 3);
+    MHD_Daemon *daemon = start_http_server(
+        8000, routes, sizeof(routes) / sizeof(routes[0])
+    );
 
     if (sigwait(&sigset, &sig) == 0) {
         if (sig == SIGINT)

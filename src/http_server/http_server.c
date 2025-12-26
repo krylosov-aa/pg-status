@@ -18,43 +18,54 @@ MHD_Result not_found(HTTPResponse *response) {
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         0, NULL, MHD_RESPMEM_PERSISTENT
     );
-    response->mhd_response = mhd_response;
-    response->status_code = MHD_HTTP_NOT_FOUND;
+    response -> mhd_response = mhd_response;
+    response -> status_code = MHD_HTTP_NOT_FOUND;
     return MHD_YES;
-}
-
-void set_content_type_header(const HTTPResponse *response) {
-    if (response != nullptr && response -> content_type != nullptr) {
-        MHD_add_response_header(
-            response->mhd_response,
-            MHD_HTTP_HEADER_CONTENT_TYPE,
-            response -> content_type
-        );
-    }
 }
 
 MHD_Result queue_response(
     MHD_Connection *connection,
-    const HTTPResponse *response,
+    HTTPResponse *response,
     const char *path, const char *method
 ) {
     MHD_Result ret = MHD_NO;
-    if (response->mhd_response) {
-        set_content_type_header(response);
-        ret = MHD_queue_response(
-            connection, response->status_code, response->mhd_response
+    MHD_Response *mhd_response = nullptr;
+
+    if (response -> mhd_response) {
+        mhd_response = response -> mhd_response;
+        response -> mhd_response = nullptr;
+    }
+
+    if (!mhd_response && response -> response)
+        mhd_response = MHD_create_response_from_buffer(
+            strlen(response -> response),
+            (void*) response -> response,
+            response -> memory_mode
         );
-        if (ret == MHD_YES) {
-            // printf("%s %s\n", method, path);
-        } else {
+
+    if (mhd_response) {
+        if (response -> content_type != nullptr)
+            MHD_add_response_header(
+                mhd_response,
+                MHD_HTTP_HEADER_CONTENT_TYPE,
+                response -> content_type
+            );
+
+        ret = MHD_queue_response(
+            connection, response->status_code, mhd_response
+        );
+
+        if (ret != MHD_YES)
             printf_error(
                 "Failed to MHD_queue_response %s %s", method, path
             );
-        }
-        MHD_destroy_response(response->mhd_response);
-    } else {
+
+        MHD_destroy_response(mhd_response);
+
+    }
+    else {
         printf_error(
-            "mhd_response wasn't provided for MHD_queue_response %s %s",
+            "mhd_response or response wasn't provided for queue_response %s %s",
             method, path);
     }
     return ret;
@@ -141,7 +152,7 @@ MHD_Result process_handler(
 
     result = handler(response);
 
-    if (response -> mhd_response) {
+    if (response -> mhd_response || response -> response) {
         result = queue_response(connection, response, path, method);
     }
     return result;
@@ -152,6 +163,8 @@ HTTPResponse *allocate_response(void) {
     HTTPResponse *response = malloc(sizeof(HTTPResponse));
     if (response != nullptr) {
         response -> mhd_response = nullptr;
+        response -> response = nullptr;
+        response -> memory_mode = MHD_RESPMEM_MUST_COPY;
         response -> content_type = nullptr;
         response -> status_code = 200;
     }
