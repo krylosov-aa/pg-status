@@ -40,7 +40,7 @@ cJSON *host_to_json(const char *host) {
     return obj;
 }
 
-cJSON *replicas_to_json(const MonitorStatus *cursor) {
+cJSON *replicas_to_json(const MonitorHost *cursor) {
     cJSON *arr = json_array();
 
     while (cursor) {
@@ -54,7 +54,7 @@ cJSON *replicas_to_json(const MonitorStatus *cursor) {
 
 
 MHD_Result get_replicas_json(HTTPResponse *response) {
-    const MonitorStatus *stat = get_monitor_status();
+    const MonitorHost *stat = get_monitor_host_head();
     cJSON *json = replicas_to_json(stat);
 
     response -> response = json_to_str(json);

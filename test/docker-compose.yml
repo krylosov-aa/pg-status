@@ -6,11 +6,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.1"
-          memory: 6M
+          cpus: "1"
+          memory: 64M
         reservations:
-          cpus: "0.1"
-          memory: 6M
+          cpus: "1"
+          memory: 64M
     networks:
       - net
     restart: unless-stopped

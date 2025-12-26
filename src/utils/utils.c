@@ -129,10 +129,9 @@ long str_to_long(const char *value) {
     if (
         end_ptr == value ||
         *end_ptr != '\0' ||
-        errno == ERANGE ||
-        result > UINT_MAX
+        errno == ERANGE
     )
-        raise_error("Failed to convert '%s' to uint", value);
+        raise_error("Failed to convert '%s' to long", value);
 
     return result;
 }
@@ -146,10 +145,25 @@ unsigned long str_to_ulong(const char *value) {
     if (
         end_ptr == value ||
         *end_ptr != '\0' ||
-        errno == ERANGE ||
-        result > UINT_MAX
+        errno == ERANGE
     )
-        raise_error("Failed to convert '%s' to uint", value);
+        raise_error("Failed to convert '%s' to ulong", value);
+
+    return result;
+}
+
+unsigned long long str_to_ull(const char *value) {
+    char *end_ptr = nullptr;
+    errno = 0;
+
+    const unsigned long long result = strtoull(value, &end_ptr, 10);
+
+    if (
+        end_ptr == value ||
+        *end_ptr != '\0' ||
+        errno == ERANGE
+    )
+        raise_error("Failed to convert '%s' to ull", value);
 
     return result;
 }

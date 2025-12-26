@@ -10,7 +10,11 @@
 #include <sys/types.h>
 
 
-MonitorStatus *monitor_status = nullptr;
+atomic_uint pg_monitor_running = 1;
+
+MonitorHost *monitor_host_head = nullptr;
+
+_Atomic (MonitorHost *) last_random_replica = nullptr;
 
 MonitorParameters parameters = {
     .user = "postgres",
@@ -79,86 +83,56 @@ char *get_connection_string(char *host, char *port) {
     );
 }
 
-void set_bool_atomic(atomic_bool *ptr, const bool val) {
-    atomic_store_explicit(ptr, val, memory_order_release);
+MonitorStatus *init_monitor_status(void) {
+    MonitorStatus *status = malloc(sizeof(MonitorStatus));
+    status -> delay_ms = 0;
+    status -> delay_bytes = 0;
+    status -> is_master = false;
+    status -> alive = false;
+    return status;
 }
 
-bool get_bool_atomic(const atomic_bool *ptr) {
-    return atomic_load_explicit(ptr, memory_order_acquire);
-}
+MonitorHost *init_monitor_host(char *host, char *port) {
+    MonitorHost *monitor_host = calloc(1, sizeof(MonitorHost));
+    monitor_host -> host = copy_string(host);
+    monitor_host -> connection_str = get_connection_string(host, port);
+    monitor_host -> next = nullptr;
+    monitor_host -> failed_connections = 0;
 
-char *get_master_host(void) {
-    MonitorStatus *cursor = monitor_status;
-    while (cursor) {
-        if (get_bool_atomic(&cursor -> is_master))
-            return cursor -> host;
-        cursor = cursor -> next;
-    }
-    return "null";
-}
-
-MonitorStatus *get_monitor_status(void) {
-    return monitor_status;
-}
-
-bool is_alive_replica(const MonitorStatus *host) {
-    return (
-        get_bool_atomic(&host -> alive) &&
-        !get_bool_atomic(&host -> is_master)
+    atomic_store_explicit(
+        &monitor_host -> status,
+        init_monitor_status(),
+        memory_order_release
     );
-}
 
-_Atomic (MonitorStatus *) last_random_replica = nullptr;
-
-char *round_robin_replica(void) {
-    MonitorStatus *cursor = atomic_load_explicit(
-        &last_random_replica, memory_order_acquire
+    atomic_store_explicit(
+        &monitor_host -> not_actual_status,
+        init_monitor_status(),
+        memory_order_release
     );
-    if (!cursor || !cursor -> next)
-        cursor = get_monitor_status();
-    else
-        cursor = cursor -> next;
 
-    const MonitorStatus *start = cursor;
-    while (!is_alive_replica(cursor)) {
-        cursor = cursor -> next;
-        if (!cursor)
-            cursor = get_monitor_status();
-
-        if (cursor == start)
-            return "null";
-    }
-    atomic_store_explicit(&last_random_replica, cursor, memory_order_release);
-
-    return cursor -> host;
+    return monitor_host;
 }
 
-void init_monitor_status(void) {
-    get_values_from_env();
-
+void init_monitor_host_linked_list(void) {
     char *hosts = copy_string(parameters.hosts);
     char *host = next_host(hosts);
 
     char *ports = copy_string(parameters.port);
     char *port = next_port(ports);
 
-    monitor_status = calloc(1, sizeof(MonitorStatus));
-    MonitorStatus *cursor = monitor_status;
-    unsigned int cnt = 0;
+    monitor_host_head = init_monitor_host(host, port);
+    MonitorHost *cursor = monitor_host_head;
+    host = next_host(hosts);
+    port = next_port(ports);
+    unsigned int cnt = 1;
 
-    while (host != nullptr) {
+    while (host) {
         if (cnt == MAX_HOSTS)
             raise_error("Too many hosts. Maximum value = %d", MAX_HOSTS);
-        if (cnt > 0) {
-            cursor -> next = calloc(1, sizeof(MonitorStatus));
-            cursor = cursor -> next;
-        }
 
-        cursor -> host = copy_string(host);
-        cursor -> connection_str = get_connection_string(host, port);
-        cursor -> failed_connections = 0;
-        set_bool_atomic(&cursor -> is_master, false);
-        set_bool_atomic(&cursor -> alive, false);
+        cursor -> next = init_monitor_host(host, port);
+        cursor = cursor -> next;
 
         host = next_host(hosts);
         port = next_port(ports);
@@ -169,46 +143,63 @@ void init_monitor_status(void) {
     free(ports);
 }
 
+MonitorStatus *atomic_get_status(const MonitorHost *host) {
+    return atomic_load_explicit(
+        &host -> status, memory_order_acquire
+    );
+}
+
 void check_hosts(void) {
-    MonitorStatus *cursor = monitor_status;
+    MonitorHost *cursor = monitor_host_head;
 
     while (cursor) {
-        bool is_replica = true;
-        const int exit_val = is_host_in_recovery(
-            cursor -> connection_str,
-            &is_replica
-        );
-
-        if (exit_val == 0) {
-            cursor -> failed_connections = 0;
-            set_bool_atomic(&cursor -> alive, true);
-
-            if (is_replica) {
-                printf("%s: replica\n", cursor -> host);
-                set_bool_atomic(&cursor -> is_master, false);
-            }
-            else {
-                printf("%s: master\n", cursor -> host);
-                set_bool_atomic(&cursor -> is_master, true);
-            }
-        }
-        else {
-            printf("%s: dead\n", cursor -> host);
-            if (cursor -> failed_connections >= parameters.max_fails) {
-                set_bool_atomic(&cursor -> alive, false);
-                set_bool_atomic(&cursor -> is_master, false);
-            }
-            else
-                cursor -> failed_connections++;
-        }
-
+        check_host_streaming_replication(cursor, parameters.max_fails);
         cursor = cursor -> next;
     }
     printf("\n");
 }
 
+char *get_master_host(void) {
+    MonitorHost *cursor = monitor_host_head;
+    while (cursor) {
+        if (atomic_get_status(cursor) -> is_master)
+            return cursor -> host;
+        cursor = cursor -> next;
+    }
+    return "null";
+}
 
-atomic_uint pg_monitor_running = 1;
+MonitorHost *get_monitor_host_head(void) {
+    return monitor_host_head;
+}
+
+bool is_alive_replica(const MonitorHost *host) {
+    const MonitorStatus *status = atomic_get_status(host);
+    return status -> alive && !status -> is_master;
+}
+
+char *round_robin_replica(void) {
+    MonitorHost *cursor = atomic_load_explicit(
+        &last_random_replica, memory_order_acquire
+    );
+    if (!cursor || !cursor -> next)
+        cursor = get_monitor_host_head();
+    else
+        cursor = cursor -> next;
+
+    const MonitorHost *start = cursor;
+    while (!is_alive_replica(cursor)) {
+        cursor = cursor -> next;
+        if (!cursor)
+            cursor = get_monitor_host_head();
+
+        if (cursor == start)
+            return "null";
+    }
+    atomic_store_explicit(&last_random_replica, cursor, memory_order_release);
+
+    return cursor -> host;
+}
 
 void stop_pg_monitor(void) {
     atomic_store(&pg_monitor_running, true);
@@ -218,7 +209,8 @@ void stop_pg_monitor(void) {
 void *pg_monitor_thread(void *arg) {
     (void)arg;
 
-    init_monitor_status();
+    get_values_from_env();
+    init_monitor_host_linked_list();
 
     while (atomic_load(&pg_monitor_running)) {
         check_hosts();

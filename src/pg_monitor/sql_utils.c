@@ -1,3 +1,6 @@
+#include <stdatomic.h>
+#include <stdlib.h>
+
 #include "pg_monitor.h"
 #include "utils.h"
 
@@ -54,6 +57,14 @@ PGresult *execute_sql(PGconn *conn, const char *query) {
     return res;
 }
 
+PGresult *connect_and_execute(const char *connection_str, const char *query) {
+    PGconn *conn = db_connect(connection_str);
+    if (!conn)
+        return nullptr;
+
+    return execute_sql(conn, query);
+}
+
 int extract_bool_value(PGresult *q_res, bool *result) {
     if (q_res == nullptr)
         return 1;
@@ -73,15 +84,75 @@ int execute_sql_bool(PGconn *conn, const char *query, bool *result) {
     return extract_bool_value(q_res, result);
 }
 
+const char *streaming_replication_query =
+    "with is_in_recovery as (\n"
+    "  select pg_is_in_recovery() is_replica\n"
+    ")\n"
+    "SELECT\n"
+    "    is_replica\n"
+    "  , case when not is_replica then pg_current_wal_lsn() end master_lsn\n"
+    "  , case when is_replica then pg_last_wal_receive_lsn() end replica_received_lsn\n"
+    "  , case when is_replica then pg_last_wal_replay_lsn() end replica_lsn\n"
+    "  , case when is_replica\n"
+    "      then coalesce((extract(epoch from now() - pg_last_xact_replay_timestamp()) * 1000)::bigint, 0)\n"
+    "      else 0 end replica_delay_ms\n"
+    "from is_in_recovery;\n";
 
-const char *in_recovery_query = "SELECT pg_is_in_recovery();";
+unsigned long long parse_lsn(const char *lsn) {
+    unsigned int hi, lo;
+    if (!lsn || sscanf(lsn, "%X/%X", &hi, &lo) != 2)
+        return 0;
+    return (unsigned long long)hi << 32 | lo;
+}
 
-int is_host_in_recovery(const char* connection_str, bool* result) {
-    PGconn *conn = db_connect(connection_str);
-    if (conn == nullptr)
-        return 1;
+unsigned long long max_lsn(unsigned long long  a, unsigned long long  b) {
+    return a > b ? a : b;
+}
 
-    const int exit_val = execute_sql_bool(conn, in_recovery_query, result);
-    PQfinish(conn);
-    return exit_val;
+void check_host_streaming_replication(
+    MonitorHost *host, const unsigned int max_fails
+) {
+    static unsigned long long master_lsn = 0;
+    MonitorStatus *status = atomic_get_status(host);
+    MonitorStatus *new_status = atomic_load_explicit(
+        &host -> not_actual_status, memory_order_acquire
+    );
+
+    PGresult *q_res = connect_and_execute(
+        host -> connection_str, streaming_replication_query
+    );
+
+    if (!q_res) {
+        printf("%s: dead\n", host -> host);
+        host -> failed_connections++;
+        if (host -> failed_connections > max_fails) {
+            new_status -> alive = false;
+            new_status -> is_master = false;
+        }
+    }
+    else {
+        new_status -> alive = true;
+        host -> failed_connections = 0;
+
+        const bool is_replica = is_t(PQgetvalue(q_res, 0, 0));
+        if (is_replica) {
+            printf("%s: replica\n", host -> host);
+            new_status -> is_master = false;
+            new_status -> delay_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
+
+            unsigned long long replica_received_lsn = parse_lsn(PQgetvalue(q_res, 0, 2));
+            unsigned long long replica_lsn = parse_lsn(PQgetvalue(q_res, 0, 3));
+            new_status -> delay_bytes = max_lsn(master_lsn, replica_received_lsn) - replica_lsn;
+        }
+        else {
+            printf("%s: master\n", host -> host);
+            new_status -> is_master = true;
+            new_status -> delay_ms = 0;
+            new_status -> delay_bytes = 0;
+            master_lsn = parse_lsn(PQgetvalue(q_res, 0, 1));
+        }
+    }
+
+    atomic_store_explicit(&host -> status, new_status, memory_order_release);
+    atomic_store_explicit(&host -> not_actual_status, status, memory_order_release);
 }

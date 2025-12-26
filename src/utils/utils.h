@@ -3,6 +3,7 @@
 
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <sys/stat.h>
 
 typedef struct FileDescriptor {
@@ -43,6 +44,8 @@ char *uint_to_str(const unsigned int value);
 long str_to_long(const char *value);
 
 unsigned long str_to_ulong(const char *value);
+
+unsigned long long str_to_ull(const char *value);
 
 int str_to_int(const char *value);
 
