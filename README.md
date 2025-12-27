@@ -15,7 +15,7 @@ It always serves data directly from memory and responds extremely quickly, so it
 
 ## Using
 
-### Параметры
+### Parameters
 
 You can configure various parameters using environment variables:
 
