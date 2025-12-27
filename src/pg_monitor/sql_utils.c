@@ -109,6 +109,9 @@ unsigned long long max_lsn(unsigned long long  a, unsigned long long  b) {
     return a > b ? a : b;
 }
 
+/**
+ * Updates the host status
+ */
 void check_host_streaming_replication(
     MonitorHost *host, const unsigned int max_fails
 ) {

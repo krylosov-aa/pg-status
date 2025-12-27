@@ -53,7 +53,6 @@ cJSON *replicas_to_json(const MonitorHost *cursor) {
     return arr;
 }
 
-
 MHD_Result get_replicas_json(HTTPResponse *response) {
     const MonitorHost *stat = get_monitor_host_head();
     cJSON *json = replicas_to_json(stat);

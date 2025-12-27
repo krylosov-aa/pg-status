@@ -10,13 +10,18 @@
 #include <sys/types.h>
 
 
+// Parameter for stopping a thread
 atomic_uint pg_monitor_running = 1;
 
+// A pointer to the head of the linked list of hosts
 MonitorHost *monitor_host_head = nullptr;
 
+// A pointer to the last replica returned in the round-robin algorithm
 _Atomic (MonitorHost *) last_random_replica = nullptr;
 
+// pg-monitor parameters
 MonitorParameters parameters = {
+    // The default parameters are set here.
     .user = "postgres",
     .password = "postgres",
     .database = "postgres",
@@ -30,6 +35,16 @@ MonitorParameters parameters = {
     .sync_max_lag_bytes = 1000000,  // 1 mb
 };
 
+/**
+ * Returns a pointer to the head of the linked list of hosts.
+ */
+MonitorHost *get_monitor_host_head(void) {
+    return monitor_host_head;
+}
+
+/**
+ * Overrides default parameters if they are set in environment variables.
+ */
 void get_values_from_env(void) {
     replace_from_env("pg_status__pg_user", &parameters.user);
     replace_from_env("pg_status__pg_database", &parameters.database);
@@ -51,6 +66,10 @@ void get_values_from_env(void) {
         raise_error("pg_status__hosts not set");
 }
 
+/**
+ * Returns hosts sequentially. When no more hosts are available,
+ * it returns nullptr.
+ */
 char *next_host(char *hosts) {
     static char *save_ptr = nullptr;
     static char *host = nullptr;
@@ -82,6 +101,9 @@ char *next_port(char *ports) {
     return last_port;
 }
 
+/**
+ * Returns the string to connect to pg
+ */
 char *get_connection_string(char *host, char *port) {
     return format_string(
         "user=%s password=%s host=%s port=%s "
@@ -91,6 +113,9 @@ char *get_connection_string(char *host, char *port) {
     );
 }
 
+/**
+ * Initializes MonitorStatus to its initial value.
+ */
 MonitorStatus *init_monitor_status(void) {
     MonitorStatus *status = malloc(sizeof(MonitorStatus));
     status -> delay_ms = 0;
@@ -100,6 +125,9 @@ MonitorStatus *init_monitor_status(void) {
     return status;
 }
 
+/**
+ * Initializes MonitorHost to its initial value.
+ */
 MonitorHost *init_monitor_host(char *host, char *port) {
     MonitorHost *monitor_host = calloc(1, sizeof(MonitorHost));
     monitor_host -> host = copy_string(host);
@@ -122,6 +150,9 @@ MonitorHost *init_monitor_host(char *host, char *port) {
     return monitor_host;
 }
 
+/**
+ * Initializes MonitorHost linked list to its initial value.
+ */
 void init_monitor_host_linked_list(void) {
     char *hosts = copy_string(parameters.hosts);
     char *host = next_host(hosts);
@@ -151,26 +182,21 @@ void init_monitor_host_linked_list(void) {
     free(ports);
 }
 
+/**
+ * Atomically returns a pointer to the host status
+ */
 MonitorStatus *atomic_get_status(const MonitorHost *host) {
     return atomic_load_explicit(
         &host -> status, memory_order_acquire
     );
 }
 
-void check_hosts(void) {
-    MonitorHost *cursor = monitor_host_head;
-
-    while (cursor) {
-        check_host_streaming_replication(cursor, parameters.max_fails);
-        cursor = cursor -> next;
-    }
-    printf("\n");
-}
-
-MonitorHost *get_monitor_host_head(void) {
-    return monitor_host_head;
-}
-
+/**
+ * A function for searching for a host that matches certain conditions
+ * @param handler A function that determines whether the specified host has been found
+ * @param master_if_not_found Determines whether to return the master if the desired host is not found by handler
+ * @return Host name corresponding to conditions
+ */
 char *find_host(
     const condition_handler handler, const bool master_if_not_found
 ) {
@@ -194,14 +220,24 @@ char *find_host(
     return "null";
 }
 
+/**
+ * condition_handler that searches for a live master
+ */
 bool is_master(const MonitorStatus *status) {
-    return status -> is_master;
+    return status -> alive && status -> is_master;
 }
 
+/**
+ * condition_handler that searches for a live replica
+ */
 bool is_alive_replica(const MonitorStatus *status) {
     return status -> alive && !status -> is_master;
 }
 
+/**
+ * condition_handler that searches for a live replica that is considered
+ * time-synchronous
+ */
 bool is_sync_replica_by_time(const MonitorStatus *status) {
     return (
         is_alive_replica(status) &&
@@ -209,6 +245,10 @@ bool is_sync_replica_by_time(const MonitorStatus *status) {
     );
 }
 
+/**
+ * condition_handler that searches for a live replica that is considered
+ * byte-synchronous
+ */
 bool is_sync_replica_by_bytes(const MonitorStatus *status) {
     return (
         is_alive_replica(status) &&
@@ -216,6 +256,10 @@ bool is_sync_replica_by_bytes(const MonitorStatus *status) {
     );
 }
 
+/**
+ * condition_handler that searches for a live replica that is considered
+ * time-synchronous or byte-synchronous
+ */
 bool is_sync_replica_by_time_or_bytes(const MonitorStatus *status) {
     return (
         is_sync_replica_by_time(status) ||
@@ -223,6 +267,10 @@ bool is_sync_replica_by_time_or_bytes(const MonitorStatus *status) {
     );
 }
 
+/**
+ * condition_handler that searches for a live replica that is considered
+ * time-synchronous and byte-synchronous
+ */
 bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status) {
     return (
         is_sync_replica_by_time(status) &&
@@ -230,6 +278,10 @@ bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status) {
     );
 }
 
+/**
+ * Returns a random replica using the round-robin algorithm.
+ * If there are no live replicas, it returns the master.
+ */
 char *round_robin_replica(void) {
     MonitorHost *cursor = atomic_load_explicit(
         &last_random_replica, memory_order_acquire
@@ -255,11 +307,23 @@ char *round_robin_replica(void) {
     return cursor -> host;
 }
 
-void stop_pg_monitor(void) {
-    atomic_store(&pg_monitor_running, true);
-    printf("pg_monitor stopped\n");
+/**
+ * One iteration of host checking
+ */
+void check_hosts(void) {
+    MonitorHost *cursor = monitor_host_head;
+
+    while (cursor) {
+        check_host_streaming_replication(cursor, parameters.max_fails);
+        cursor = cursor -> next;
+    }
+    printf("\n");
 }
 
+/**
+ * The main monitoring thread, which runs continuously and periodically
+ * does host checks
+ */
 void *pg_monitor_thread(void *arg) {
     (void)arg;
 
@@ -273,6 +337,9 @@ void *pg_monitor_thread(void *arg) {
     return nullptr;
 }
 
+/**
+ * Starts a host monitoring thread
+ */
 pthread_t start_pg_monitor() {
     pthread_t pg_monitor_tid;
     const int started = pthread_create(
@@ -284,4 +351,12 @@ pthread_t start_pg_monitor() {
 
     printf("pg_monitor started\n");
     return pg_monitor_tid;
+}
+
+/**
+ * Stops a host monitoring thread
+ */
+void stop_pg_monitor(void) {
+    atomic_store(&pg_monitor_running, true);
+    printf("pg_monitor stopped\n");
 }
