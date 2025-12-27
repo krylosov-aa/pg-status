@@ -40,13 +40,9 @@ pthread_t start_pg_monitor();
 
 void stop_pg_monitor(void);
 
-char *get_master_host(void);
-
 MonitorHost *get_monitor_host_head(void);
 
 MonitorStatus *atomic_get_status(const MonitorHost *host);
-
-bool is_alive_replica(const MonitorHost *host);
 
 char *round_robin_replica(void);
 
@@ -54,12 +50,17 @@ void check_host_streaming_replication(
     MonitorHost *host, const unsigned int max_fails
 );
 
-char *sync_host_by_time(void);
+typedef bool (*condition_handler)(const MonitorStatus *);
 
-char *sync_host_by_bytes(void);
+char *find_host(
+    const condition_handler handler, const bool master_if_not_found
+);
 
-char *sync_host_by_time_or_bytes(void);
-
-char *sync_host_by_time_and_bytes(void);
+bool is_master(const MonitorStatus *status);
+bool is_alive_replica(const MonitorStatus *status);
+bool is_sync_replica_by_time(const MonitorStatus *status);
+bool is_sync_replica_by_bytes(const MonitorStatus *status);
+bool is_sync_replica_by_time_or_bytes(const MonitorStatus *status);
+bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status);
 
 #endif //PG_STATUS_PG_MONITOR_H

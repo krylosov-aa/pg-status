@@ -44,7 +44,8 @@ cJSON *replicas_to_json(const MonitorHost *cursor) {
     cJSON *arr = json_array();
 
     while (cursor) {
-        if (is_alive_replica(cursor))
+        const MonitorStatus *status = atomic_get_status(cursor);
+        if (is_alive_replica(status))
             cJSON_AddItemToArray(arr, host_to_json(cursor -> host));
         cursor = cursor -> next;
     }
@@ -93,7 +94,7 @@ MHD_Result get_random_replica(HTTPResponse *response) {
 }
 
 MHD_Result get_master_json(HTTPResponse *response) {
-    char *master = get_master_host();
+    char *master = find_host(is_master, false);
     cJSON *json = host_to_json(master);
 
     response -> response = json_to_str(json);
@@ -110,7 +111,7 @@ MHD_Result get_master(HTTPResponse *response) {
     )
         return get_master_json(response);
 
-    response -> response = get_master_host();
+    response -> response = find_host(is_master, false);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
     response -> status_code = MHD_HTTP_OK;
 
@@ -118,7 +119,7 @@ MHD_Result get_master(HTTPResponse *response) {
 }
 
 MHD_Result get_sync_host_by_time_json(HTTPResponse *response) {
-    char *master = sync_host_by_time();
+    char *master = find_host(is_sync_replica_by_time, true);
     cJSON *json = host_to_json(master);
 
     response -> response = json_to_str(json);
@@ -135,7 +136,7 @@ MHD_Result get_sync_host_by_time(HTTPResponse *response) {
     )
         return get_sync_host_by_time_json(response);
 
-    response -> response = sync_host_by_time();
+    response -> response = find_host(is_sync_replica_by_time, true);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
     response -> status_code = MHD_HTTP_OK;
 
@@ -143,7 +144,7 @@ MHD_Result get_sync_host_by_time(HTTPResponse *response) {
 }
 
 MHD_Result get_sync_host_by_bytes_json(HTTPResponse *response) {
-    char *master = sync_host_by_bytes();
+    char *master = find_host(is_sync_replica_by_bytes, true);
     cJSON *json = host_to_json(master);
 
     response -> response = json_to_str(json);
@@ -160,7 +161,7 @@ MHD_Result get_sync_host_by_bytes(HTTPResponse *response) {
     )
         return get_sync_host_by_bytes_json(response);
 
-    response -> response = sync_host_by_bytes();
+    response -> response = find_host(is_sync_replica_by_bytes, true);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
     response -> status_code = MHD_HTTP_OK;
 
@@ -168,7 +169,7 @@ MHD_Result get_sync_host_by_bytes(HTTPResponse *response) {
 }
 
 MHD_Result get_sync_host_by_time_or_bytes_json(HTTPResponse *response) {
-    char *master = sync_host_by_time_or_bytes();
+    char *master = find_host(is_sync_replica_by_time_or_bytes, true);
     cJSON *json = host_to_json(master);
 
     response -> response = json_to_str(json);
@@ -185,7 +186,7 @@ MHD_Result get_sync_host_by_time_or_bytes(HTTPResponse *response) {
     )
         return get_sync_host_by_time_or_bytes_json(response);
 
-    response -> response = sync_host_by_time_or_bytes();
+    response -> response = find_host(is_sync_replica_by_time_or_bytes, true);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
     response -> status_code = MHD_HTTP_OK;
 
@@ -193,7 +194,7 @@ MHD_Result get_sync_host_by_time_or_bytes(HTTPResponse *response) {
 }
 
 MHD_Result get_sync_host_by_time_and_bytes_json(HTTPResponse *response) {
-    char *master = sync_host_by_time_and_bytes();
+    char *master = find_host(is_sync_replica_by_time_and_bytes, true);
     cJSON *json = host_to_json(master);
 
     response -> response = json_to_str(json);
@@ -210,7 +211,7 @@ MHD_Result get_sync_host_by_time_and_bytes(HTTPResponse *response) {
     )
         return get_sync_host_by_time_and_bytes_json(response);
 
-    response -> response = sync_host_by_time_and_bytes();
+    response -> response = find_host(is_sync_replica_by_time_and_bytes, true);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
     response -> status_code = MHD_HTTP_OK;
 

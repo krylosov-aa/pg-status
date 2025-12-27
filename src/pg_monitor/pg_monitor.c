@@ -167,23 +167,67 @@ void check_hosts(void) {
     printf("\n");
 }
 
-char *get_master_host(void) {
-    MonitorHost *cursor = monitor_host_head;
-    while (cursor) {
-        if (atomic_get_status(cursor) -> is_master)
-            return cursor -> host;
-        cursor = cursor -> next;
-    }
-    return "null";
-}
-
 MonitorHost *get_monitor_host_head(void) {
     return monitor_host_head;
 }
 
-bool is_alive_replica(const MonitorHost *host) {
-    const MonitorStatus *status = atomic_get_status(host);
+char *find_host(
+    const condition_handler handler, const bool master_if_not_found
+) {
+    const MonitorHost *cursor = monitor_host_head;
+    const MonitorHost *master = nullptr;
+    while (cursor) {
+        const MonitorStatus *status = atomic_get_status(cursor);
+
+        if (handler(status))
+            return cursor -> host;
+
+        if (status -> is_master)
+            master = cursor;
+
+        cursor = cursor -> next;
+    }
+
+    if (master_if_not_found && master)
+        return master -> host;
+
+    return "null";
+}
+
+bool is_master(const MonitorStatus *status) {
+    return status -> is_master;
+}
+
+bool is_alive_replica(const MonitorStatus *status) {
     return status -> alive && !status -> is_master;
+}
+
+bool is_sync_replica_by_time(const MonitorStatus *status) {
+    return (
+        is_alive_replica(status) &&
+        status -> delay_ms <= parameters.sync_max_lag_ms
+    );
+}
+
+bool is_sync_replica_by_bytes(const MonitorStatus *status) {
+    return (
+        is_alive_replica(status) &&
+        status -> delay_bytes <= parameters.sync_max_lag_bytes
+    );
+}
+
+bool is_sync_replica_by_time_or_bytes(const MonitorStatus *status) {
+    return (
+        is_sync_replica_by_time(status) ||
+        is_sync_replica_by_bytes(status)
+    );
+}
+
+bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status) {
+    return (
+        is_sync_replica_by_time(status) &&
+        is_sync_replica_by_bytes(status)
+    );
 }
 
 char *round_robin_replica(void) {
@@ -194,99 +238,21 @@ char *round_robin_replica(void) {
         cursor = get_monitor_host_head();
     else
         cursor = cursor -> next;
-
+    const MonitorStatus *status = atomic_get_status(cursor);
     const MonitorHost *start = cursor;
-    while (!is_alive_replica(cursor)) {
+
+    while (!is_alive_replica(status)) {
         cursor = cursor -> next;
         if (!cursor)
             cursor = get_monitor_host_head();
-
         if (cursor == start)
-            return get_master_host();
+            return find_host(is_master, false);
+
+        status = atomic_get_status(cursor);
     }
     atomic_store_explicit(&last_random_replica, cursor, memory_order_release);
 
     return cursor -> host;
-}
-
-/**
- * Searches for a synchronous replica.
- * If there isn't one, it returns the master if he's alive.
- */
-char *sync_host_by_time(void) {
-    const MonitorHost *cursor = monitor_host_head;
-    while (cursor) {
-        const MonitorStatus *status = atomic_get_status(cursor);
-        if (
-            status -> alive &&
-            !status -> is_master &&
-            status -> delay_ms <= parameters.sync_max_lag_ms
-        )
-            return cursor -> host;
-        cursor = cursor -> next;
-    }
-    return get_master_host();
-}
-
-/**
- * Searches for a synchronous replica.
- * If there isn't one, it returns the master if he's alive.
- */
-char *sync_host_by_bytes(void) {
-    const MonitorHost *cursor = monitor_host_head;
-    while (cursor) {
-        const MonitorStatus *status = atomic_get_status(cursor);
-        if (
-            status -> alive &&
-            !status -> is_master &&
-            status -> delay_bytes <= parameters.sync_max_lag_bytes
-        )
-            return cursor -> host;
-        cursor = cursor -> next;
-    }
-    return get_master_host();
-}
-
-/**
- * Searches for a synchronous replica.
- * If there isn't one, it returns the master if he's alive.
- */
-char *sync_host_by_time_or_bytes(void) {
-    const MonitorHost *cursor = monitor_host_head;
-    while (cursor) {
-        const MonitorStatus *status = atomic_get_status(cursor);
-        if (
-            status -> alive &&
-            !status -> is_master &&
-            (
-                status -> delay_bytes <= parameters.sync_max_lag_bytes ||
-                status -> delay_ms <= parameters.sync_max_lag_ms
-            )
-        )
-            return cursor -> host;
-        cursor = cursor -> next;
-    }
-    return get_master_host();
-}
-
-/**
- * Searches for a synchronous replica.
- * If there isn't one, it returns the master if he's alive.
- */
-char *sync_host_by_time_and_bytes(void) {
-    const MonitorHost *cursor = monitor_host_head;
-    while (cursor) {
-        const MonitorStatus *status = atomic_get_status(cursor);
-        if (
-            status -> alive &&
-            !status -> is_master &&
-            status -> delay_bytes <= parameters.sync_max_lag_bytes &&
-            status -> delay_ms <= parameters.sync_max_lag_ms
-        )
-            return cursor -> host;
-        cursor = cursor -> next;
-    }
-    return get_master_host();
 }
 
 void stop_pg_monitor(void) {
