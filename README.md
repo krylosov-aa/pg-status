@@ -35,31 +35,31 @@ You can configure various parameters using environment variables:
 
 The service exposes several HTTP endpoints for retrieving host information:
 
-#### GET /master
+#### `GET /master`
 
 Returns the host of the current master, if one exists. If no master is available, it returns null.
 
-#### GET /replica
+#### `GET /replica`
 
 Returns the host of a replica, selected using the round-robin algorithm.
 If no replicas are available, the master’s host is returned instead.
 
-#### GET /sync_by_time
+#### `GET /sync_by_time`
 
 Returns the host of a replica considered time-synchronous — that is, its time lag is less than the value specified in `pg_status__sync_max_lag_ms`.
 If no replica meets this condition, the master’s host is returned.
 
-#### GET /sync_by_bytes
+#### `GET /sync_by_bytes`
 
 Returns the host of a replica considered byte-synchronous — that is, according to the WAL LSN, its lag is less than the value specified in `pg_status__sync_max_lag_bytes`.
 If no replica meets this condition, the master’s host is returned.
 
-#### GET /sync_by_time_or_bytes
+#### `GET /sync_by_time_or_bytes`
 
 Returns the host of a replica that is considered synchronous either by time or by bytes.
 If no such replica exists, the master’s host is returned.
 
-#### GET /sync_by_time_and_bytes
+#### `GET /sync_by_time_and_bytes`
 
 Returns the host of a replica that is considered synchronous by both time and bytes.
 If no such replica exists, the master’s host is returned.
