@@ -8,32 +8,6 @@
 #include <stdlib.h>
 #include <cjson/cJSON.h>
 
-cJSON *json_array(void) {
-    cJSON *arr = cJSON_CreateArray();
-    if (!arr)
-        raise_error("Can't create json array");
-    return arr;
-}
-
-cJSON *json_object(void) {
-    cJSON *arr = cJSON_CreateObject();
-    if (!arr)
-        raise_error("Can't create json object");
-    return arr;
-}
-
-void add_str_to_json_object(cJSON * obj, const char *key, const char *val) {
-    if (!cJSON_AddStringToObject(obj, key, val)) {
-        raise_error("Can't add str to object");
-    }
-}
-
-char *json_to_str(cJSON *json) {
-    char *result = cJSON_PrintUnformatted(json);
-    cJSON_Delete(json);
-    return result;
-}
-
 cJSON *host_to_json(const char *host) {
     cJSON *obj = json_object();
     add_str_to_json_object(obj, "host", host);
