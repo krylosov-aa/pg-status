@@ -14,6 +14,8 @@ typedef struct MonitorParameters {
     char *hosts;
     char *port;
     char *connect_timeout;
+    unsigned long long sync_max_lag_ms;
+    unsigned long long sync_max_lag_bytes;
     unsigned int sleep;
     unsigned int max_fails;
 } MonitorParameters;
@@ -51,5 +53,9 @@ char *round_robin_replica(void);
 void check_host_streaming_replication(
     MonitorHost *host, const unsigned int max_fails
 );
+
+char *sync_host_by_time(void);
+
+char *sync_host_by_bytes(void);
 
 #endif //PG_STATUS_PG_MONITOR_H

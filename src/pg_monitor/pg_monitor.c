@@ -26,6 +26,8 @@ MonitorParameters parameters = {
     .connect_timeout = "2",
     .sleep = 5,
     .max_fails = 3,
+    .sync_max_lag_ms = 1000,
+    .sync_max_lag_bytes = 1000000,  // 1 mb
 };
 
 void get_values_from_env(void) {
@@ -37,6 +39,12 @@ void get_values_from_env(void) {
     replace_from_env("pg_status__port", &parameters.port);
     replace_from_env_uint("pg_status__sleep", &parameters.sleep);
     replace_from_env_uint("pg_status__max_fails", &parameters.max_fails);
+    replace_from_env_ull(
+        "pg_status__sync_max_lag_ms", &parameters.sync_max_lag_ms
+    );
+    replace_from_env_ull(
+        "pg_status__sync_max_lag_bytes", &parameters.sync_max_lag_bytes
+    );
 
     replace_from_env("pg_status__hosts", &parameters.hosts);
     if (parameters.hosts == nullptr)
@@ -194,11 +202,49 @@ char *round_robin_replica(void) {
             cursor = get_monitor_host_head();
 
         if (cursor == start)
-            return "null";
+            return get_master_host();
     }
     atomic_store_explicit(&last_random_replica, cursor, memory_order_release);
 
     return cursor -> host;
+}
+
+/**
+ * Searches for a synchronous replica.
+ * If there isn't one, it returns the master if he's alive.
+ */
+char *sync_host_by_time(void) {
+    const MonitorHost *cursor = monitor_host_head;
+    while (cursor) {
+        const MonitorStatus *status = atomic_get_status(cursor);
+        if (
+            status -> alive &&
+            !status -> is_master &&
+            status -> delay_ms <= parameters.sync_max_lag_ms
+        )
+            return cursor -> host;
+        cursor = cursor -> next;
+    }
+    return get_master_host();
+}
+
+/**
+ * Searches for a synchronous replica.
+ * If there isn't one, it returns the master if he's alive.
+ */
+char *sync_host_by_bytes(void) {
+    const MonitorHost *cursor = monitor_host_head;
+    while (cursor) {
+        const MonitorStatus *status = atomic_get_status(cursor);
+        if (
+            status -> alive &&
+            !status -> is_master &&
+            status -> delay_bytes <= parameters.sync_max_lag_bytes
+        )
+            return cursor -> host;
+        cursor = cursor -> next;
+    }
+    return get_master_host();
 }
 
 void stop_pg_monitor(void) {

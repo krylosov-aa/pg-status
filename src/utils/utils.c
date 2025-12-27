@@ -188,6 +188,12 @@ void replace_from_env_uint(const char *env_name, unsigned int *result) {
         *result = str_to_uint(env_val);
 }
 
+void replace_from_env_ull(const char *env_name, unsigned long long *result) {
+    const char *env_val = getenv(env_name);
+    if (env_val && *env_val)
+        *result = str_to_ull(env_val);
+}
+
 void replace_from_env_copy(const char *env_name, char **result) {
     const char *env_val = getenv(env_name);
     if (env_val != nullptr && *env_val) {

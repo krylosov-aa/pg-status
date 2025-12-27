@@ -47,6 +47,7 @@ unsigned long str_to_ulong(const char *value);
 
 unsigned long long str_to_ull(const char *value);
 
+
 int str_to_int(const char *value);
 
 unsigned int str_to_uint(const char *value);
@@ -54,6 +55,8 @@ unsigned int str_to_uint(const char *value);
 void replace_from_env(const char *env_name, char **result);
 
 void replace_from_env_uint(const char *env_name, unsigned int *result);
+
+void replace_from_env_ull(const char *env_name, unsigned long long *result);
 
 void replace_from_env_copy(const char *env_name, char **result);
 

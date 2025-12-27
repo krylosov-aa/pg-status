@@ -117,6 +117,56 @@ MHD_Result get_master(HTTPResponse *response) {
     return MHD_YES;
 }
 
+MHD_Result get_sync_host_by_time_json(HTTPResponse *response) {
+    char *master = sync_host_by_time();
+    cJSON *json = host_to_json(master);
+
+    response -> response = json_to_str(json);
+    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
+    response -> status_code = MHD_HTTP_OK;
+
+    return MHD_YES;
+}
+
+MHD_Result get_sync_host_by_time(HTTPResponse *response) {
+    if (
+        response -> content_type &&
+        is_equal_strings(response -> content_type, "application/json")
+    )
+        return get_sync_host_by_time_json(response);
+
+    response -> response = sync_host_by_time();
+    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
+    response -> status_code = MHD_HTTP_OK;
+
+    return MHD_YES;
+}
+
+MHD_Result get_sync_host_by_bytes_json(HTTPResponse *response) {
+    char *master = sync_host_by_bytes();
+    cJSON *json = host_to_json(master);
+
+    response -> response = json_to_str(json);
+    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
+    response -> status_code = MHD_HTTP_OK;
+
+    return MHD_YES;
+}
+
+MHD_Result get_sync_host_by_bytes(HTTPResponse *response) {
+    if (
+        response -> content_type &&
+        is_equal_strings(response -> content_type, "application/json")
+    )
+        return get_sync_host_by_bytes_json(response);
+
+    response -> response = sync_host_by_bytes();
+    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
+    response -> status_code = MHD_HTTP_OK;
+
+    return MHD_YES;
+}
+
 
 int main(void) {
     sigset_t sigset;
@@ -136,6 +186,8 @@ int main(void) {
         { "GET", "/master", get_master },
         { "GET", "/replicas_info", get_replicas_json },
         { "GET", "/replica", get_random_replica },
+        { "GET", "/sync_by_time", get_sync_host_by_time },
+        { "GET", "/sync_by_bytes", get_sync_host_by_bytes },
     };
     MHD_Daemon *daemon = start_http_server(
         8000, routes, sizeof(routes) / sizeof(routes[0])
