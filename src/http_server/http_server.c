@@ -6,14 +6,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * list of routes
+ */
 typedef struct Routes {
     Route *routes;
     unsigned int cnt;
 } Routes;
 
+/**
+ * list of routes registered for processing
+ */
 Routes *routes_list = nullptr;
 
 
+/**
+ * The default handler if no matching route is found is to return a 404.
+ */
 MHD_Result not_found(HTTPResponse *response) {
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         0, NULL, MHD_RESPMEM_PERSISTENT
@@ -23,6 +32,9 @@ MHD_Result not_found(HTTPResponse *response) {
     return MHD_YES;
 }
 
+/**
+ * Sends a response to the mhd queue for sending the response
+ */
 MHD_Result queue_response(
     MHD_Connection *connection,
     HTTPResponse *response,
@@ -71,6 +83,9 @@ MHD_Result queue_response(
     return ret;
 }
 
+/**
+ * Handler at the end of request processing
+ */
 void request_completed(
     void *cls,
     MHD_Connection *connection,
@@ -108,6 +123,9 @@ void request_completed(
     }
 }
 
+/**
+ * Handler at the start of client connection
+ */
 void notify_connection_callback(
     void *cls,
     MHD_Connection *connection,
@@ -124,6 +142,9 @@ void notify_connection_callback(
     }
 }
 
+/**
+ * Searches for a suitable route among registered routes
+ */
 request_handler_t find_handler(const char *method, const char *path) {
     for (unsigned int i = 0; i < routes_list -> cnt; i++) {
         Route *routes = routes_list -> routes;
@@ -135,6 +156,9 @@ request_handler_t find_handler(const char *method, const char *path) {
     return not_found;
 }
 
+/**
+ * Starts execution of the handler registered in the route.
+ */
 MHD_Result process_handler(
   const char *path,
   const char *method,
@@ -158,7 +182,9 @@ MHD_Result process_handler(
     return result;
 }
 
-
+/**
+ * Prepares a structure with default parameters to store the response
+ */
 HTTPResponse *allocate_response(void) {
     HTTPResponse *response = malloc(sizeof(HTTPResponse));
     if (response != nullptr) {
@@ -171,6 +197,9 @@ HTTPResponse *allocate_response(void) {
     return response;
 }
 
+/**
+ * Processing a get request
+ */
 MHD_Result process_get(
   void *cls,
   MHD_Connection *connection,
@@ -186,6 +215,9 @@ MHD_Result process_get(
     return process_handler(path, method, response, connection);
 }
 
+/**
+ * Processing a post request
+ */
 MHD_Result process_post(
   void *cls,
   MHD_Connection *connection,
@@ -207,6 +239,9 @@ MHD_Result process_post(
     return process_handler(path, method, response, connection);
 }
 
+/**
+ * Processing a request
+ */
 MHD_Result answer_to_connection(
   void *cls,
   MHD_Connection *connection,
@@ -225,6 +260,9 @@ MHD_Result answer_to_connection(
 }
 
 
+/**
+ * Starts http server daemon
+ */
 MHD_Daemon *start_http_server(
     const uint16_t port,
     Route *routes,
@@ -253,6 +291,9 @@ MHD_Daemon *start_http_server(
 
 }
 
+/**
+ * Stops http server daemon
+ */
 void stop_http_server(MHD_Daemon *daemon) {
     MHD_stop_daemon(daemon);
     printf("http server stopped\n");

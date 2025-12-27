@@ -1,9 +1,12 @@
 #ifndef PG_STATUS_PG_MONITOR_H
 #define PG_STATUS_PG_MONITOR_H
 
-# define MAX_HOSTS 10
 #include <pthread.h>
 
+/**
+ * The maximum number of hosts monitored by pg-status
+ */
+# define MAX_HOSTS 10
 
 /**
  * Starts a host monitoring thread
@@ -14,7 +17,6 @@ pthread_t start_pg_monitor();
  * Stops a host monitoring thread
  */
 void stop_pg_monitor(void);
-
 
 /**
  * List of all monitoring parameters

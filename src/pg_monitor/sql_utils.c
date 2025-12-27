@@ -107,7 +107,9 @@ int execute_sql_bool(PGconn *conn, const char *query, bool *result) {
     return extract_bool_value(q_res, result);
 }
 
-// sql query to get host status
+/**
+ * sql query to get host status
+ */
 const char *streaming_replication_query =
     "with is_in_recovery as (\n"
     "  select pg_is_in_recovery() is_replica\n"

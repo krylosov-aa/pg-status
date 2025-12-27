@@ -10,18 +10,25 @@
 #include <sys/types.h>
 
 
-// Parameter for stopping a thread
+/**
+ * Parameter for stopping a thread
+ */
 atomic_uint pg_monitor_running = 1;
 
-// A pointer to the head of the linked list of hosts
+/**
+ * A pointer to the head of the linked list of hosts
+ */
 MonitorHost *monitor_host_head = nullptr;
 
-// A pointer to the last replica returned in the round-robin algorithm
+/**
+ * A pointer to the last replica returned in the round-robin algorithm
+ */
 _Atomic (MonitorHost *) last_random_replica = nullptr;
 
-// pg-monitor parameters
+/**
+ * pg-monitor parameters. The default parameters are set here.
+ */
 MonitorParameters parameters = {
-    // The default parameters are set here.
     .user = "postgres",
     .password = "postgres",
     .database = "postgres",
