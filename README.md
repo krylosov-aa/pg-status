@@ -128,7 +128,7 @@ Currently, you can set up and run the project in the following ways:
 - Build with CMake
 - Run inside a Docker container (using the provided Dockerfile)
 
-- For convenience, you can also use [make commands](Makefile) to build and run the project, including two available
+For convenience, you can also use [make commands](Makefile) to build and run the project, including two available
 Docker variants:
 
 ### make build_up
