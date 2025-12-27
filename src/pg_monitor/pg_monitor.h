@@ -58,4 +58,8 @@ char *sync_host_by_time(void);
 
 char *sync_host_by_bytes(void);
 
+char *sync_host_by_time_or_bytes(void);
+
+char *sync_host_by_time_and_bytes(void);
+
 #endif //PG_STATUS_PG_MONITOR_H

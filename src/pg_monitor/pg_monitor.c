@@ -247,6 +247,48 @@ char *sync_host_by_bytes(void) {
     return get_master_host();
 }
 
+/**
+ * Searches for a synchronous replica.
+ * If there isn't one, it returns the master if he's alive.
+ */
+char *sync_host_by_time_or_bytes(void) {
+    const MonitorHost *cursor = monitor_host_head;
+    while (cursor) {
+        const MonitorStatus *status = atomic_get_status(cursor);
+        if (
+            status -> alive &&
+            !status -> is_master &&
+            (
+                status -> delay_bytes <= parameters.sync_max_lag_bytes ||
+                status -> delay_ms <= parameters.sync_max_lag_ms
+            )
+        )
+            return cursor -> host;
+        cursor = cursor -> next;
+    }
+    return get_master_host();
+}
+
+/**
+ * Searches for a synchronous replica.
+ * If there isn't one, it returns the master if he's alive.
+ */
+char *sync_host_by_time_and_bytes(void) {
+    const MonitorHost *cursor = monitor_host_head;
+    while (cursor) {
+        const MonitorStatus *status = atomic_get_status(cursor);
+        if (
+            status -> alive &&
+            !status -> is_master &&
+            status -> delay_bytes <= parameters.sync_max_lag_bytes &&
+            status -> delay_ms <= parameters.sync_max_lag_ms
+        )
+            return cursor -> host;
+        cursor = cursor -> next;
+    }
+    return get_master_host();
+}
+
 void stop_pg_monitor(void) {
     atomic_store(&pg_monitor_running, true);
     printf("pg_monitor stopped\n");
