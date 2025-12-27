@@ -1,5 +1,4 @@
 #include <stdatomic.h>
-#include <stdlib.h>
 
 #include "pg_monitor.h"
 #include "utils.h"
@@ -12,15 +11,24 @@
 #include <stdio.h>
 
 
+/**
+ * Converts pg false to bool false
+ */
 bool is_f(const char *pg_val) {
     return is_equal_strings(pg_val, "f");
 }
 
+/**
+ * Converts pg true to bool true
+ */
 bool is_t(const char *pg_val) {
     return is_equal_strings(pg_val, "t");
 }
 
 
+/**
+ * Creates a connection to pg
+ */
 PGconn *db_connect(const char *connection_str) {
     PGconn *conn = PQconnectdb(connection_str);
     if (PQstatus(conn) != CONNECTION_OK) {
@@ -34,6 +42,9 @@ PGconn *db_connect(const char *connection_str) {
     return conn;
 }
 
+/**
+ * Checks that the pg answer is valid. Fails with an error if it's not.
+ */
 int check_exec_result(const PGconn *conn, const PGresult *result) {
     const ExecStatusType resStatus = PQresultStatus(result);
     if (resStatus != PGRES_TUPLES_OK && resStatus != PGRES_COMMAND_OK) {
@@ -46,7 +57,9 @@ int check_exec_result(const PGconn *conn, const PGresult *result) {
     }
     return 0;
 }
-
+/**
+ * Executes sql query with verification that there is a correct pg answer
+ */
 PGresult *execute_sql(PGconn *conn, const char *query) {
     PGresult *res = PQexec(conn, query);
     const int check_result = check_exec_result(conn, res);
@@ -57,6 +70,10 @@ PGresult *execute_sql(PGconn *conn, const char *query) {
     return res;
 }
 
+/**
+ * Connects to the pg and executes a request with a check of the response
+ * validity
+ */
 PGresult *connect_and_execute(const char *connection_str, const char *query) {
     PGconn *conn = db_connect(connection_str);
     if (!conn)
@@ -65,6 +82,9 @@ PGresult *connect_and_execute(const char *connection_str, const char *query) {
     return execute_sql(conn, query);
 }
 
+/**
+ * Extracts a bool value from the first column of the first row.
+ */
 int extract_bool_value(PGresult *q_res, bool *result) {
     if (q_res == nullptr)
         return 1;
@@ -78,12 +98,16 @@ int extract_bool_value(PGresult *q_res, bool *result) {
     return 0;
 }
 
-
+/**
+ * Executes sql query and extracts a bool value from the first column of the
+ * first row
+ */
 int execute_sql_bool(PGconn *conn, const char *query, bool *result) {
     PGresult *q_res = execute_sql(conn, query);
     return extract_bool_value(q_res, result);
 }
 
+// sql query to get host status
 const char *streaming_replication_query =
     "with is_in_recovery as (\n"
     "  select pg_is_in_recovery() is_replica\n"
@@ -98,6 +122,10 @@ const char *streaming_replication_query =
     "      else 0 end replica_delay_ms\n"
     "from is_in_recovery;\n";
 
+
+/**
+ * Converts pg lsn to bytes
+ */
 unsigned long long parse_lsn(const char *lsn) {
     unsigned int hi, lo;
     if (!lsn || sscanf(lsn, "%X/%X", &hi, &lo) != 2)
@@ -105,12 +133,26 @@ unsigned long long parse_lsn(const char *lsn) {
     return (unsigned long long)hi << 32 | lo;
 }
 
+/**
+ * Selects the maximum lsn
+ */
 unsigned long long max_lsn(unsigned long long  a, unsigned long long  b) {
     return a > b ? a : b;
 }
 
 /**
  * Updates the host status
+ *
+ * Updating the status is filling `not_actual_status` and atomically
+ * replacing the pointer in `status`. The former `status` then atomically
+ * becomes `not_actual_status`. This way, concurrent threads can atomically
+ * read the current status. And even if there's a thread that
+ * has an old pointer, it won't be broken.
+ *
+ * A replica’s lsn lag is defined as the difference between its own lsn and
+ * the greater of the lsn received by the replica or the lsn on the master.
+ * Therefore, even if a replica does not receive a new lsn, a measurable
+ * lag can still occur.
  */
 void check_host_streaming_replication(
     MonitorHost *host, const unsigned int max_fails
@@ -143,9 +185,15 @@ void check_host_streaming_replication(
             new_status -> is_master = false;
             new_status -> delay_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
 
-            unsigned long long replica_received_lsn = parse_lsn(PQgetvalue(q_res, 0, 2));
-            unsigned long long replica_lsn = parse_lsn(PQgetvalue(q_res, 0, 3));
-            new_status -> delay_bytes = max_lsn(master_lsn, replica_received_lsn) - replica_lsn;
+            const unsigned long long replica_received_lsn = parse_lsn(
+                PQgetvalue(q_res, 0, 2)
+            );
+            const unsigned long long replica_lsn = parse_lsn(
+                PQgetvalue(q_res, 0, 3)
+            );
+            new_status -> delay_bytes = (
+                max_lsn(master_lsn, replica_received_lsn) - replica_lsn
+            );
         }
         else {
             printf("%s: master\n", host -> host);
