@@ -3,14 +3,6 @@ services:
     image: pg-status:latest
     ports:
       - 8000:8000
-    deploy:
-      resources:
-        limits:
-          cpus: "0.1"
-          memory: 6M
-        reservations:
-          cpus: "0.1"
-          memory: 6M
     restart: unless-stopped
     environment:
       - pg_status__connect_timeout=${pg_status__connect_timeout}
