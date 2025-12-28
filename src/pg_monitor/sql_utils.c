@@ -200,6 +200,9 @@ void check_host_streaming_replication(
     atomic_store_explicit(&host -> status, new_status, memory_order_release);
     atomic_store_explicit(&host -> not_actual_status, status, memory_order_release);
 
+    if (q_res)
+        PQclear(q_res);
+
     if (conn)
         PQfinish(conn);
 }
