@@ -343,14 +343,12 @@ void *pg_monitor_thread(void *arg) {
     struct timespec ts;
     pthread_mutex_lock(&monitor_mutex);
     while (monitor_running) {
-        pthread_mutex_unlock(&monitor_mutex);
 
         check_hosts();
 
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_sec += parameters.sleep;
 
-        pthread_mutex_lock(&monitor_mutex);
         pthread_cond_timedwait(&monitor_cond, &monitor_mutex, &ts);
     }
     pthread_mutex_unlock(&monitor_mutex);
