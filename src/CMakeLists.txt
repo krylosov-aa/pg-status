@@ -8,6 +8,7 @@ pkg_check_modules(CJSON REQUIRED IMPORTED_TARGET libcjson)
 
 target_link_libraries(main
         PRIVATE
+        common_warnings
         utils
         http_server
         pg_monitor

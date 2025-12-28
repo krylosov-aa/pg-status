@@ -3,7 +3,7 @@ add_library(pg_monitor
         pg_monitor.c
 )
 
-target_link_libraries(pg_monitor PUBLIC utils)
+target_link_libraries(pg_monitor PUBLIC common_warnings utils)
 
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(LIBPQ libpq QUIET)

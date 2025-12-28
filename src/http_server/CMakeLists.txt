@@ -3,6 +3,7 @@ add_library(http_server http_server.c)
 pkg_check_modules(MICROHTTPD REQUIRED IMPORTED_TARGET libmicrohttpd)
 target_link_libraries(
         http_server PUBLIC
+        common_warnings
         utils
         PkgConfig::MICROHTTPD
 )
