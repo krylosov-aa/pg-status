@@ -71,18 +71,6 @@ PGresult *execute_sql(PGconn *conn, const char *query) {
 }
 
 /**
- * Connects to the pg and executes a request with a check of the response
- * validity
- */
-PGresult *connect_and_execute(const char *connection_str, const char *query) {
-    PGconn *conn = db_connect(connection_str);
-    if (!conn)
-        return nullptr;
-
-    return execute_sql(conn, query);
-}
-
-/**
  * Extracts a bool value from the first column of the first row.
  */
 int extract_bool_value(PGresult *q_res, bool *result) {
@@ -104,7 +92,9 @@ int extract_bool_value(PGresult *q_res, bool *result) {
  */
 int execute_sql_bool(PGconn *conn, const char *query, bool *result) {
     PGresult *q_res = execute_sql(conn, query);
-    return extract_bool_value(q_res, result);
+    const int out = extract_bool_value(q_res, result);
+    PQfinish(conn);
+    return out;
 }
 
 /**
@@ -165,9 +155,10 @@ void check_host_streaming_replication(
         &host -> not_actual_status, memory_order_acquire
     );
 
-    PGresult *q_res = connect_and_execute(
-        host -> connection_str, streaming_replication_query
-    );
+    PGresult *q_res = nullptr;
+    PGconn *conn = db_connect(host -> connection_str);
+    if (conn)
+        q_res = execute_sql(conn, streaming_replication_query);
 
     if (!q_res) {
         printf("%s: dead\n", host -> host);
@@ -208,4 +199,7 @@ void check_host_streaming_replication(
 
     atomic_store_explicit(&host -> status, new_status, memory_order_release);
     atomic_store_explicit(&host -> not_actual_status, status, memory_order_release);
+
+    if (conn)
+        PQfinish(conn);
 }
