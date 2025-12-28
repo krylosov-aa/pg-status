@@ -20,7 +20,7 @@ target_compile_options(common_warnings INTERFACE
 
         "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
         "$<$<CONFIG:Debug>:-fno-omit-frame-pointer>"
-        "$<$<CONFIG:Debug>:-g>"
+        "$<$<CONFIG:Debug>:-g3>"
 )
 target_link_options(common_warnings INTERFACE
         "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
