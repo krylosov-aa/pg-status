@@ -1,0 +1,717 @@
+2025-12-28T15:49:47.931773833Z ==1== Memcheck, a memory error detector
+2025-12-28T15:49:47.931792000Z ==1== Copyright (C) 2002-2024, and GNU GPL'd, by Julian Seward et al.
+2025-12-28T15:49:47.931793708Z ==1== Using Valgrind-3.24.0 and LibVEX; rerun with -h for copyright info
+2025-12-28T15:49:47.931794875Z ==1== Command: /app/main
+2025-12-28T15:49:47.931796041Z ==1== 
+2025-12-28T15:49:48.570088252Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:48.570096252Z ==1==    at 0x494D5E0: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:48.570097418Z ==1==    by 0x495461B: MHD_start_daemon_va (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:48.570098585Z ==1==    by 0x4956193: MHD_start_daemon (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:48.570099543Z ==1==    by 0x10B78B: start_http_server (http_server.c:276)
+2025-12-28T15:49:48.570100418Z ==1==    by 0x10A5AF: main (main.c:218)
+2025-12-28T15:49:48.570101293Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:48.570102252Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:48.570103168Z ==1== 
+2025-12-28T15:49:48.570104002Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:48.570104918Z ==1==    at 0x494D5F0: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:48.570105877Z ==1==    by 0x495461B: MHD_start_daemon_va (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:48.570107252Z ==1==    by 0x4956193: MHD_start_daemon (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:48.570108210Z ==1==    by 0x10B78B: start_http_server (http_server.c:276)
+2025-12-28T15:49:48.570109127Z ==1==    by 0x10A5AF: main (main.c:218)
+2025-12-28T15:49:48.570109960Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:48.570110877Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:48.570111793Z ==1== 
+2025-12-28T15:49:56.987816445Z ==1== Thread 3 MHD-single:
+2025-12-28T15:49:56.987853404Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:56.987855404Z ==1==    at 0x495678C: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.987856570Z ==1==    by 0x494F567: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.987857654Z ==1==    by 0x49504AF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.987858695Z ==1==    by 0x495283F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.987859945Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.987860904Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.987872570Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.987873612Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.987874612Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.987875529Z ==1== 
+2025-12-28T15:49:56.988590949Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:56.988597741Z ==1==    at 0x49568D8: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.988598866Z ==1==    by 0x4947BD7: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.988600199Z ==1==    by 0x494F5EB: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.988601116Z ==1==    by 0x49504AF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.988601991Z ==1==    by 0x495283F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.988602949Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.988603866Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.988604741Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.988605616Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.988606532Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.988607366Z ==1== 
+2025-12-28T15:49:56.990479625Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:56.990496375Z ==1==    at 0x494947C: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.990498167Z ==1==    by 0x495288B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.990499334Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.990500542Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.990501459Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.990502375Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.990503292Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.990504167Z ==1== 
+2025-12-28T15:49:56.990570834Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:56.990576042Z ==1==    at 0x4949484: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.990578834Z ==1==    by 0x495288B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.990580001Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.990581501Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.990582501Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.990592043Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.990593293Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.990594251Z ==1== 
+2025-12-28T15:49:56.992329093Z ==1== Syscall param recvfrom(len) contains uninitialised byte(s)
+2025-12-28T15:49:56.992340051Z ==1==    at 0x4A5EFAC: __syscall_cancel_arch (syscall_cancel.S:54)
+2025-12-28T15:49:56.992341218Z ==1==    by 0x4A52657: __internal_syscall_cancel (cancellation.c:49)
+2025-12-28T15:49:56.992342176Z ==1==    by 0x4A5269B: __syscall_cancel (cancellation.c:75)
+2025-12-28T15:49:56.992343093Z ==1==    by 0x4945503: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992344051Z ==1==    by 0x4947377: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992344968Z ==1==    by 0x494C703: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992345885Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992346843Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992347843Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.992348718Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.992349635Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.992350551Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.992351468Z ==1== 
+2025-12-28T15:49:56.992416135Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:56.992421802Z ==1==    at 0x494550C: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992423260Z ==1==    by 0x4947377: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992424427Z ==1==    by 0x494C703: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992425385Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992426302Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.992427219Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.992428094Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.992429010Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.992430260Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.992431177Z ==1== 
+2025-12-28T15:49:56.996543031Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:56.996557073Z ==1==    at 0x4956960: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996558906Z ==1==    by 0x4946027: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996566490Z ==1==    by 0x4948FD3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996567698Z ==1==    by 0x4949653: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996568906Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996569906Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996570865Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996571865Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.996572781Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.996573698Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.996574573Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.996575448Z ==1== 
+2025-12-28T15:49:56.996756657Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.996760907Z ==1==    at 0x4948FD8: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996762032Z ==1==    by 0x4949653: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996762949Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996763866Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996764741Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.996765657Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.996766657Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.996767532Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.996768407Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.996769282Z ==1== 
+2025-12-28T15:49:56.997018242Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.997030367Z ==1==    at 0x4948FF0: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997031992Z ==1==    by 0x4949653: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997032992Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997033909Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997034784Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997035659Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.997036575Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.997037450Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.997042492Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.997043575Z ==1== 
+2025-12-28T15:49:56.997485619Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:56.997490619Z ==1==    at 0x494910C: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997491911Z ==1==    by 0x4949653: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997492911Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997493828Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997494744Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997495744Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.997496828Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.997497869Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.997498786Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.997499619Z ==1== 
+2025-12-28T15:49:56.997894788Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.997899205Z ==1==    at 0x4946470: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997900288Z ==1==    by 0x49496B3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997901496Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997902413Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997903288Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997904788Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.997905705Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.997906538Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.997907455Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.997908330Z ==1== 
+2025-12-28T15:49:56.997916288Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.997920830Z ==1==    at 0x494647C: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997922330Z ==1==    by 0x49496B3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997923372Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997943705Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997944997Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.997950497Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.997951622Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.997952580Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.997953663Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.997954580Z ==1== 
+2025-12-28T15:49:56.998029789Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998033664Z ==1==    at 0x4946468: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998034747Z ==1==    by 0x49496B3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998035705Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998036664Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998037580Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998038497Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998039414Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998040247Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998041164Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998042080Z ==1== 
+2025-12-28T15:49:56.998229081Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998240123Z ==1==    at 0x4946470: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998241373Z ==1==    by 0x494A37B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998242498Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998243498Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998244415Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998245873Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998247040Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998247998Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998248957Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998249873Z ==1== 
+2025-12-28T15:49:56.998250707Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998251623Z ==1==    at 0x494647C: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998252832Z ==1==    by 0x494A37B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998267290Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998269207Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998270373Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998271248Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998272123Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998273082Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998273957Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998274873Z ==1== 
+2025-12-28T15:49:56.998318665Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998324415Z ==1==    at 0x4946488: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998325832Z ==1==    by 0x494A37B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998326915Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998327957Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998329124Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998330040Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998330957Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998332040Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998332957Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998333874Z ==1== 
+2025-12-28T15:49:56.998632625Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998638500Z ==1==    at 0x4946470: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998639667Z ==1==    by 0x4949703: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998640667Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998641834Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998642750Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998643709Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998644625Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998645500Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998646375Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998647250Z ==1== 
+2025-12-28T15:49:56.998648125Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998659625Z ==1==    at 0x494647C: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998660917Z ==1==    by 0x4949703: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998661834Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998662750Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998663834Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998664750Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998665667Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998666667Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998667667Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998668542Z ==1== 
+2025-12-28T15:49:56.998669334Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998670417Z ==1==    at 0x4946468: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998671375Z ==1==    by 0x4949703: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998672334Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998673209Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998674125Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998675125Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998676042Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998677584Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998678500Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998679375Z ==1== 
+2025-12-28T15:49:56.998778543Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998783334Z ==1==    at 0x4946470: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998784793Z ==1==    by 0x4949FFB: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998785876Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998786793Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998787709Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998789001Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998790001Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998790918Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998794959Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998796376Z ==1== 
+2025-12-28T15:49:56.998797209Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998798126Z ==1==    at 0x494647C: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998799084Z ==1==    by 0x4949FFB: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998800001Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998800918Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998801834Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998803209Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998804459Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998805584Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998806459Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998807376Z ==1== 
+2025-12-28T15:49:56.998808168Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:56.998809084Z ==1==    at 0x4946468: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998810084Z ==1==    by 0x4949FFB: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998811459Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998812626Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998813626Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:56.998814501Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:56.998815376Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:56.998816459Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:56.998817376Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:56.998818251Z ==1== 
+2025-12-28T15:49:57.000100924Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:57.000110674Z ==1==    at 0x4946470: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000111966Z ==1==    by 0x4946587: MHD_lookup_connection_value (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000113008Z ==1==    by 0x10B4F7: process_handler (http_server.c:171)
+2025-12-28T15:49:57.000113883Z ==1==    by 0x10B617: process_get (http_server.c:215)
+2025-12-28T15:49:57.000114758Z ==1==    by 0x10B6E3: answer_to_connection (http_server.c:257)
+2025-12-28T15:49:57.000130966Z ==1==    by 0x4946A37: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000132174Z ==1==    by 0x49497A7: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000133258Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000134174Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000135133Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000136008Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.000136966Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.000137841Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.000138716Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.000139633Z ==1== 
+2025-12-28T15:49:57.000140549Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:57.000141383Z ==1==    at 0x494647C: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000142341Z ==1==    by 0x4946587: MHD_lookup_connection_value (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000143425Z ==1==    by 0x10B4F7: process_handler (http_server.c:171)
+2025-12-28T15:49:57.000144300Z ==1==    by 0x10B617: process_get (http_server.c:215)
+2025-12-28T15:49:57.000145175Z ==1==    by 0x10B6E3: answer_to_connection (http_server.c:257)
+2025-12-28T15:49:57.000146091Z ==1==    by 0x4946A37: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000146966Z ==1==    by 0x49497A7: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000148175Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000149300Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000150800Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000151841Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.000153591Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.000154591Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.000155883Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.000157133Z ==1== 
+2025-12-28T15:49:57.000158133Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:57.000159216Z ==1==    at 0x4946468: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000160425Z ==1==    by 0x4946587: MHD_lookup_connection_value (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000162508Z ==1==    by 0x10B4F7: process_handler (http_server.c:171)
+2025-12-28T15:49:57.000163466Z ==1==    by 0x10B617: process_get (http_server.c:215)
+2025-12-28T15:49:57.000164341Z ==1==    by 0x10B6E3: answer_to_connection (http_server.c:257)
+2025-12-28T15:49:57.000165216Z ==1==    by 0x4946A37: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000166133Z ==1==    by 0x49497A7: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000167091Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000200466Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000292717Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000326300Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.000374426Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.000398342Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.000438634Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.000464509Z ==1== 
+2025-12-28T15:49:57.000490510Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:57.000506593Z ==1==    at 0x4946488: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000523093Z ==1==    by 0x4946587: MHD_lookup_connection_value (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000539385Z ==1==    by 0x10B4F7: process_handler (http_server.c:171)
+2025-12-28T15:49:57.000555135Z ==1==    by 0x10B617: process_get (http_server.c:215)
+2025-12-28T15:49:57.000570760Z ==1==    by 0x10B6E3: answer_to_connection (http_server.c:257)
+2025-12-28T15:49:57.000607469Z ==1==    by 0x4946A37: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000645094Z ==1==    by 0x49497A7: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000661302Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000673344Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000685261Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000710386Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.000727677Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.000742511Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.000758178Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.000772261Z ==1== 
+2025-12-28T15:49:57.000787553Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:57.000803511Z ==1==    at 0x49464A8: MHD_lookup_connection_value_n (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000829553Z ==1==    by 0x4946587: MHD_lookup_connection_value (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.000849095Z ==1==    by 0x10B4F7: process_handler (http_server.c:171)
+2025-12-28T15:49:57.000878803Z ==1==    by 0x10B617: process_get (http_server.c:215)
+2025-12-28T15:49:57.000920887Z ==1==    by 0x10B6E3: answer_to_connection (http_server.c:257)
+2025-12-28T15:49:57.000974345Z ==1==    by 0x4946A37: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.001019304Z ==1==    by 0x49497A7: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.001040596Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.001083554Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.001107888Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.001123638Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.001145263Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.001162221Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.001178055Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.001194680Z ==1== 
+2025-12-28T15:49:57.004851615Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.004862074Z ==1==    at 0x49499E0: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004863282Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004864282Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004865199Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004866074Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.004866991Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.004868116Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.004869032Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.004869907Z ==1== 
+2025-12-28T15:49:57.004961783Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.004965033Z ==1==    at 0x4956B40: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004965991Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004966908Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004967783Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004974199Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.004975199Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.004976116Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.004976991Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.004977866Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.004978741Z ==1== 
+2025-12-28T15:49:57.005008866Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.005015241Z ==1==    at 0x4892AA4: memset (vg_replace_strmem.c:1390)
+2025-12-28T15:49:57.005016241Z ==1==    by 0x4956B6F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005017158Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005018075Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005018991Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005020325Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005021241Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005022325Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005023158Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005024033Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005024950Z ==1== 
+2025-12-28T15:49:57.005078992Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.005081492Z ==1==    at 0x4892ABC: memset (vg_replace_strmem.c:1390)
+2025-12-28T15:49:57.005082700Z ==1==    by 0x4956B6F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005083950Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005084950Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005085908Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005086825Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005087742Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005088658Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005089492Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005090367Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005091492Z ==1== 
+2025-12-28T15:49:57.005145075Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.005149117Z ==1==    at 0x4892AEC: memset (vg_replace_strmem.c:1390)
+2025-12-28T15:49:57.005150075Z ==1==    by 0x4956B6F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005150992Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005151867Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005152784Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005153700Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005154575Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005168784Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005172367Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005173325Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005174242Z ==1== 
+2025-12-28T15:49:57.005462077Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.005471160Z ==1==    at 0x4892B00: memset (vg_replace_strmem.c:1390)
+2025-12-28T15:49:57.005472285Z ==1==    by 0x4956B6F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005473285Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005474202Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005475077Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005476244Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005477119Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005478119Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005478952Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005479827Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005480702Z ==1== 
+2025-12-28T15:49:57.005481452Z ==1== Use of uninitialised value of size 8
+2025-12-28T15:49:57.005482327Z ==1==    at 0x4892B0C: memset (vg_replace_strmem.c:1390)
+2025-12-28T15:49:57.005483202Z ==1==    by 0x4956B6F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005484119Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005485035Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005485952Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005486827Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005492994Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005493910Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005494785Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005495660Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005496536Z ==1== 
+2025-12-28T15:49:57.005497327Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.005498202Z ==1==    at 0x4892B24: memset (vg_replace_strmem.c:1390)
+2025-12-28T15:49:57.005499077Z ==1==    by 0x4956B6F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005499952Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005500911Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005501869Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005503327Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005504244Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005505536Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005506411Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005507286Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005508161Z ==1== 
+2025-12-28T15:49:57.005508911Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.005509786Z ==1==    at 0x4892B50: memset (vg_replace_strmem.c:1390)
+2025-12-28T15:49:57.005510619Z ==1==    by 0x4956B6F: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005511536Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005512411Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005513327Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005514202Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005515119Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005515994Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005516827Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005517702Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005518577Z ==1== 
+2025-12-28T15:49:57.005587203Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.005591869Z ==1==    at 0x4956B78: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005596911Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005598244Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005599828Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005601411Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005602411Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005603661Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005604619Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005605619Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005608619Z ==1== 
+2025-12-28T15:49:57.005662161Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.005665953Z ==1==    at 0x4956B8C: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005667245Z ==1==    by 0x49499F3: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005668536Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005669495Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005670453Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.005671328Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.005672245Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.005673120Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.005674036Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.005674911Z ==1== 
+2025-12-28T15:49:57.006570374Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.006582458Z ==1==    at 0x4956A18: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006583541Z ==1==    by 0x4945227: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006584583Z ==1==    by 0x4945823: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006585583Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006586458Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006587333Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006588583Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006589458Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.006594666Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.006595583Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.006596500Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.006597375Z ==1== 
+2025-12-28T15:49:57.006983085Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.006991627Z ==1==    at 0x494584C: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006993043Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006994085Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006995043Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006995918Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.006996877Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.006998127Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.006999043Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.007000043Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.007001002Z ==1== 
+2025-12-28T15:49:57.007072002Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.007076919Z ==1==    at 0x4945928: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007078085Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007079085Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007080002Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007081169Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007082294Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.007083252Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.007084127Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.007085002Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.007085919Z ==1== 
+2025-12-28T15:49:57.007960840Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.007968382Z ==1==    at 0x4945CB4: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007969632Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007970548Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007971465Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007976465Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.007977465Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.007978382Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.007979257Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.007980257Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.007981132Z ==1== 
+2025-12-28T15:49:57.008021340Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.008026340Z ==1==    at 0x4945998: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008027507Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008028632Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008029549Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008030632Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008031632Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.008032507Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.008033424Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.008034340Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.008035465Z ==1== 
+2025-12-28T15:49:57.008260591Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.008264592Z ==1==    at 0x49459CC: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008265675Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008266967Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008267925Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008268800Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.008270175Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.008271092Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.008272342Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.008273342Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.008274258Z ==1== 
+2025-12-28T15:49:57.018834188Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.018854813Z ==1==    at 0x4945DF8: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.018862396Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.018863521Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.018864521Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.018865688Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.018866605Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.018867521Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.018868396Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.018869313Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.018870188Z ==1== 
+2025-12-28T15:49:57.019286732Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.019299857Z ==1==    at 0x4945B90: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019301107Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019302107Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019303024Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019303940Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019304857Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.019306065Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.019307107Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.019308107Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.019309024Z ==1== 
+2025-12-28T15:49:57.019708276Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.019714734Z ==1==    at 0x4945E50: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019716401Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019717401Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019718568Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019719693Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.019720818Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.019721943Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.019722859Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.019723818Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.019728734Z ==1== 
+2025-12-28T15:49:57.020329112Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.020337196Z ==1==    at 0x4945E88: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020338612Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020339654Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020340571Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020341487Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020342404Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.020343279Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.020344196Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.020345112Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.020345987Z ==1== 
+2025-12-28T15:49:57.020418071Z ==1== Conditional jump or move depends on uninitialised value(s)
+2025-12-28T15:49:57.020422279Z ==1==    at 0x4945DA8: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020423738Z ==1==    by 0x4949A03: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020424821Z ==1==    by 0x494C70B: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020425780Z ==1==    by 0x49528DF: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020426821Z ==1==    by 0x4953687: ??? (in /usr/lib/aarch64-linux-gnu/libmicrohttpd.so.12.62.1)
+2025-12-28T15:49:57.020427738Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:49:57.020428655Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:49:57.020429530Z ==1==  Uninitialised value was created by a stack allocation
+2025-12-28T15:49:57.020430446Z ==1==    at 0x10B6EC: start_http_server (http_server.c:270)
+2025-12-28T15:49:57.020431363Z ==1== 
+2025-12-28T15:50:06.939993176Z pg_monitor started
+2025-12-28T15:50:06.940031093Z http server started at 127.0.0.1:8000
+2025-12-28T15:50:06.940033510Z SIGTERM
+2025-12-28T15:50:06.940034802Z pg_monitor stopped
+2025-12-28T15:50:06.940035760Z http server stopped
+2025-12-28T15:50:06.952357542Z ==1== 
+2025-12-28T15:50:06.952385833Z ==1== HEAP SUMMARY:
+2025-12-28T15:50:06.952387458Z ==1==     in use at exit: 613 bytes in 16 blocks
+2025-12-28T15:50:06.952388583Z ==1==   total heap usage: 1,296,130 allocs, 1,296,114 frees, 218,066,911 bytes allocated
+2025-12-28T15:50:06.952389667Z ==1== 
+2025-12-28T15:50:06.953046879Z ==1== Thread 1:
+2025-12-28T15:50:06.953088463Z ==1== 11 bytes in 1 blocks are still reachable in loss record 1 of 11
+2025-12-28T15:50:06.953090629Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953091879Z ==1==    by 0x10AA1B: copy_string (utils.c:79)
+2025-12-28T15:50:06.953093296Z ==1==    by 0x10BB2F: init_monitor_host (pg_monitor.c:143)
+2025-12-28T15:50:06.953094213Z ==1==    by 0x10BC0B: init_monitor_host_linked_list (pg_monitor.c:173)
+2025-12-28T15:50:06.953095129Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953095963Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953096838Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953097713Z ==1== 
+2025-12-28T15:50:06.953098629Z ==1== 16 bytes in 1 blocks are still reachable in loss record 2 of 11
+2025-12-28T15:50:06.953099504Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953100379Z ==1==    by 0x10B70B: start_http_server (http_server.c:272)
+2025-12-28T15:50:06.953101254Z ==1==    by 0x10A5AF: main (main.c:218)
+2025-12-28T15:50:06.953102088Z ==1== 
+2025-12-28T15:50:06.953102879Z ==1== 22 bytes in 2 blocks are still reachable in loss record 3 of 11
+2025-12-28T15:50:06.953103754Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953104796Z ==1==    by 0x10AA1B: copy_string (utils.c:79)
+2025-12-28T15:50:06.953105629Z ==1==    by 0x10BB2F: init_monitor_host (pg_monitor.c:143)
+2025-12-28T15:50:06.953106588Z ==1==    by 0x10BC77: init_monitor_host_linked_list (pg_monitor.c:183)
+2025-12-28T15:50:06.953107463Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953108338Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953109171Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953110004Z ==1== 
+2025-12-28T15:50:06.953110796Z ==1== 24 bytes in 1 blocks are still reachable in loss record 4 of 11
+2025-12-28T15:50:06.953111838Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953112671Z ==1==    by 0x10BAD7: init_monitor_status (pg_monitor.c:130)
+2025-12-28T15:50:06.953113963Z ==1==    by 0x10BB73: init_monitor_host (pg_monitor.c:148)
+2025-12-28T15:50:06.953115296Z ==1==    by 0x10BC0B: init_monitor_host_linked_list (pg_monitor.c:173)
+2025-12-28T15:50:06.953116338Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953117588Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953118754Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953119838Z ==1== 
+2025-12-28T15:50:06.953120588Z ==1== 24 bytes in 1 blocks are still reachable in loss record 5 of 11
+2025-12-28T15:50:06.953123546Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953124879Z ==1==    by 0x10BAD7: init_monitor_status (pg_monitor.c:130)
+2025-12-28T15:50:06.953125713Z ==1==    by 0x10BB97: init_monitor_host (pg_monitor.c:154)
+2025-12-28T15:50:06.953126588Z ==1==    by 0x10BC0B: init_monitor_host_linked_list (pg_monitor.c:173)
+2025-12-28T15:50:06.953129046Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953129921Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953130796Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953131629Z ==1== 
+2025-12-28T15:50:06.953132546Z ==1== 48 bytes in 1 blocks are still reachable in loss record 6 of 11
+2025-12-28T15:50:06.953133921Z ==1==    at 0x488C5C4: calloc (vg_replace_malloc.c:1675)
+2025-12-28T15:50:06.953135005Z ==1==    by 0x10BB23: init_monitor_host (pg_monitor.c:142)
+2025-12-28T15:50:06.953136255Z ==1==    by 0x10BC0B: init_monitor_host_linked_list (pg_monitor.c:173)
+2025-12-28T15:50:06.953137130Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953138005Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953138838Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953139671Z ==1== 
+2025-12-28T15:50:06.953140463Z ==1== 48 bytes in 2 blocks are still reachable in loss record 7 of 11
+2025-12-28T15:50:06.953141338Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953142463Z ==1==    by 0x10BAD7: init_monitor_status (pg_monitor.c:130)
+2025-12-28T15:50:06.953143296Z ==1==    by 0x10BB73: init_monitor_host (pg_monitor.c:148)
+2025-12-28T15:50:06.953144130Z ==1==    by 0x10BC77: init_monitor_host_linked_list (pg_monitor.c:183)
+2025-12-28T15:50:06.953145005Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953146088Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953148088Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953149046Z ==1== 
+2025-12-28T15:50:06.953150338Z ==1== 48 bytes in 2 blocks are still reachable in loss record 8 of 11
+2025-12-28T15:50:06.953151213Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953152046Z ==1==    by 0x10BAD7: init_monitor_status (pg_monitor.c:130)
+2025-12-28T15:50:06.953152880Z ==1==    by 0x10BB97: init_monitor_host (pg_monitor.c:154)
+2025-12-28T15:50:06.953153755Z ==1==    by 0x10BC77: init_monitor_host_linked_list (pg_monitor.c:183)
+2025-12-28T15:50:06.953154630Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953155463Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953156296Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953158963Z ==1== 
+2025-12-28T15:50:06.953159838Z ==1== 92 bytes in 1 blocks are still reachable in loss record 9 of 11
+2025-12-28T15:50:06.953160713Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953161546Z ==1==    by 0x4A49F27: __vasprintf_internal (vasprintf.c:116)
+2025-12-28T15:50:06.953162380Z ==1==    by 0x4A49F8F: vasprintf (vasprintf.c:140)
+2025-12-28T15:50:06.953163421Z ==1==    by 0x10AB1F: format_string (utils.c:103)
+2025-12-28T15:50:06.953164255Z ==1==    by 0x10BABF: get_connection_string (pg_monitor.c:118)
+2025-12-28T15:50:06.953165088Z ==1==    by 0x10BB47: init_monitor_host (pg_monitor.c:144)
+2025-12-28T15:50:06.953165963Z ==1==    by 0x10BC0B: init_monitor_host_linked_list (pg_monitor.c:173)
+2025-12-28T15:50:06.953167421Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953168296Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953169171Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953170171Z ==1== 
+2025-12-28T15:50:06.953170921Z ==1== 96 bytes in 2 blocks are still reachable in loss record 10 of 11
+2025-12-28T15:50:06.953171796Z ==1==    at 0x488C5C4: calloc (vg_replace_malloc.c:1675)
+2025-12-28T15:50:06.953172671Z ==1==    by 0x10BB23: init_monitor_host (pg_monitor.c:142)
+2025-12-28T15:50:06.953173505Z ==1==    by 0x10BC77: init_monitor_host_linked_list (pg_monitor.c:183)
+2025-12-28T15:50:06.953174380Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953175213Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953178546Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953179463Z ==1== 
+2025-12-28T15:50:06.953180213Z ==1== 184 bytes in 2 blocks are still reachable in loss record 11 of 11
+2025-12-28T15:50:06.953181130Z ==1==    at 0x488545C: malloc (vg_replace_malloc.c:446)
+2025-12-28T15:50:06.953181963Z ==1==    by 0x4A49F27: __vasprintf_internal (vasprintf.c:116)
+2025-12-28T15:50:06.953182921Z ==1==    by 0x4A49F8F: vasprintf (vasprintf.c:140)
+2025-12-28T15:50:06.953183755Z ==1==    by 0x10AB1F: format_string (utils.c:103)
+2025-12-28T15:50:06.953184588Z ==1==    by 0x10BABF: get_connection_string (pg_monitor.c:118)
+2025-12-28T15:50:06.953185505Z ==1==    by 0x10BB47: init_monitor_host (pg_monitor.c:144)
+2025-12-28T15:50:06.953186588Z ==1==    by 0x10BC77: init_monitor_host_linked_list (pg_monitor.c:183)
+2025-12-28T15:50:06.953187421Z ==1==    by 0x10C15F: pg_monitor_thread (pg_monitor.c:341)
+2025-12-28T15:50:06.953188255Z ==1==    by 0x4A55F77: start_thread (pthread_create.c:448)
+2025-12-28T15:50:06.953189088Z ==1==    by 0x4ABDC1B: thread_start (clone.S:79)
+2025-12-28T15:50:06.953190130Z ==1== 
+2025-12-28T15:50:06.953197755Z ==1== LEAK SUMMARY:
+2025-12-28T15:50:06.953198713Z ==1==    definitely lost: 0 bytes in 0 blocks
+2025-12-28T15:50:06.953199630Z ==1==    indirectly lost: 0 bytes in 0 blocks
+2025-12-28T15:50:06.953200463Z ==1==      possibly lost: 0 bytes in 0 blocks
+2025-12-28T15:50:06.953201505Z ==1==    still reachable: 613 bytes in 16 blocks
+2025-12-28T15:50:06.953202547Z ==1==         suppressed: 0 bytes in 0 blocks
+2025-12-28T15:50:06.953203547Z ==1== 
+2025-12-28T15:50:06.953204505Z ==1== For lists of detected and suppressed errors, rerun with: -s
+2025-12-28T15:50:06.953205422Z ==1== ERROR SUMMARY: 132512 errors from 51 contexts (suppressed: 0 from 0)

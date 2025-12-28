@@ -17,6 +17,7 @@ target_compile_options(common_warnings INTERFACE
         -Wformat=2
         -Wundef
         -Wno-unused-parameter
+        -Wmissing-field-initializers
 
         "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
         "$<$<CONFIG:Debug>:-fno-omit-frame-pointer>"
