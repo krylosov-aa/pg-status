@@ -11,9 +11,12 @@
 
 
 /**
- * Parameter for stopping a thread
+ * Parameters for stopping a thread
  */
-atomic_uint pg_monitor_running = 1;
+static pthread_mutex_t monitor_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  monitor_cond  = PTHREAD_COND_INITIALIZER;
+static bool monitor_running = true;
+static pthread_t monitor_tid;
 
 /**
  * A pointer to the head of the linked list of hosts
@@ -337,10 +340,20 @@ void *pg_monitor_thread(void *arg) {
     get_values_from_env();
     init_monitor_host_linked_list();
 
-    while (atomic_load(&pg_monitor_running)) {
+    struct timespec ts;
+    pthread_mutex_lock(&monitor_mutex);
+    while (monitor_running) {
+        pthread_mutex_unlock(&monitor_mutex);
+
         check_hosts();
-        sleep(parameters.sleep);
+
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += parameters.sleep;
+
+        pthread_mutex_lock(&monitor_mutex);
+        pthread_cond_timedwait(&monitor_cond, &monitor_mutex, &ts);
     }
+    pthread_mutex_unlock(&monitor_mutex);
     return nullptr;
 }
 
@@ -348,22 +361,26 @@ void *pg_monitor_thread(void *arg) {
  * Starts a host monitoring thread
  */
 pthread_t start_pg_monitor() {
-    pthread_t pg_monitor_tid;
     const int started = pthread_create(
-        &pg_monitor_tid, nullptr, pg_monitor_thread, nullptr
+        &monitor_tid, nullptr, pg_monitor_thread, nullptr
     );
 
     if (started != 0)
         raise_error("Failed to start pg_monitor");
 
     printf("pg_monitor started\n");
-    return pg_monitor_tid;
+    return monitor_tid;
 }
 
 /**
  * Stops a host monitoring thread
  */
 void stop_pg_monitor(void) {
-    atomic_store(&pg_monitor_running, true);
+    pthread_mutex_lock(&monitor_mutex);
+        monitor_running = false;
+        pthread_cond_signal(&monitor_cond);
+    pthread_mutex_unlock(&monitor_mutex);
+
+    pthread_join(monitor_tid, nullptr);
     printf("pg_monitor stopped\n");
 }
