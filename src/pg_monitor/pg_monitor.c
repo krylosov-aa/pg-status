@@ -328,6 +328,7 @@ void check_hosts(void) {
         cursor = cursor -> next;
     }
     printf("\n");
+    fflush(stdout);
 }
 
 /**
