@@ -1,27 +1,27 @@
 services:
-  pg-status:
-    image: pg-status:latest
-    ports:
-      - 8000:8000
-    deploy:
-      resources:
-        limits:
-          cpus: "1"
-          memory: 64M
-        reservations:
-          cpus: "1"
-          memory: 64M
-    networks:
-      - net
-    restart: unless-stopped
-    environment:
-      - pg_status__connect_timeout=2
-      - pg_status__hosts=pg-proxy-1,pg-proxy-2,pg-proxy-3
-      - pg_status__pg_database=postgres
-      - pg_status__pg_password=postgres
-      - pg_status__pg_user=postgres
-      - pg_status__port=5432
-      - pg_status__sleep=5
+#  pg-status:
+#    image: pg-status:latest
+#    ports:
+#      - 8000:8000
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "1"
+#          memory: 64M
+#        reservations:
+#          cpus: "1"
+#          memory: 64M
+#    networks:
+#      - net
+#    restart: unless-stopped
+#    environment:
+#      - pg_status__connect_timeout=2
+#      - pg_status__hosts=pg-proxy-1,pg-proxy-2,pg-proxy-3
+#      - pg_status__pg_database=postgres
+#      - pg_status__pg_password=postgres
+#      - pg_status__pg_user=postgres
+#      - pg_status__port=5432
+#      - pg_status__sleep=5
 
   postgres_master:
     build:

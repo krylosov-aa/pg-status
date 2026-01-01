@@ -37,6 +37,9 @@ void get_replicas_json(HTTPResponse *response) {
 }
 
 void return_single_host(HTTPResponse *response, const char *host) {
+    if (is_equal_strings(host, "null"))
+        response -> status_code = 404;
+
     if (need_json_response(response)) {
         response -> response = json_to_str(host_to_json(host));
         response -> memory_mode = MHD_RESPMEM_MUST_FREE;

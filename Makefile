@@ -29,3 +29,8 @@ build_up_test:
 
 2-master:
 	./test/pg-proxy-2_is_master.sh
+
+build_push:
+	docker build --platform linux/amd64 -t pg-status:${v} .
+	docker tag pg-status:${v} registry.yandex.net/skills/pg-status:${v}
+	docker push registry.yandex.net/skills/pg-status:${v}
