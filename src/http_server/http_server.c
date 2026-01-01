@@ -47,12 +47,18 @@ MHD_Result queue_response(
         response -> mhd_response = nullptr;
     }
 
-    if (!mhd_response && response -> response)
-        mhd_response = MHD_create_response_from_buffer(
-            strlen(response -> response),
-            (void*) response -> response,
-            response -> memory_mode
-        );
+    if (!mhd_response) {
+        if (response -> response)
+            mhd_response = MHD_create_response_from_buffer(
+                strlen(response -> response),
+                (void*) response -> response,
+                response -> memory_mode
+            );
+        else
+            mhd_response = MHD_create_response_from_buffer(
+                0, NULL, MHD_RESPMEM_PERSISTENT
+            );
+    }
 
     if (mhd_response) {
         if (response -> content_type != nullptr)
@@ -172,9 +178,7 @@ MHD_Result process_handler(
 
     handler(response);
 
-    if (response -> mhd_response || response -> response) {
-        result = queue_response(connection, response, path, method);
-    }
+    result = queue_response(connection, response, path, method);
     return result;
 }
 
