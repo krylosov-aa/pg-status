@@ -88,6 +88,8 @@ char *copy_string(const char *str) {
  * Checks if strings are the same
  */
 bool is_equal_strings(const char *first, const char *second) {
+    if (!first || !second)
+        return false;
     return strcmp(first, second) == 0;
 }
 

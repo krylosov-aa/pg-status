@@ -24,7 +24,7 @@ typedef struct HTTPResponse {
 
     // Response type. It can be set by the server or specified by handler.
     // Must be allocated on the heap and will be freed by the server.
-    char *content_type;
+    const char *content_type;
 
     // What to do with the response after mhd gives the response to the client
     MHD_ResponseMemoryMode memory_mode;
@@ -62,5 +62,7 @@ MHD_Daemon *start_http_server(
  * Stops http server daemon
  */
 void stop_http_server(MHD_Daemon *daemon);
+
+bool need_json_response(const HTTPResponse *response);
 
 #endif //PG_STATUS_HTTP_SERVER_H

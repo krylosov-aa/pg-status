@@ -33,10 +33,7 @@ MHD_Result get_replicas_json(HTTPResponse *response) {
 
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-    response -> status_code = MHD_HTTP_OK;
-
-    if (!response -> content_type)
-        response -> content_type = format_string("application/json");
+    response -> content_type = "application/json";
 
     return MHD_YES;
 }
@@ -47,21 +44,16 @@ MHD_Result get_random_replica_json(HTTPResponse *response) {
 
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
 
 MHD_Result get_random_replica(HTTPResponse *response) {
-    if (
-        response -> content_type &&
-        is_equal_strings(response -> content_type, "application/json")
-    )
+    if (need_json_response(response))
         return get_random_replica_json(response);
 
     response -> response = round_robin_replica();
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
@@ -72,21 +64,16 @@ MHD_Result get_master_json(HTTPResponse *response) {
 
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
 
 MHD_Result get_master(HTTPResponse *response) {
-    if (
-        response -> content_type &&
-        is_equal_strings(response -> content_type, "application/json")
-    )
+    if (need_json_response(response))
         return get_master_json(response);
 
     response -> response = find_host(is_master, false);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
@@ -97,21 +84,16 @@ MHD_Result get_sync_host_by_time_json(HTTPResponse *response) {
 
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
 
 MHD_Result get_sync_host_by_time(HTTPResponse *response) {
-    if (
-        response -> content_type &&
-        is_equal_strings(response -> content_type, "application/json")
-    )
+    if (need_json_response(response))
         return get_sync_host_by_time_json(response);
 
     response -> response = find_host(is_sync_replica_by_time, true);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
@@ -122,21 +104,16 @@ MHD_Result get_sync_host_by_bytes_json(HTTPResponse *response) {
 
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
 
 MHD_Result get_sync_host_by_bytes(HTTPResponse *response) {
-    if (
-        response -> content_type &&
-        is_equal_strings(response -> content_type, "application/json")
-    )
+    if (need_json_response(response))
         return get_sync_host_by_bytes_json(response);
 
     response -> response = find_host(is_sync_replica_by_bytes, true);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
@@ -147,21 +124,16 @@ MHD_Result get_sync_host_by_time_or_bytes_json(HTTPResponse *response) {
 
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
 
 MHD_Result get_sync_host_by_time_or_bytes(HTTPResponse *response) {
-    if (
-        response -> content_type &&
-        is_equal_strings(response -> content_type, "application/json")
-    )
+    if (need_json_response(response))
         return get_sync_host_by_time_or_bytes_json(response);
 
     response -> response = find_host(is_sync_replica_by_time_or_bytes, true);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
@@ -172,21 +144,16 @@ MHD_Result get_sync_host_by_time_and_bytes_json(HTTPResponse *response) {
 
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }
 
 MHD_Result get_sync_host_by_time_and_bytes(HTTPResponse *response) {
-    if (
-        response -> content_type &&
-        is_equal_strings(response -> content_type, "application/json")
-    )
+    if (need_json_response(response))
         return get_sync_host_by_time_and_bytes_json(response);
 
     response -> response = find_host(is_sync_replica_by_time_and_bytes, true);
     response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-    response -> status_code = MHD_HTTP_OK;
 
     return MHD_YES;
 }

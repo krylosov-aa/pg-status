@@ -116,9 +116,6 @@ void request_completed(
     }
     if (*req_cls) {
         HTTPResponse *response = *req_cls;
-        char *content_type = response -> content_type;
-        if (content_type != nullptr)
-            free(content_type);
         free(response);
     }
 }
@@ -169,10 +166,10 @@ MHD_Result process_handler(
     const request_handler_t handler = find_handler(method, path);
 
     const char *content_type = MHD_lookup_connection_value(
-        connection, MHD_HEADER_KIND, MHD_HTTP_HEADER_CONTENT_TYPE
+        connection, MHD_HEADER_KIND, MHD_HTTP_HEADER_ACCEPT
     );
     if (content_type != nullptr)
-        response -> content_type = copy_string(content_type);
+        response -> content_type = content_type;
 
     result = handler(response);
 
@@ -192,7 +189,7 @@ HTTPResponse *allocate_response(void) {
         response -> response = nullptr;
         response -> memory_mode = MHD_RESPMEM_MUST_COPY;
         response -> content_type = nullptr;
-        response -> status_code = 200;
+        response -> status_code = MHD_HTTP_OK;
     }
     return response;
 }
@@ -297,4 +294,12 @@ MHD_Daemon *start_http_server(
 void stop_http_server(MHD_Daemon *daemon) {
     MHD_stop_daemon(daemon);
     printf("http server stopped\n");
+}
+
+
+bool need_json_response(const HTTPResponse *response) {
+    return (
+        response -> content_type &&
+        is_equal_strings(response -> content_type, "application/json")
+    );
 }
