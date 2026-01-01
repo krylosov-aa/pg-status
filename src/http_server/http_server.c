@@ -23,13 +23,12 @@ Routes *routes_list = nullptr;
 /**
  * The default handler if no matching route is found is to return a 404.
  */
-MHD_Result not_found(HTTPResponse *response) {
+void not_found(HTTPResponse *response) {
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         0, NULL, MHD_RESPMEM_PERSISTENT
     );
     response -> mhd_response = mhd_response;
     response -> status_code = MHD_HTTP_NOT_FOUND;
-    return MHD_YES;
 }
 
 /**
@@ -171,7 +170,7 @@ MHD_Result process_handler(
     if (content_type != nullptr)
         response -> content_type = content_type;
 
-    result = handler(response);
+    handler(response);
 
     if (response -> mhd_response || response -> response) {
         result = queue_response(connection, response, path, method);

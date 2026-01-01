@@ -27,135 +27,54 @@ cJSON *replicas_to_json(const MonitorHost *cursor) {
     return arr;
 }
 
-MHD_Result get_replicas_json(HTTPResponse *response) {
+void get_replicas_json(HTTPResponse *response) {
     const MonitorHost *stat = get_monitor_host_head();
     cJSON *json = replicas_to_json(stat);
 
     response -> response = json_to_str(json);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
     response -> content_type = "application/json";
-
-    return MHD_YES;
 }
 
-MHD_Result get_random_replica_json(HTTPResponse *response) {
-    char *host = round_robin_replica();
-    cJSON *json = host_to_json(host);
-
-    response -> response = json_to_str(json);
-    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-
-    return MHD_YES;
+void return_single_host(HTTPResponse *response, const char *host) {
+    if (need_json_response(response)) {
+        response -> response = json_to_str(host_to_json(host));
+        response -> memory_mode = MHD_RESPMEM_MUST_FREE;
+    }
+    else {
+        response -> response = round_robin_replica();
+        response -> memory_mode = MHD_RESPMEM_PERSISTENT;
+    }
 }
 
-MHD_Result get_random_replica(HTTPResponse *response) {
-    if (need_json_response(response))
-        return get_random_replica_json(response);
-
-    response -> response = round_robin_replica();
-    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-
-    return MHD_YES;
+void get_random_replica(HTTPResponse *response) {
+    const char *host = round_robin_replica();
+    return_single_host(response, host);
 }
 
-MHD_Result get_master_json(HTTPResponse *response) {
-    char *master = find_host(is_master, false);
-    cJSON *json = host_to_json(master);
-
-    response -> response = json_to_str(json);
-    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-
-    return MHD_YES;
+void get_master(HTTPResponse *response) {
+    const char *host = find_host(is_master, false);
+    return_single_host(response, host);
 }
 
-MHD_Result get_master(HTTPResponse *response) {
-    if (need_json_response(response))
-        return get_master_json(response);
-
-    response -> response = find_host(is_master, false);
-    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-
-    return MHD_YES;
+void get_sync_host_by_time(HTTPResponse *response) {
+    const char *host = find_host(is_sync_replica_by_time, true);
+    return_single_host(response, host);
 }
 
-MHD_Result get_sync_host_by_time_json(HTTPResponse *response) {
-    char *master = find_host(is_sync_replica_by_time, true);
-    cJSON *json = host_to_json(master);
-
-    response -> response = json_to_str(json);
-    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-
-    return MHD_YES;
+void get_sync_host_by_bytes(HTTPResponse *response) {
+    const char *host = find_host(is_sync_replica_by_bytes, true);
+    return_single_host(response, host);
 }
 
-MHD_Result get_sync_host_by_time(HTTPResponse *response) {
-    if (need_json_response(response))
-        return get_sync_host_by_time_json(response);
-
-    response -> response = find_host(is_sync_replica_by_time, true);
-    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-
-    return MHD_YES;
+void get_sync_host_by_time_or_bytes(HTTPResponse *response) {
+    const char *host = find_host(is_sync_replica_by_time_or_bytes, true);
+    return_single_host(response, host);
 }
 
-MHD_Result get_sync_host_by_bytes_json(HTTPResponse *response) {
-    char *master = find_host(is_sync_replica_by_bytes, true);
-    cJSON *json = host_to_json(master);
-
-    response -> response = json_to_str(json);
-    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-
-    return MHD_YES;
-}
-
-MHD_Result get_sync_host_by_bytes(HTTPResponse *response) {
-    if (need_json_response(response))
-        return get_sync_host_by_bytes_json(response);
-
-    response -> response = find_host(is_sync_replica_by_bytes, true);
-    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-
-    return MHD_YES;
-}
-
-MHD_Result get_sync_host_by_time_or_bytes_json(HTTPResponse *response) {
-    char *master = find_host(is_sync_replica_by_time_or_bytes, true);
-    cJSON *json = host_to_json(master);
-
-    response -> response = json_to_str(json);
-    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-
-    return MHD_YES;
-}
-
-MHD_Result get_sync_host_by_time_or_bytes(HTTPResponse *response) {
-    if (need_json_response(response))
-        return get_sync_host_by_time_or_bytes_json(response);
-
-    response -> response = find_host(is_sync_replica_by_time_or_bytes, true);
-    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-
-    return MHD_YES;
-}
-
-MHD_Result get_sync_host_by_time_and_bytes_json(HTTPResponse *response) {
-    char *master = find_host(is_sync_replica_by_time_and_bytes, true);
-    cJSON *json = host_to_json(master);
-
-    response -> response = json_to_str(json);
-    response -> memory_mode = MHD_RESPMEM_MUST_FREE;
-
-    return MHD_YES;
-}
-
-MHD_Result get_sync_host_by_time_and_bytes(HTTPResponse *response) {
-    if (need_json_response(response))
-        return get_sync_host_by_time_and_bytes_json(response);
-
-    response -> response = find_host(is_sync_replica_by_time_and_bytes, true);
-    response -> memory_mode = MHD_RESPMEM_PERSISTENT;
-
-    return MHD_YES;
+void get_sync_host_by_time_and_bytes(HTTPResponse *response) {
+    const char *host = find_host(is_sync_replica_by_time_and_bytes, true);
+    return_single_host(response, host);
 }
 
 
