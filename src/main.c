@@ -10,7 +10,10 @@
 
 cJSON *host_to_json(const char *host) {
     cJSON *obj = json_object();
-    add_str_to_json_object(obj, "host", host);
+    if (is_equal_strings(host, "null"))
+        add_null_to_json_object(obj, "host");
+    else
+        add_str_to_json_object(obj, "host", host);
     return obj;
 }
 

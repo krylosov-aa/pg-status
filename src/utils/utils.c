@@ -298,6 +298,15 @@ void add_str_to_json_object(cJSON * obj, const char *key, const char *val) {
 }
 
 /**
+ * Adds a new key with value null to json
+ */
+void add_null_to_json_object(cJSON * obj, const char *key) {
+    if (!cJSON_AddNullToObject(obj, key)) {
+        raise_error("Can't add null to object");
+    }
+}
+
+/**
  * Converts json to string.
  * The string must be freed by the caller.
  */
