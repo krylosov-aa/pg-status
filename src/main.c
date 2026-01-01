@@ -10,7 +10,7 @@
 
 cJSON *host_to_json(const char *host) {
     cJSON *obj = json_object();
-    if (is_equal_strings(host, "null"))
+    if (!host)
         add_null_to_json_object(obj, "host");
     else
         add_str_to_json_object(obj, "host", host);
@@ -40,7 +40,7 @@ void get_replicas_json(HTTPResponse *response) {
 }
 
 void return_single_host(HTTPResponse *response, const char *host) {
-    if (is_equal_strings(host, "null"))
+    if (!host)
         response -> status_code = 404;
 
     if (need_json_response(response)) {

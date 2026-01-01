@@ -227,7 +227,7 @@ char *find_host(
     if (master_if_not_found && master)
         return master -> host;
 
-    return "null";
+    return nullptr;
 }
 
 /**
