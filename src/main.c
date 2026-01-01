@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <cjson/cJSON.h>
 
-cJSON *host_to_json(const char *host) {
+cJSON *host_to_json(char *host) {
     cJSON *obj = json_object();
     if (!host)
         add_null_to_json_object(obj, "host");
@@ -39,7 +39,7 @@ void get_replicas_json(HTTPResponse *response) {
     response -> content_type = "application/json";
 }
 
-void return_single_host(HTTPResponse *response, const char *host) {
+void return_single_host(HTTPResponse *response, char *host) {
     if (!host)
         response -> status_code = 404;
 
@@ -48,38 +48,38 @@ void return_single_host(HTTPResponse *response, const char *host) {
         response -> memory_mode = MHD_RESPMEM_MUST_FREE;
     }
     else {
-        response -> response = round_robin_replica();
+        response -> response = host;
         response -> memory_mode = MHD_RESPMEM_PERSISTENT;
     }
 }
 
 void get_random_replica(HTTPResponse *response) {
-    const char *host = round_robin_replica();
+    char *host = round_robin_replica();
     return_single_host(response, host);
 }
 
 void get_master(HTTPResponse *response) {
-    const char *host = find_host(is_master, false);
+    char *host = find_host(is_master, false);
     return_single_host(response, host);
 }
 
 void get_sync_host_by_time(HTTPResponse *response) {
-    const char *host = find_host(is_sync_replica_by_time, true);
+    char *host = find_host(is_sync_replica_by_time, true);
     return_single_host(response, host);
 }
 
 void get_sync_host_by_bytes(HTTPResponse *response) {
-    const char *host = find_host(is_sync_replica_by_bytes, true);
+    char *host = find_host(is_sync_replica_by_bytes, true);
     return_single_host(response, host);
 }
 
 void get_sync_host_by_time_or_bytes(HTTPResponse *response) {
-    const char *host = find_host(is_sync_replica_by_time_or_bytes, true);
+    char *host = find_host(is_sync_replica_by_time_or_bytes, true);
     return_single_host(response, host);
 }
 
 void get_sync_host_by_time_and_bytes(HTTPResponse *response) {
-    const char *host = find_host(is_sync_replica_by_time_and_bytes, true);
+    char *host = find_host(is_sync_replica_by_time_and_bytes, true);
     return_single_host(response, host);
 }
 
