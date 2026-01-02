@@ -10,10 +10,12 @@
 
 cJSON *host_to_json(char *host) {
     cJSON *obj = json_object();
-    if (!host)
+    if (!host) {
         add_null_to_json_object(obj, "host");
-    else
+    }
+    else {
         add_str_to_json_object(obj, "host", host);
+    }
     return obj;
 }
 
@@ -22,8 +24,9 @@ cJSON *replicas_to_json(const MonitorHost *cursor) {
 
     while (cursor) {
         const MonitorStatus *status = atomic_get_status(cursor);
-        if (is_alive_replica(status))
+        if (is_alive_replica(status)) {
             cJSON_AddItemToArray(arr, host_to_json(cursor -> host));
+        }
         cursor = cursor -> next;
     }
 
@@ -40,8 +43,9 @@ void get_replicas_json(HTTPResponse *response) {
 }
 
 void return_single_host(HTTPResponse *response, char *host) {
-    if (!host)
+    if (!host) {
         response -> status_code = 404;
+    }
 
     if (need_json_response(response)) {
         response -> response = json_to_str(host_to_json(host));
@@ -112,10 +116,12 @@ int main(void) {
     );
 
     if (sigwait(&sigset, &sig) == 0) {
-        if (sig == SIGINT)
+        if (sig == SIGINT) {
             printf("SIGINT\n");
-        else if (sig == SIGTERM)
+        }
+        else if (sig == SIGTERM) {
             printf("SIGTERM\n");
+        }
     }
 
     stop_pg_monitor();

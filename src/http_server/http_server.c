@@ -48,34 +48,38 @@ MHD_Result queue_response(
     }
 
     if (!mhd_response) {
-        if (response -> response)
+        if (response -> response) {
             mhd_response = MHD_create_response_from_buffer(
                 strlen(response -> response),
                 (void*) response -> response,
                 response -> memory_mode
             );
-        else
+        }
+        else {
             mhd_response = MHD_create_response_from_buffer(
                 0, NULL, MHD_RESPMEM_PERSISTENT
             );
+        }
     }
 
     if (mhd_response) {
-        if (response -> content_type != nullptr)
+        if (response -> content_type != nullptr) {
             MHD_add_response_header(
                 mhd_response,
                 MHD_HTTP_HEADER_CONTENT_TYPE,
                 response -> content_type
             );
+        }
 
         ret = MHD_queue_response(
             connection, response->status_code, mhd_response
         );
 
-        if (ret != MHD_YES)
+        if (ret != MHD_YES) {
             printf_error(
                 "Failed to MHD_queue_response %s %s", method, path
             );
+        }
 
         MHD_destroy_response(mhd_response);
 
@@ -151,9 +155,12 @@ request_handler_t find_handler(const char *method, const char *path) {
     for (unsigned int i = 0; i < routes_list -> cnt; i++) {
         Route *routes = routes_list -> routes;
 
-        if (strcmp(routes[i].method, method) == 0 &&
-            strcmp(routes[i].path, path) == 0)
+        if (
+            strcmp(routes[i].method, method) == 0 &&
+            strcmp(routes[i].path, path) == 0
+        ) {
             return routes[i].handler;
+        }
     }
     return not_found;
 }
@@ -173,8 +180,9 @@ MHD_Result process_handler(
     const char *content_type = MHD_lookup_connection_value(
         connection, MHD_HEADER_KIND, MHD_HTTP_HEADER_ACCEPT
     );
-    if (content_type != nullptr)
+    if (content_type != nullptr) {
         response -> content_type = content_type;
+    }
 
     handler(response);
 
@@ -301,8 +309,8 @@ void stop_http_server(MHD_Daemon *daemon) {
 
 
 bool need_json_response(const HTTPResponse *response) {
-    return (
+    return
         response -> content_type &&
         is_equal_strings(response -> content_type, "application/json")
-    );
+    ;
 }

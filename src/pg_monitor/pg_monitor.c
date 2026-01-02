@@ -72,8 +72,9 @@ void get_values_from_env(void) {
     );
 
     replace_from_env("pg_status__hosts", &parameters.hosts);
-    if (parameters.hosts == nullptr)
+    if (parameters.hosts == nullptr) {
         raise_error("pg_status__hosts not set");
+    }
 }
 
 /**
@@ -84,10 +85,12 @@ char *next_host(char *hosts) {
     static char *save_ptr = nullptr;
     static char *host = nullptr;
 
-    if (host == nullptr)
+    if (host == nullptr) {
         host = strtok_r(hosts, parameters.hosts_delimiter, &save_ptr);
-    else
+    }
+    else {
         host = strtok_r(nullptr, parameters.hosts_delimiter, &save_ptr);
+    }
     return host;
 }
 
@@ -101,13 +104,16 @@ char *next_port(char *ports) {
     static char *save_ptr = nullptr;
     static char *port = nullptr;
 
-    if (port == nullptr)
+    if (port == nullptr) {
         port = strtok_r(ports, parameters.hosts_delimiter, &save_ptr);
-    else
+    }
+    else {
         port = strtok_r(nullptr, parameters.hosts_delimiter, &save_ptr);
+    }
 
-    if (port != nullptr)
+    if (port != nullptr) {
         last_port = port;
+    }
     return last_port;
 }
 
@@ -140,7 +146,7 @@ MonitorStatus *init_monitor_status(void) {
  */
 MonitorHost *init_monitor_host(char *host, char *port) {
     MonitorHost *monitor_host = calloc(1, sizeof(MonitorHost));
-    monitor_host -> host = copy_string(host);
+    monitor_host -> host = strdup(host);
     monitor_host -> connection_str = get_connection_string(host, port);
     monitor_host -> next = nullptr;
     monitor_host -> failed_connections = 0;
@@ -164,10 +170,10 @@ MonitorHost *init_monitor_host(char *host, char *port) {
  * Initializes MonitorHost linked list to its initial value.
  */
 void init_monitor_host_linked_list(void) {
-    char *hosts = copy_string(parameters.hosts);
+    char *hosts = strdup(parameters.hosts);
     char *host = next_host(hosts);
 
-    char *ports = copy_string(parameters.port);
+    char *ports = strdup(parameters.port);
     char *port = next_port(ports);
 
     monitor_host_head = init_monitor_host(host, port);
@@ -177,8 +183,9 @@ void init_monitor_host_linked_list(void) {
     unsigned int cnt = 1;
 
     while (host) {
-        if (cnt == MAX_HOSTS)
+        if (cnt == MAX_HOSTS) {
             raise_error("Too many hosts. Maximum value = %d", MAX_HOSTS);
+        }
 
         cursor -> next = init_monitor_host(host, port);
         cursor = cursor -> next;
@@ -215,17 +222,20 @@ char *find_host(
     while (cursor) {
         const MonitorStatus *status = atomic_get_status(cursor);
 
-        if (handler(status))
+        if (handler(status)) {
             return cursor -> host;
+        }
 
-        if (status -> is_master)
+        if (status -> is_master) {
             master = cursor;
+        }
 
         cursor = cursor -> next;
     }
 
-    if (master_if_not_found && master)
+    if (master_if_not_found && master) {
         return master -> host;
+    }
 
     return nullptr;
 }
@@ -296,19 +306,23 @@ char *round_robin_replica(void) {
     MonitorHost *cursor = atomic_load_explicit(
         &last_random_replica, memory_order_acquire
     );
-    if (!cursor || !cursor -> next)
+    if (!cursor || !cursor -> next) {
         cursor = get_monitor_host_head();
-    else
+    }
+    else {
         cursor = cursor -> next;
+    }
     const MonitorStatus *status = atomic_get_status(cursor);
     const MonitorHost *start = cursor;
 
     while (!is_alive_replica(status)) {
         cursor = cursor -> next;
-        if (!cursor)
+        if (!cursor) {
             cursor = get_monitor_host_head();
-        if (cursor == start)
+        }
+        if (cursor == start) {
             return find_host(is_master, false);
+        }
 
         status = atomic_get_status(cursor);
     }
@@ -328,7 +342,7 @@ void check_hosts(void) {
         cursor = cursor -> next;
     }
     printf("\n");
-    fflush(stdout);
+    (void)fflush(stdout);
 }
 
 /**
@@ -364,8 +378,9 @@ pthread_t start_pg_monitor() {
         &monitor_tid, nullptr, pg_monitor_thread, nullptr
     );
 
-    if (started != 0)
+    if (started != 0) {
         raise_error("Failed to start pg_monitor");
+    }
 
     printf("pg_monitor started\n");
     return monitor_tid;

@@ -1,0 +1,22 @@
+Checks: >
+  *,
+  -readability-magic-numbers,
+  -cppcoreguidelines-*,
+  -modernize-*,
+  -hicpp-*,
+  -fuchsia-*,
+  -google-*,
+  -llvm-*,
+  -android-*,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -bugprone-easily-swappable-parameters,
+  -llvmlibc-restrict-system-libc-headers,
+  -altera-*,
+  -misc-include-cleaner,
+  -concurrency-mt-unsafe,
+  -misc-unused-parameters,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'src/.*'

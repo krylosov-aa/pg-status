@@ -114,7 +114,7 @@ typedef bool (*condition_handler)(const MonitorStatus *);
  * @return Host name corresponding to conditions
  */
 char *find_host(
-    const condition_handler handler, const bool master_if_not_found
+    condition_handler handler, bool master_if_not_found
 );
 
 /**
@@ -156,7 +156,7 @@ bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status);
  * Updates the host status
  */
 void check_host_streaming_replication(
-    MonitorHost *host, const unsigned int max_fails
+    MonitorHost *host, unsigned int max_fails
 );
 
 #endif //PG_STATUS_PG_MONITOR_H

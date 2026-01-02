@@ -31,16 +31,25 @@ FileDescriptor open_file(const char *path) {
     return mfd;
 }
 
+int fputs_error(void) {
+    char buf[256];
+    if (strerror_r(errno, buf, sizeof(buf)) == 0) {
+        return fputs(buf, stderr);
+    }
+    return fputs("Unknown error", stderr);
+}
+
 /**
  * Prints the message in red with \n and also adds the error text from errno
  */
 void printf_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    (void)vfprintf(stderr, format, args);
     va_end(args);
-    fprintf(stderr, ". strerror: %s\n", strerror(errno));
-    fprintf(stderr, "\n");
+    (void)fputs(". strerror: ", stderr);
+    (void)fputs_error();
+    (void)fputc('\n', stderr);
 }
 
 /**
@@ -50,11 +59,12 @@ void printf_error(const char *format, ...) {
 void raise_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    (void)vfprintf(stderr, format, args);
     va_end(args);
-    fprintf(stderr, ". strerror: %s\n", strerror(errno));
-    fprintf(stderr, "\n");
-    exit(1);
+    (void)fputs(". strerror: ", stderr);
+    (void)fputs_error();
+    (void)fputc('\n', stderr);
+    _Exit(EXIT_FAILURE);
 }
 
 /**
@@ -62,34 +72,24 @@ void raise_error(const char *format, ...) {
  * The result must be freed by the caller.
  */
 char *concatenate_strings(const char *first, const char *second) {
-    char *new = malloc(strlen(first) + strlen(second) + 1);
-    strcpy(new, first);
-    strcat(new, second);
+    const size_t len1 = strlen(first);
+    const size_t len2 = strlen(second);
+    char *new = malloc(len1 + len2 + 1);
+    if (!new) {
+        return nullptr;
+    }
+    strlcpy(new, first, len1 + len2 + 1);
+    strlcat(new, second, len1 + len2 + 1);
     return new;
-}
-
-/**
- * Copies a string. The result must be freed by the caller.
- */
-char *copy_string(const char *str) {
-    if (str == nullptr)
-        return nullptr;
-
-    const size_t size = strlen(str) + 1;
-    char *new_str = malloc(size);
-    if (new_str == nullptr)
-        return nullptr;
-
-    memcpy(new_str, str, size);
-    return new_str;
 }
 
 /**
  * Checks if strings are the same
  */
 bool is_equal_strings(const char *first, const char *second) {
-    if (!first || !second)
+    if (!first || !second) {
         return false;
+    }
     return strcmp(first, second) == 0;
 }
 
@@ -102,11 +102,13 @@ char *format_string(const char *format, ...) {
     va_list args;
     va_start(args, format);
     char *string = nullptr;
-    if (vasprintf(&string, format, args) < 0) {
-        printf_error("Unable to format_string %s", format);
-        exit(1);
-    }
+    const int len = vasprintf(&string, format, args);
     va_end(args);
+
+    if (len < 0) {
+        printf_error("Unable to format_string %s", format);
+        _Exit(EXIT_FAILURE);
+    }
     return string;
 }
 
@@ -117,7 +119,7 @@ char *ulong_to_str(const unsigned long value) {
     const int len = snprintf(nullptr, 0, "%lu", value);
     const size_t size = (size_t)len + 1;
     char *str = malloc(size);
-    snprintf(str, size, "%lu", value);
+    (void)snprintf(str, size, "%lu", value);
     return str;
 }
 
@@ -128,7 +130,7 @@ char *long_to_str(const long value) {
     const int len = snprintf(nullptr, 0, "%ld", value);
     const size_t size = (size_t)len + 1;
     char *str = malloc(size);
-    snprintf(str, size, "%ld", value);
+    (void)snprintf(str, size, "%ld", value);
     return str;
 }
 
@@ -139,7 +141,7 @@ char *int_to_str(const int value) {
     const int len = snprintf(nullptr, 0, "%d", value);
     const size_t size = (size_t)len + 1;
     char *str = malloc(size);
-    snprintf(str, size, "%d", value);
+    (void)snprintf(str, size, "%d", value);
     return str;
 }
 
@@ -150,7 +152,7 @@ char *uint_to_str(const unsigned int value) {
     const int len = snprintf(nullptr, 0, "%u", value);
     const size_t size = (size_t)len + 1;
     char *str = malloc(size);
-    snprintf(str, size, "%u", value);
+    (void)snprintf(str, size, "%u", value);
     return str;
 }
 
@@ -167,8 +169,9 @@ long str_to_long(const char *value) {
         end_ptr == value ||
         *end_ptr != '\0' ||
         errno == ERANGE
-    )
+    ) {
         raise_error("Failed to convert '%s' to long", value);
+    }
 
     return result;
 }
@@ -186,8 +189,9 @@ unsigned long str_to_ulong(const char *value) {
         end_ptr == value ||
         *end_ptr != '\0' ||
         errno == ERANGE
-    )
+    ) {
         raise_error("Failed to convert '%s' to ulong", value);
+    }
 
     return result;
 }
@@ -205,8 +209,9 @@ unsigned long long str_to_ull(const char *value) {
         end_ptr == value ||
         *end_ptr != '\0' ||
         errno == ERANGE
-    )
+    ) {
         raise_error("Failed to convert '%s' to ull", value);
+    }
 
     return result;
 }
@@ -231,8 +236,9 @@ unsigned int str_to_uint(const char *value) {
  */
 void replace_from_env(const char *env_name, char **result) {
     char *env_val = getenv(env_name);
-    if (env_val && *env_val)
+    if (env_val && *env_val) {
         *result = env_val;
+    }
 }
 
 /**
@@ -241,8 +247,9 @@ void replace_from_env(const char *env_name, char **result) {
  */
 void replace_from_env_uint(const char *env_name, unsigned int *result) {
     const char *env_val = getenv(env_name);
-    if (env_val && *env_val)
+    if (env_val && *env_val) {
         *result = str_to_uint(env_val);
+    }
 }
 
 /**
@@ -251,8 +258,9 @@ void replace_from_env_uint(const char *env_name, unsigned int *result) {
  */
 void replace_from_env_ull(const char *env_name, unsigned long long *result) {
     const char *env_val = getenv(env_name);
-    if (env_val && *env_val)
+    if (env_val && *env_val) {
         *result = str_to_ull(env_val);
+    }
 }
 
 /**
@@ -263,7 +271,7 @@ void replace_from_env_ull(const char *env_name, unsigned long long *result) {
 void replace_from_env_copy(const char *env_name, char **result) {
     const char *env_val = getenv(env_name);
     if (env_val != nullptr && *env_val) {
-        char *env_val_copy = copy_string(env_val);
+        char *env_val_copy = strdup(env_val);
         *result = env_val_copy;
     }
 }
@@ -273,8 +281,9 @@ void replace_from_env_copy(const char *env_name, char **result) {
  */
 cJSON *json_array(void) {
     cJSON *arr = cJSON_CreateArray();
-    if (!arr)
+    if (!arr) {
         raise_error("Can't create json array");
+    }
     return arr;
 }
 
@@ -283,8 +292,9 @@ cJSON *json_array(void) {
  */
 cJSON *json_object(void) {
     cJSON *arr = cJSON_CreateObject();
-    if (!arr)
+    if (!arr) {
         raise_error("Can't create json object");
+    }
     return arr;
 }
 

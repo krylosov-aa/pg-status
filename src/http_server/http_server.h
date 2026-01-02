@@ -53,9 +53,9 @@ typedef struct Route {
  * Starts http server daemon
  */
 MHD_Daemon *start_http_server(
-    const uint16_t port,
+    uint16_t port,
     Route *routes,
-    const unsigned int cnt_routes
+    unsigned int cnt_routes
 );
 
 /**

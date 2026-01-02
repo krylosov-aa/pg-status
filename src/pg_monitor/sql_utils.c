@@ -1,4 +1,7 @@
 #include <stdatomic.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 #include "pg_monitor.h"
 #include "utils.h"
@@ -74,13 +77,16 @@ PGresult *execute_sql(PGconn *conn, const char *query) {
  * Extracts a bool value from the first column of the first row.
  */
 int extract_bool_value(PGresult *q_res, bool *result) {
-    if (q_res == nullptr)
+    if (q_res == nullptr) {
         return 1;
+    }
 
-    if (PQntuples(q_res) > 0 && PQnfields(q_res) > 0)
+    if (PQntuples(q_res) > 0 && PQnfields(q_res) > 0) {
         *result = is_t(PQgetvalue(q_res, 0, 0));
-    else
+    }
+    else {
         return 1;
+    }
 
     PQclear(q_res);
     return 0;
@@ -119,9 +125,31 @@ const char *streaming_replication_query =
  * Converts pg lsn to bytes
  */
 unsigned long long parse_lsn(const char *lsn) {
-    unsigned int hi, lo;
-    if (!lsn || sscanf(lsn, "%X/%X", &hi, &lo) != 2)
+    if (!lsn) {
         return 0;
+    }
+
+    char *slash;
+    unsigned long hi;
+    unsigned long lo;
+
+    slash = strchr(lsn, '/');
+    if (!slash) {
+        return 0;
+    }
+
+    errno = 0;
+    hi = strtoul(lsn, NULL, 16);
+    if (errno != 0) {
+        return 0;
+    }
+
+    errno = 0;
+    lo = strtoul(slash + 1, NULL, 16);
+    if (errno != 0) {
+        return 0;
+    }
+
     return (unsigned long long)hi << 32 | lo;
 }
 
@@ -157,8 +185,9 @@ void check_host_streaming_replication(
 
     PGresult *q_res = nullptr;
     PGconn *conn = db_connect(host -> connection_str);
-    if (conn)
+    if (conn) {
         q_res = execute_sql(conn, streaming_replication_query);
+    }
 
     if (!q_res) {
         printf("%s: dead\n", host -> host);
@@ -200,9 +229,11 @@ void check_host_streaming_replication(
     atomic_store_explicit(&host -> status, new_status, memory_order_release);
     atomic_store_explicit(&host -> not_actual_status, status, memory_order_release);
 
-    if (q_res)
+    if (q_res) {
         PQclear(q_res);
+    }
 
-    if (conn)
+    if (conn) {
         PQfinish(conn);
+    }
 }

@@ -29,3 +29,9 @@ build_up_test:
 
 2-master:
 	./test/pg-proxy-2_is_master.sh
+
+scan-build:
+	scan-build -o scan_reports cmake --build cmake-build-release
+
+clean:
+	 cmake --build cmake-build-debug --verbose --target clean
