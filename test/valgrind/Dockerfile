@@ -30,6 +30,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY --from=builder /app/build/src/main /app/main
+COPY --from=builder /app/build/src/pg-status /app/pg-status
 
-ENTRYPOINT ["valgrind", "--leak-check=full", "--show-leak-kinds=all", "--track-origins=yes", "--num-callers=50", "/app/main"]
+ENTRYPOINT ["valgrind", "--leak-check=full", "--show-leak-kinds=all", "--track-origins=yes", "--num-callers=50", "/app/pg-status"]

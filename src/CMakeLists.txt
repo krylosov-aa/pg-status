@@ -2,11 +2,11 @@ add_subdirectory(utils)
 add_subdirectory(http_server)
 add_subdirectory(pg_monitor)
 
-add_executable(main main.c)
+add_executable(pg-status main.c)
 
 pkg_check_modules(CJSON REQUIRED IMPORTED_TARGET libcjson)
 
-target_link_libraries(main
+target_link_libraries(pg-status
         PRIVATE
         common_warnings
         utils
@@ -16,7 +16,7 @@ target_link_libraries(main
 )
 
 if(UNIX AND NOT APPLE)
-    target_link_libraries(main PRIVATE pq microhttpd)
+    target_link_libraries(pg-status PRIVATE pq microhttpd)
 endif()
 
-target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(pg-status PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

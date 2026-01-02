@@ -3,7 +3,10 @@ project(pg-status C)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_CLANG_TIDY "clang-tidy")
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_C_CLANG_TIDY "clang-tidy")
+endif()
 
 add_library(common_warnings INTERFACE)
 target_compile_options(common_warnings INTERFACE
