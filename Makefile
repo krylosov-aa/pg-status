@@ -35,3 +35,9 @@ scan-build:
 
 clean:
 	 cmake --build cmake-build-debug --verbose --target clean
+
+build_push:
+	docker build --platform linux/amd64 -t pg-status:${v} .
+	docker tag pg-status:${v} ${r}pg-status:${v}
+	docker push ${r}pg-status:${v}
+

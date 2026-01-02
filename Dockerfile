@@ -2,12 +2,16 @@
 FROM alpine AS builder
 
 RUN apk add --no-cache \
+        clang \
+        clang-extra-tools \
         build-base \
         cmake \
         pkgconfig \
         libpq-dev \
         libmicrohttpd-dev \
         cjson-dev
+
+ENV CC=clang
 
 WORKDIR /app
 
