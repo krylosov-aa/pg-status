@@ -37,7 +37,7 @@ The service provides several HTTP endpoints for retrieving host information.
 
 All APIs support two response formats: plain text and JSON.
 
-If you include the header Accept: application/json, the response will be in JSON format, for example: `{"host": "localhost"}`
+If you include the header `Accept: application/json`, the response will be in JSON format, for example: `{"host": "localhost"}`
 
 If you omit this header, the response will be plain text: `localhost`
 
