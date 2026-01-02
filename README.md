@@ -41,7 +41,7 @@ If you include the header `Accept: application/json`, the response will be in JS
 
 If you omit this header, the response will be plain text: `localhost`
 
-If the API cannot find a matching request, it will return a 404 status code.
+If the API cannot find a matching host, it will return a 404 status code.
 In this case, the response body will be empty for plain text mode, and `{"host": null}` for json mode.
 
 
