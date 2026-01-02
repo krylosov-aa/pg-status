@@ -33,7 +33,17 @@ You can configure various parameters using environment variables:
 
 ### API
 
-The service exposes several HTTP endpoints for retrieving host information:
+The service provides several HTTP endpoints for retrieving host information.
+
+All APIs support two response formats: plain text and JSON.
+
+If you include the header Accept: application/json, the response will be in JSON format, for example: `{"host": "localhost"}`
+
+If you omit this header, the response will be plain text: `localhost`
+
+If the API cannot find a matching request, it will return a 404 status code.
+In this case, the response body will be empty for plain text mode, and `{"host": null}` for json mode.
+
 
 #### `GET /master`
 
