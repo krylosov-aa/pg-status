@@ -41,3 +41,5 @@ build_push:
 	docker tag pg-status:${v} ${r}pg-status:${v}
 	docker push ${r}pg-status:${v}
 
+build_valgrind:
+	docker build -f test/valgrind/Dockerfile -t pg-status-valgrind .

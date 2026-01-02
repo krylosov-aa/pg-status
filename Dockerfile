@@ -7,6 +7,7 @@ RUN apk add --no-cache \
         clang-extra-tools \
         build-base \
         cmake \
+        ninja \
         pkgconfig \
         libtool \
         autoconf \
@@ -32,8 +33,8 @@ COPY src/ src/
 
 ENV CC=clang
 
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Release . && \
-    cmake --build build --config Release
+RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
+    cmake --build build
 
 # -------- Run --------
 FROM alpine:3.20

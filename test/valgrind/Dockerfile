@@ -4,6 +4,7 @@ FROM debian:stable-slim AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         cmake \
+        ninja-build \
         pkg-config \
         libpq-dev \
         libmicrohttpd-dev \
@@ -15,8 +16,8 @@ WORKDIR /app
 COPY CMakeLists.txt .
 COPY src/ src/
 
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Debug . && \
-    cmake --build build --config Debug
+RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
+    cmake --build build
 
 # -------- Run --------
 FROM debian:stable-slim
