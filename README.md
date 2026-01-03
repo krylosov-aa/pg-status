@@ -97,6 +97,9 @@ A statically linked binary is also provided you can simply download it and run i
 
 There are several available options:
 
+#### docker-hub:
+- [Fast build, very lightweight container](https://hub.docker.com/r/krylosovaa/pg-status)
+
 #### Alpine
 - [Fast build, very lightweight container](docker/alpine/Dockerfile_shared)
 - [The lightest container, but takes slightly longer to build](docker/alpine/Dockerfile_shared_disabled_https)
