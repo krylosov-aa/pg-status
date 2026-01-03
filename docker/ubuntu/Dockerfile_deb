@@ -44,10 +44,8 @@ Description: A microservice (sidecar) that helps instantly determine the status 
 CONTROL
 EOF
 
-# Ставим правильные права
 RUN chmod 755 usr/bin/pg-status && chmod 755 DEBIAN
 
-# Собираем deb-пакет
 RUN dpkg-deb --build . /pg-status_1.0.0_amd64.deb
 
 # -------- Export --------
