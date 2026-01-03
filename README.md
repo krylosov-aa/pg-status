@@ -143,12 +143,6 @@ In addition to the main service, this setup launches two PostgreSQL instances: o
 To simulate host failover or disconnection, proxy services are used.
 This approach allows you to test master-switch scenarios without actually stopping PostgreSQL — you can simply switch the proxy’s target instead.
 
-Builds [the lightweight container](docker/alpine/Dockerfile_shared) using parameters defined in [test/docker-compose.yml](test/docker-compose.yml).
-
-In addition to the main service, this setup launches two PostgreSQL instances — one acting as the master and the other as the replica.
-To simulate host failover or disconnection, proxy services are used.
-This approach allows you to test master-switch scenarios without actually restarting PostgreSQL — you can simply switch the proxy’s target.
-
 Helper shell scripts are provided for this purpose:
 - [test/pg-proxy-1_is_master.sh](test/pg-proxy-1_is_master.sh)
 - [test/pg-proxy-2_is_master.sh](test/pg-proxy-2_is_master.sh)
