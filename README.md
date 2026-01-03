@@ -80,13 +80,13 @@ You can currently set up and run the project in the following ways:
 
 ### Install deb package
 
-You can download a deb package for linux amd64 from [the Release](https://github.com/krylosov-aa/pg-status/releases/).
+You can download a deb package for linux amd64 from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
 [Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.0.0/pg-status_1.0.0_amd64.deb)
 
 ### Download binary
 
-You can download pre-built linux amd64 binaries from [the Release](https://github.com/krylosov-aa/pg-status/releases/).
+You can download pre-built linux amd64 binaries from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
 A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
 You can read about the required dependencies below, and also take a very clear look at the docker files,
