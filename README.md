@@ -81,6 +81,7 @@ You can currently set up and run the project in the following ways:
 ### Download binary
 
 You can download pre-built linux amd64 binaries from [the Releases section](https://github.com/krylosov-aa/pg-status/releases/).
+
 A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
 You can read about the required dependencies below, and also take a very clear look at the docker files,
 which demonstrate the installation.
