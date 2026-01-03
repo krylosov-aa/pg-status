@@ -74,6 +74,75 @@ If no such replica exists, the master’s host is returned.
 Returns the host of a replica that is considered synchronous by both time and bytes.
 If no such replica exists, the master’s host is returned.
 
+## Installation
+
+You can currently set up and run the project in the following ways:
+
+### Run a Docker container
+
+There are several available options:
+
+#### Alpine
+- [Fast build, very lightweight container](docker/alpine/Dockerfile_shared)
+- [The lightest container, but takes slightly longer to build](docker/alpine/Dockerfile_shared_disabled_https)
+- [The heaviest among the lightweight options, but provides a static binary](docker/alpine/Dockerfile_static)
+
+#### Ubuntu
+- [With dynamic linking](docker/ubuntu/Dockerfile_shared)
+- [Static binary](docker/ubuntu/Dockerfile_static)
+
+The [Makefile](Makefile) contains several ready-to-use commands that you can either run directly or use as a reference.
+Each Dockerfile describes a build process (which you can adapt if you’re not using these files) that allows you to
+build a binary and either export it to the host or run it directly inside the container.
+
+### Dependencies
+
+This project depends on three external libraries:
+- [libmicrohttpd](https://www.gnu.org/software/libmicrohttpd/) under [GNU LGPL v2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+- [postgresql libpq](https://www.postgresql.org/docs/current/libpq.html)
+- [CJson](https://github.com/DaveGamble/cJSON)
+
+
+### Build with CMake
+
+You can compile the project from source for any platform using CMake.
+Required dependencies: libmicrohttpd, cJSON, and libpq.
+You can refer to the Dockerfiles for examples of how to install dependencies and configure the build,
+depending on whether you prefer a dynamically linked or static binary.
+
+
+## Testing the service
+
+You can start the containers and test the application however you like.
+
+### make build_up
+
+Builds [the lightweight container]((docker/alpine/Dockerfile_shared)) using parameters defined in
+[docker-compose.yml](docker-compose.yml).
+
+You can create and populate a `.env` file using [the provided example](.env_example), or specify the required
+parameters directly in [docker-compose.yml](docker-compose.yml).
+This allows you to test the application with your own database setup.
+
+### make build_up_test
+
+Builds [the lightweight container](docker/alpine/Dockerfile_shared)
+with parameters defined in [test/docker-compose.yml](test/docker-compose.yml).
+
+In addition to the main service, this setup launches two PostgreSQL instances: one acting as the master and the other as a replica.
+To simulate host failover or disconnection, proxy services are used.
+This approach allows you to test master-switch scenarios without actually stopping PostgreSQL — you can simply switch the proxy’s target instead.
+
+Builds [the lightweight container](docker/alpine/Dockerfile_shared) using parameters defined in [test/docker-compose.yml](test/docker-compose.yml).
+
+In addition to the main service, this setup launches two PostgreSQL instances — one acting as the master and the other as the replica.
+To simulate host failover or disconnection, proxy services are used.
+This approach allows you to test master-switch scenarios without actually restarting PostgreSQL — you can simply switch the proxy’s target.
+
+Helper shell scripts are provided for this purpose:
+- [test/pg-proxy-1_is_master.sh](test/pg-proxy-1_is_master.sh)
+- [test/pg-proxy-2_is_master.sh](test/pg-proxy-2_is_master.sh)
+
 
 ## Performance
 
@@ -129,31 +198,3 @@ Details (average, fastest, slowest):
 Status code distribution:
   [200] 46318 responses
 ```
-
-
-## Launch / Testing
-
-Currently, you can set up and run the project in the following ways:
-
-- Build with CMake
-- Run inside a Docker container ([using the provided Dockerfile](Dockerfile))
-
-For convenience, you can also use [make commands](Makefile) to build and run the project, including two available
-Docker variants:
-
-### make build_up
-
-Builds and runs the container as defined in [docker-compose.yml](docker-compose.yml).
-Within this configuration, you can set environment variables and test the service with your own database.
-
-### make build_up_test
-
-Builds and runs the container as defined in [test/docker-compose.yml](test/docker-compose.yml).
-
-In addition to the main service, this setup launches two PostgreSQL instances: one acting as the master and the other as a replica.
-To simulate host failover or disconnection, proxy services are used.
-This approach allows you to test master-switch scenarios without actually stopping PostgreSQL — you can simply switch the proxy’s target instead.
-
-Helper shell scripts are provided for this purpose:
-- [test/pg-proxy-1_is_master.sh](test/pg-proxy-1_is_master.sh)
-- [test/pg-proxy-2_is_master.sh](test/pg-proxy-2_is_master.sh)

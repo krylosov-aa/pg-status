@@ -1,5 +1,5 @@
 # -------- Build --------
-FROM alpine AS builder
+FROM alpine:latest AS builder
 
 RUN apk add --no-cache \
         bash \
@@ -36,8 +36,13 @@ ENV CC=clang
 RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
     cmake --build build
 
+# -------- Export --------
+FROM scratch AS export
+COPY --from=builder /app/build/src/pg-status /pg-status
+
+
 # -------- Run --------
-FROM alpine:3.20
+FROM alpine:latest
 
 RUN apk add --no-cache \
         libpq \

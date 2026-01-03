@@ -64,7 +64,6 @@ COPY src/ src/
 
 ENV CC=clang
 ENV CFLAGS="-static -O2"
-ENV LDFLAGS="-static"
 
 RUN cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
@@ -74,19 +73,18 @@ RUN cmake -B build -G Ninja \
         -DCMAKE_FIND_LIBRARY_SUFFIXES=".a" \
         -DCMAKE_PREFIX_PATH="/usr/local" \
         -DLIBPQ_INCLUDE_DIR="/usr/local/include" \
-        -DLIBPQ_LIBRARY="/usr/local/lib/libpq.a;/usr/local/lib/libpgcommon.a;/usr/local/lib/libpgport.a;/usr/lib/x86_64-linux-gnu/libssl.a;/usr/lib/x86_64-linux-gnu/libcrypto.a" \
+        -DLIBPQ_LIBRARY="/usr/local/lib/libpq.a;/usr/local/lib/libpgcommon.a;/usr/local/lib/libpgport.a;/usr/lib/x86_64-linux-gnu/libssl.a;/usr/lib/x86_64-linux-gnu/libcrypto.a;m;z;dl" \
         . && \
     cmake --build build
 
+# -------- Export --------
+FROM scratch AS export
+COPY --from=builder /app/build/src/pg-status /pg-status
+
 # -------- Run --------
-FROM ubuntu:latest
+FROM ubuntu:latest AS runner
 WORKDIR /app
 
 COPY --from=builder /app/build/src/pg-status /app/pg-status
 
 ENTRYPOINT ["/app/pg-status"]
-
-#
-## -------- Run (static export) --------
-#FROM scratch AS export
-#COPY --from=builder /app/build/src/pg-status /pg-status
