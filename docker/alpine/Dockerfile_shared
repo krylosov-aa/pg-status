@@ -1,0 +1,37 @@
+# -------- Build --------
+FROM alpine AS builder
+
+RUN apk add --no-cache \
+        clang \
+        clang-extra-tools \
+        build-base \
+        cmake \
+        ninja \
+        pkgconfig \
+        libpq-dev \
+        libmicrohttpd-dev \
+        cjson-dev
+
+ENV CC=clang
+
+WORKDIR /app
+
+COPY CMakeLists.txt .
+COPY src/ src/
+
+RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
+    cmake --build build
+
+# -------- Run --------
+FROM alpine:3.20
+
+RUN apk add --no-cache \
+        libpq \
+        libmicrohttpd \
+        cjson
+
+WORKDIR /app
+
+COPY --from=builder /app/build/src/pg-status /app/pg-status
+
+ENTRYPOINT ["/app/pg-status"]

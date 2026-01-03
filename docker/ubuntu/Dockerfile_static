@@ -1,0 +1,92 @@
+# -------- Build --------
+FROM ubuntu:latest AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash clang clang-tools build-essential cmake ninja-build pkg-config libtool \
+    autoconf automake tar curl \
+    zlib1g-dev libssl-dev libicu-dev bison flex ca-certificates \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp
+
+# ---- libmicrohttpd ----
+RUN curl -LO https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-1.0.2.tar.gz && \
+    tar xf libmicrohttpd-1.0.2.tar.gz && \
+    cd libmicrohttpd-1.0.2 && \
+    ./configure --disable-https --enable-static --disable-shared && \
+    make -j$(nproc) && \
+    make install
+
+# ---- cJSON ----
+RUN curl -LO https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz && \
+    tar xf v1.7.19.tar.gz && \
+    cd cJSON-1.7.19 && \
+    sed -i '/cmake_minimum_required/d' CMakeLists.txt && \
+    sed -i '1i cmake_minimum_required(VERSION 3.10)' CMakeLists.txt && \
+    cmake -B build -G Ninja \
+        -DENABLE_CJSON_TEST=OFF \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_BUILD_TYPE=Release . && \
+    cmake --build build --target install
+
+# ---- OpenSSL ----
+RUN curl -LO https://www.openssl.org/source/openssl-3.3.1.tar.gz && \
+    tar xf openssl-3.3.1.tar.gz && \
+    cd openssl-3.3.1 && \
+    env CC=gcc ./Configure linux-x86_64 no-shared no-dso no-tests --prefix=/usr/local && \
+    make -j$(nproc) && make install_sw
+
+
+# ---- libpq ----
+RUN curl -LO https://ftp.postgresql.org/pub/source/v18.1/postgresql-18.1.tar.gz && \
+    tar xf postgresql-18.1.tar.gz && \
+    cd postgresql-18.1 && \
+    ./configure --prefix=/usr/local --without-readline --with-openssl --without-icu CFLAGS="-O2" && \
+    make -C src/common && make -C src/port && make -C src/interfaces/libpq && \
+    ar rcs src/common/libpgcommon.a src/common/*.o && \
+    ar rcs src/port/libpgport.a src/port/*.o && \
+    cp src/common/libpgcommon.a src/port/libpgport.a /usr/local/lib && \
+    make -C src/interfaces/libpq install && \
+    mkdir -p /usr/local/include/postgresql && \
+    cp src/interfaces/libpq/libpq-fe.h src/include/postgres_ext.h \
+       src/include/libpq/pqcomm.h \
+       src/include/libpq/libpq-fs.h \
+       /usr/local/include/postgresql/
+
+# ---- Build app ----
+WORKDIR /app
+
+COPY CMakeLists.txt .
+COPY src/ src/
+
+ENV CC=clang
+ENV CFLAGS="-static -O2"
+ENV LDFLAGS="-static"
+
+RUN cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_EXE_LINKER_FLAGS="-static" \
+        -DCMAKE_SHARED_LIBRARY_LINK_C_FLAGS="" \
+        -DCMAKE_FIND_LIBRARY_SUFFIXES=".a" \
+        -DCMAKE_PREFIX_PATH="/usr/local" \
+        -DLIBPQ_INCLUDE_DIR="/usr/local/include" \
+        -DLIBPQ_LIBRARY="/usr/local/lib/libpq.a;/usr/local/lib/libpgcommon.a;/usr/local/lib/libpgport.a;/usr/lib/x86_64-linux-gnu/libssl.a;/usr/lib/x86_64-linux-gnu/libcrypto.a" \
+        . && \
+    cmake --build build
+
+# -------- Run --------
+FROM ubuntu:latest
+WORKDIR /app
+
+COPY --from=builder /app/build/src/pg-status /app/pg-status
+
+ENTRYPOINT ["/app/pg-status"]
+
+#
+## -------- Run (static export) --------
+#FROM scratch AS export
+#COPY --from=builder /app/build/src/pg-status /pg-status

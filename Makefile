@@ -43,3 +43,25 @@ build_push:
 
 build_valgrind:
 	docker build -f test/valgrind/Dockerfile -t pg-status-valgrind .
+
+build_static_alpine:
+	docker build -f docker/alpine/Dockerfile_static --target export -o out .
+
+build_static_alpine_linux:
+	docker buildx build \
+	  --platform linux/amd64 \
+	  -f docker/alpine/Dockerfile_static \
+	  --target export \
+	  -o out .
+
+build_shared_alpine:
+	docker build -f docker/alpine/Dockerfile_shared -t pg-status-shared-alpine .
+
+build_shared_ubuntu:
+	docker build -f docker/ubuntu/Dockerfile_shared -t pg-status-shared-ubuntu .
+
+build_shared_wo_https_ubuntu:
+	docker build -f docker/ubuntu/Dockerfile_shared_disabled_https -t pg-status-shared-wo-https-ubuntu .
+
+build_static_ubuntu:
+	docker build --platform linux/amd64 -f docker/ubuntu/Dockerfile_static -t pg-status-static-ubuntu .
