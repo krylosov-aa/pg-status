@@ -110,7 +110,6 @@ build a binary and either export it to the host or run it directly inside the co
 ### Build with CMake
 
 You can compile the project from source for any platform using CMake.
-Required dependencies: libmicrohttpd, cJSON, and libpq.
 You can refer to the Dockerfiles for examples of how to install dependencies and configure the build,
 depending on whether you prefer a dynamically linked or static binary.
 
