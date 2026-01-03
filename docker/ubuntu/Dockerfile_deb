@@ -1,0 +1,55 @@
+# -------- Build --------
+FROM ubuntu:latest AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang \
+    clang-tools \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    libpq-dev \
+    libmicrohttpd-dev \
+    libcjson-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV CC=clang
+WORKDIR /app
+
+COPY CMakeLists.txt .
+COPY src/ src/
+
+RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
+    cmake --build build
+
+# -------- Deb Package --------
+FROM ubuntu:latest AS packager
+
+WORKDIR /pkgroot
+
+RUN mkdir -p DEBIAN usr/bin
+
+COPY --from=builder /app/build/src/pg-status usr/bin/pg-status
+
+RUN <<'EOF' bash
+cat > DEBIAN/control <<CONTROL
+Package: pg-status
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libpq5, libmicrohttpd12, libcjson1
+Maintainer: krylosov-aa <krylosov.andrew@gmail.com>
+Description: A microservice (sidecar) that helps instantly determine the status of your PostgreSQL hosts including whether they are alive, which one is the master, which ones are replicas, and how far each replica is lagging behind the master.
+CONTROL
+EOF
+
+# Ставим правильные права
+RUN chmod 755 usr/bin/pg-status && chmod 755 DEBIAN
+
+# Собираем deb-пакет
+RUN dpkg-deb --build . /pg-status_1.0.0_amd64.deb
+
+# -------- Export --------
+FROM scratch AS export
+COPY --from=packager /pg-status_1.0.0_amd64.deb /

@@ -21,6 +21,10 @@ build_static_executable:
 	sudo docker build -f docker/ubuntu/Dockerfile_static --target export -o out/static .
 	sudo chown -R $$(id -u):$$(id -g) out/static
 
+build_deb:
+	sudo docker build -f docker/ubuntu/Dockerfile_deb --target export -o out/deb .
+	sudo chown -R $$(id -u):$$(id -g) out/deb
+
 
 
 build:
