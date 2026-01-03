@@ -13,7 +13,7 @@ interface that can be used to retrieve a list of hosts meeting given conditions.
 It always serves data directly from memory and responds extremely quickly, so it can be safely used on every request.
 
 
-## Using
+## Usage
 
 ### Parameters
 
@@ -77,6 +77,15 @@ If no such replica exists, the master’s host is returned.
 ## Installation
 
 You can currently set up and run the project in the following ways:
+
+### Download binary
+
+You can download pre-built linux amd64 binaries from [the Releases section](https://github.com/krylosov-aa/pg-status/releases/).
+A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
+You can read about the required dependencies below, and also take a very clear look at the docker files,
+which demonstrate the installation.
+
+A statically linked binary is also provided you can simply download it and run it without any additional setup.
 
 ### Run a Docker container
 
