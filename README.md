@@ -88,6 +88,7 @@ which demonstrate the installation.
 
 A statically linked binary is also provided you can simply download it and run it without any additional setup.
 
+
 ### Run a Docker container
 
 There are several available options:
@@ -105,13 +106,6 @@ The [Makefile](Makefile) contains several ready-to-use commands that you can eit
 Each Dockerfile describes a build process (which you can adapt if you’re not using these files) that allows you to
 build a binary and either export it to the host or run it directly inside the container.
 
-### Dependencies
-
-This project depends on three external libraries:
-- [libmicrohttpd](https://www.gnu.org/software/libmicrohttpd/) under [GNU LGPL v2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
-- [postgresql libpq](https://www.postgresql.org/docs/current/libpq.html)
-- [CJson](https://github.com/DaveGamble/cJSON)
-
 
 ### Build with CMake
 
@@ -119,6 +113,13 @@ You can compile the project from source for any platform using CMake.
 Required dependencies: libmicrohttpd, cJSON, and libpq.
 You can refer to the Dockerfiles for examples of how to install dependencies and configure the build,
 depending on whether you prefer a dynamically linked or static binary.
+
+### Dependencies
+
+This project depends on three external libraries:
+- [libmicrohttpd](https://www.gnu.org/software/libmicrohttpd/) under [GNU LGPL v2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+- [postgresql libpq](https://www.postgresql.org/docs/current/libpq.html)
+- [CJson](https://github.com/DaveGamble/cJSON)
 
 
 ## Testing the service
