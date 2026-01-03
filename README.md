@@ -78,9 +78,13 @@ If no such replica exists, the master’s host is returned.
 
 You can currently set up and run the project in the following ways:
 
+### Install deb package
+
+You can download a deb package for linux amd64 from [the Release](https://github.com/krylosov-aa/pg-status/releases/).
+
 ### Download binary
 
-You can download pre-built linux amd64 binaries from [the Releases section](https://github.com/krylosov-aa/pg-status/releases/).
+You can download pre-built linux amd64 binaries from [the Release](https://github.com/krylosov-aa/pg-status/releases/).
 
 A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
 You can read about the required dependencies below, and also take a very clear look at the docker files,
