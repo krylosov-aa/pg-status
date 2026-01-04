@@ -63,7 +63,7 @@ typedef struct MonitorParameters {
 typedef struct MonitorStatus {
     unsigned long long delay_ms;
     unsigned long long delay_bytes;
-    bool is_master;
+    bool master;
     bool alive;
 } MonitorStatus;
 

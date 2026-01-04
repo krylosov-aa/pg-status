@@ -8,36 +8,32 @@
 #include <stdlib.h>
 #include <cjson/cJSON.h>
 
-cJSON *host_to_json(char *host) {
-    cJSON *obj = json_object();
+void add_host_to_json(cJSON *json_obj, char *host) {
     if (!host) {
-        add_null_to_json_object(obj, "host");
+        add_null_to_json_object(json_obj, "host");
     }
     else {
-        add_str_to_json_object(obj, "host", host);
+        add_str_to_json_object(json_obj, "host", host);
     }
-    return obj;
 }
 
-cJSON *replicas_to_json(const MonitorHost *cursor) {
+void get_all_hosts(HTTPResponse *response) {
+    const MonitorHost *mon_host = get_monitor_host_head();
     cJSON *arr = json_array();
 
-    while (cursor) {
-        const MonitorStatus *status = atomic_get_status(cursor);
-        if (is_alive_replica(status)) {
-            cJSON_AddItemToArray(arr, host_to_json(cursor -> host));
-        }
-        cursor = cursor -> next;
+    while (mon_host) {
+        cJSON *json_obj = json_object();
+        add_host_to_json(json_obj, mon_host -> host);
+
+        const MonitorStatus *status = atomic_get_status(mon_host);
+        add_bool_to_json_object(json_obj, "master", status -> master);
+        add_bool_to_json_object(json_obj, "alive", status -> alive);
+
+        cJSON_AddItemToArray(arr, json_obj);
+        mon_host = mon_host -> next;
     }
 
-    return arr;
-}
-
-void get_replicas_json(HTTPResponse *response) {
-    const MonitorHost *stat = get_monitor_host_head();
-    cJSON *json = replicas_to_json(stat);
-
-    response -> response = json_to_str(json);
+    response -> response = json_to_str(arr);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
     response -> content_type = "application/json";
 }
@@ -48,7 +44,9 @@ void return_single_host(HTTPResponse *response, char *host) {
     }
 
     if (need_json_response(response)) {
-        response -> response = json_to_str(host_to_json(host));
+        cJSON *json_obj = json_object();
+        add_host_to_json(json_obj, host);
+        response -> response = json_to_str(json_obj);
         response -> memory_mode = MHD_RESPMEM_MUST_FREE;
     }
     else {
@@ -105,7 +103,7 @@ int main(void) {
     Route routes[] = {
         { "GET", "/master", get_master },
         { "GET", "/replica", get_random_replica },
-        { "GET", "/replicas_info", get_replicas_json },
+        { "GET", "/hosts", get_all_hosts },
         { "GET", "/sync_by_time", get_sync_host_by_time },
         { "GET", "/sync_by_bytes", get_sync_host_by_bytes },
         { "GET", "/sync_by_time_or_bytes", get_sync_host_by_time_or_bytes },

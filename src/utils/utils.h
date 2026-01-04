@@ -141,6 +141,13 @@ void add_str_to_json_object(cJSON * obj, const char *key, const char *val);
  */
 void add_null_to_json_object(cJSON * obj, const char *key);
 
+
+
+/**
+ * Adds a new key and bool value to json
+ */
+void add_bool_to_json_object(cJSON * obj, const char *key, bool val);
+
 /**
  * Converts json to string.
  * The string must be freed by the caller.

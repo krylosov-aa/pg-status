@@ -194,7 +194,7 @@ void check_host_streaming_replication(
         host -> failed_connections++;
         if (host -> failed_connections > max_fails) {
             new_status -> alive = false;
-            new_status -> is_master = false;
+            new_status -> master = false;
         }
     }
     else {
@@ -204,7 +204,7 @@ void check_host_streaming_replication(
         const bool is_replica = is_t(PQgetvalue(q_res, 0, 0));
         if (is_replica) {
             printf("%s: replica\n", host -> host);
-            new_status -> is_master = false;
+            new_status -> master = false;
             new_status -> delay_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
 
             const unsigned long long replica_received_lsn = parse_lsn(
@@ -219,7 +219,7 @@ void check_host_streaming_replication(
         }
         else {
             printf("%s: master\n", host -> host);
-            new_status -> is_master = true;
+            new_status -> master = true;
             new_status -> delay_ms = 0;
             new_status -> delay_bytes = 0;
             master_lsn = parse_lsn(PQgetvalue(q_res, 0, 1));

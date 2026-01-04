@@ -136,7 +136,7 @@ MonitorStatus *init_monitor_status(void) {
     MonitorStatus *status = malloc(sizeof(MonitorStatus));
     status -> delay_ms = 0;
     status -> delay_bytes = 0;
-    status -> is_master = false;
+    status -> master = false;
     status -> alive = false;
     return status;
 }
@@ -226,7 +226,7 @@ char *find_host(
             return cursor -> host;
         }
 
-        if (status -> is_master) {
+        if (status -> master) {
             master = cursor;
         }
 
@@ -244,14 +244,14 @@ char *find_host(
  * condition_handler that searches for a live master
  */
 bool is_master(const MonitorStatus *status) {
-    return status -> alive && status -> is_master;
+    return status -> alive && status -> master;
 }
 
 /**
  * condition_handler that searches for a live replica
  */
 bool is_alive_replica(const MonitorStatus *status) {
-    return status -> alive && !status -> is_master;
+    return status -> alive && !status -> master;
 }
 
 /**

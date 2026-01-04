@@ -299,7 +299,7 @@ cJSON *json_object(void) {
 }
 
 /**
- * Adds a new key and value to json
+ * Adds a new key and string value to json
  */
 void add_str_to_json_object(cJSON * obj, const char *key, const char *val) {
     if (!cJSON_AddStringToObject(obj, key, val)) {
@@ -313,6 +313,15 @@ void add_str_to_json_object(cJSON * obj, const char *key, const char *val) {
 void add_null_to_json_object(cJSON * obj, const char *key) {
     if (!cJSON_AddNullToObject(obj, key)) {
         raise_error("Can't add null to object");
+    }
+}
+
+/**
+ * Adds a new key and bool value to json
+ */
+void add_bool_to_json_object(cJSON * obj, const char *key, const bool val) {
+    if (!cJSON_AddBoolToObject(obj, key, val)) {
+        raise_error("Can't add bool to object");
     }
 }
 

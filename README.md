@@ -74,6 +74,31 @@ If no such replica exists, the master’s host is returned.
 Returns the host of a replica that is considered synchronous by both time and bytes.
 If no such replica exists, the master’s host is returned.
 
+#### `GET /hosts`
+
+Returns a list of all hosts with their status information in json format.
+
+For example:
+```json
+[
+  {
+    "host": "host-1",
+    "master": true,
+    "alive": true
+  },
+  {
+    "host": "host-2",
+    "master": false,
+    "alive": true
+  },
+  {
+    "host": "host-3",
+    "master": false,
+    "alive": false
+  }
+]
+```
+
 ## Installation
 
 You can currently set up and run the project in the following ways:
