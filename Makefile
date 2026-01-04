@@ -25,13 +25,12 @@ build_deb:
 	sudo docker build -f docker/ubuntu/Dockerfile_deb --target export -o out/deb .
 	sudo chown -R $$(id -u):$$(id -g) out/deb
 
-build_publish:
+build_push:
 	sudo docker build -f docker/alpine/Dockerfile_shared -t pg-status:${v} .
-	sudo docker tag pg-status:${v} krylosovaa/pg-status:${v}
-	sudo docker tag pg-status:${v} krylosovaa/pg-status:latest
-	sudo docker push krylosovaa/pg-status:${v}
-	sudo docker push krylosovaa/pg-status:latest
-
+	sudo docker tag pg-status:${v} ${r}/pg-status:${v}
+	sudo docker tag pg-status:${v} ${r}/pg-status:latest
+	sudo docker push ${r}/pg-status:${v}
+	sudo docker push ${r}/pg-status:latest
 
 build:
 	docker build -f docker/alpine/Dockerfile_shared -t pg-status .
@@ -68,11 +67,6 @@ scan-build:
 
 clean:
 	 cmake --build cmake-build-debug --verbose --target clean
-
-build_push:
-	docker build --platform linux/amd64 -t pg-status:${v} .
-	docker tag pg-status:${v} ${r}pg-status:${v}
-	docker push ${r}pg-status:${v}
 
 build_valgrind:
 	docker build -f test/valgrind/Dockerfile -t pg-status-valgrind .
