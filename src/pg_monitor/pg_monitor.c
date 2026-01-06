@@ -241,6 +241,22 @@ char *find_host(
 }
 
 /**
+ * A function for searching for a host by name
+ */
+MonitorStatus *find_host_by_name(const char *host) {
+    const MonitorHost *cursor = monitor_host_head;
+
+    while (cursor) {
+        if (is_equal_strings(cursor -> host, host)) {
+            return atomic_get_status(cursor);
+        }
+        cursor = cursor -> next;
+    }
+
+    return nullptr;
+}
+
+/**
  * condition_handler that searches for a live master
  */
 bool is_master(const MonitorStatus *status) {

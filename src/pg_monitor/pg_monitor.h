@@ -118,6 +118,11 @@ char *find_host(
 );
 
 /**
+ * A function for searching for a host by name
+ */
+MonitorStatus *find_host_by_name(const char *host);
+
+/**
  * condition_handler that searches for a live master
  */
 bool is_master(const MonitorStatus *status);

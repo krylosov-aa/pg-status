@@ -36,7 +36,9 @@ typedef struct HTTPResponse {
 /**
  * Interface for the handler that will be called when the route is called
  */
-typedef void (*request_handler_t)(HTTPResponse *response);
+typedef void (*request_handler_t)(
+    MHD_Connection *connection, HTTPResponse *response
+);
 
 /**
  * A route that specifies the path, method, and callable
