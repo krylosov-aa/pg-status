@@ -128,10 +128,10 @@ You can download pre-built linux amd64 binaries from [releases](https://github.c
 
 A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
 You can read about the required dependencies below, and also take a very clear look at the docker files,
-which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status-shared-1.2.0.zip)
+which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64_shared)
 
 A statically linked binary is also provided you can simply download it and run it without any additional setup.
-[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status-static-1.2.0.zip)
+[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64_static)
 
 
 ### Run a Docker container
