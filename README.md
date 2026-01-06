@@ -201,6 +201,9 @@ Helper shell scripts are provided for this purpose:
 The measurements were taken using [this Docker compose setup](test/docker-compose.yml)
 with [this container](docker/alpine/Dockerfile_shared).
 
+The performance of http responses is not affected by pg monitoring because a
+lock free solution is used to update the status of hosts.
+
 - CPU - 0.1
 - Memory - 9Mib
 
