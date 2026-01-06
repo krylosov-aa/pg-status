@@ -198,12 +198,13 @@ Helper shell scripts are provided for this purpose:
 
 ## Performance
 
-The measurements were taken inside a Docker container running the 3.20 version of alpine.
-
-The load was generated from the host machine using `hey -z 30s -c 100 -q 50 http://localhost:8000/master`.
+The measurements were taken using [this Docker compose setup](test/docker-compose.yml)
+with [this container](docker/alpine/Dockerfile_shared).
 
 - CPU - 0.1
 - Memory - 9Mib
+
+The load was generated from the host machine using `hey -z 30s -c 100 -q 50 http://localhost:8000/master`.
 
 Results:
 ```
