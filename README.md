@@ -237,3 +237,11 @@ Details (average, fastest, slowest):
 Status code distribution:
   [200] 46318 responses
 ```
+
+# Third‑party components
+
+It uses the following third‑party components:
+
+- libmicrohttpd — licensed under [the GNU Lesser General Public License v2.1 or later](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+- cJSON — licensed under [the MIT License](https://github.com/DaveGamble/cJSON/blob/master/LICENSE)
+- libpq — licensed under [the PostgreSQL License](https://www.postgresql.org/about/licence/)
