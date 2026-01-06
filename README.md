@@ -200,55 +200,55 @@ Helper shell scripts are provided for this purpose:
 
 The measurements were taken inside a Docker container running the 3.20 version of alpine.
 
-The load was generated from the host machine using `hey` for 30 seconds with 2 threads.
+The load was generated from the host machine using `hey -z 30s -c 100 -q 50 http://localhost:8000/master`.
 
 - CPU - 0.1
-- Memory - 6Mib
+- Memory - 9Mib
 
 Results:
 ```
 Summary:
-  Total:        30.0296 secs
-  Slowest:      0.0719 secs
-  Fastest:      0.0007 secs
-  Average:      0.0013 secs
-  Requests/sec: 1542.4118
+  Total:        30.0533 secs
+  Slowest:      0.1966 secs
+  Fastest:      0.0006 secs
+  Average:      0.0562 secs
+  Requests/sec: 1709.2979
 
-  Total data:   2454854 bytes
-  Size/request: 53 bytes
+  Total data:   513700 bytes
+  Size/request: 10 bytes
 
 Response time histogram:
   0.001 [1]     |
-  0.008 [45798] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-  0.015 [179]   |
-  0.022 [168]   |
-  0.029 [82]    |
-  0.036 [34]    |
-  0.043 [30]    |
-  0.051 [17]    |
-  0.058 [5]     |
-  0.065 [2]     |
-  0.072 [2]     |
+  0.020 [21530] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.040 [58]    |
+  0.059 [0]     |
+  0.079 [358]   |■
+  0.099 [26568] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.118 [2636]  |■■■■
+  0.138 [0]     |
+  0.157 [0]     |
+  0.177 [0]     |
+  0.197 [219]   |
 
 
 Latency distribution:
-  10% in 0.0010 secs
-  25% in 0.0010 secs
-  50% in 0.0010 secs
-  75% in 0.0011 secs
-  90% in 0.0012 secs
-  95% in 0.0013 secs
-  99% in 0.0102 secs
+  10% in 0.0058 secs
+  25% in 0.0079 secs
+  50% in 0.0858 secs
+  75% in 0.0910 secs
+  90% in 0.0954 secs
+  95% in 0.0991 secs
+  99% in 0.1043 secs
 
 Details (average, fastest, slowest):
-  DNS+dialup:   0.0002 secs, 0.0007 secs, 0.0719 secs
-  DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
-  req write:    0.0000 secs, 0.0000 secs, 0.0004 secs
-  resp wait:    0.0011 secs, 0.0005 secs, 0.0716 secs
-  resp read:    0.0000 secs, 0.0000 secs, 0.0005 secs
+  DNS+dialup:   0.0013 secs, 0.0006 secs, 0.1966 secs
+  DNS-lookup:   0.0007 secs, 0.0000 secs, 0.0100 secs
+  req write:    0.0004 secs, 0.0000 secs, 0.0137 secs
+  resp wait:    0.0537 secs, 0.0001 secs, 0.1941 secs
+  resp read:    0.0009 secs, 0.0000 secs, 0.0107 secs
 
 Status code distribution:
-  [200] 46318 responses
+  [200] 51370 responses
 ```
 
 # Third‑party components

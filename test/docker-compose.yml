@@ -3,14 +3,9 @@ services:
     image: pg-status:latest
     ports:
       - 8000:8000
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: "1"
-#          memory: 64M
-#        reservations:
-#          cpus: "1"
-#          memory: 64M
+    mem_limit: 9m
+    mem_reservation: 9m
+    cpus: 0.1
     networks:
       - net
     restart: unless-stopped
