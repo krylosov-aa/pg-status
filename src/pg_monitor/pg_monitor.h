@@ -83,6 +83,11 @@ typedef struct MonitorHost {
     unsigned int failed_connections;
 } MonitorHost;
 
+/**
+ * A sign that all data have been initialized and pg_status is ready
+ * to provide information about hosts.
+ */
+bool is_pg_monitor_ready(void);
 
 /**
  * Returns a pointer to the head of the linked list of hosts.

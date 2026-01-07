@@ -19,6 +19,12 @@ static bool monitor_running = true;
 static pthread_t monitor_tid;
 
 /**
+ * A sign that all data have been initialized and pg_status is ready
+ * to provide information about hosts.
+ */
+atomic_bool pg_monitor_ready = false;
+
+/**
  * A pointer to the head of the linked list of hosts
  */
 MonitorHost *monitor_host_head = nullptr;
@@ -44,6 +50,17 @@ MonitorParameters parameters = {
     .sync_max_lag_ms = 1000,
     .sync_max_lag_bytes = 1000000,  // 1 mb
 };
+
+
+/**
+ * A sign that all data have been initialized and pg_status is ready
+ * to provide information about hosts.
+ */
+bool is_pg_monitor_ready(void) {
+    return atomic_load_explicit(
+        &pg_monitor_ready, memory_order_acquire
+    );
+}
 
 /**
  * Returns a pointer to the head of the linked list of hosts.
@@ -402,16 +419,21 @@ void *pg_monitor_thread(void *arg) {
     get_values_from_env();
     init_monitor_host_linked_list();
 
+    check_hosts();
+    atomic_store_explicit(&pg_monitor_ready, true, memory_order_release);
+
     struct timespec ts;
     pthread_mutex_lock(&monitor_mutex);
     while (monitor_running) {
-
-        check_hosts();
-
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_sec += parameters.sleep;
 
         pthread_cond_timedwait(&monitor_cond, &monitor_mutex, &ts);
+        if (!monitor_running) {
+            break;
+        };
+
+        check_hosts();
     }
     pthread_mutex_unlock(&monitor_mutex);
     return nullptr;

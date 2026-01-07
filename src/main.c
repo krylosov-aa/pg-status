@@ -134,6 +134,16 @@ void get_host_status(MHD_Connection *connection, HTTPResponse *response) {
     response -> content_type = "application/json";
 }
 
+Route routes[] = {
+    { "GET", "/master", get_master },
+    { "GET", "/replica", get_random_replica },
+    { "GET", "/hosts", get_all_hosts },
+    { "GET", "/status", get_host_status },
+    { "GET", "/sync_by_time", get_sync_host_by_time },
+    { "GET", "/sync_by_bytes", get_sync_host_by_bytes },
+    { "GET", "/sync_by_time_or_bytes", get_sync_host_by_time_or_bytes },
+    { "GET", "/sync_by_time_and_bytes", get_sync_host_by_time_and_bytes },
+};
 
 int main(void) {
     sigset_t sigset;
@@ -149,16 +159,10 @@ int main(void) {
 
     start_pg_monitor();
 
-    Route routes[] = {
-        { "GET", "/master", get_master },
-        { "GET", "/replica", get_random_replica },
-        { "GET", "/hosts", get_all_hosts },
-        { "GET", "/status", get_host_status },
-        { "GET", "/sync_by_time", get_sync_host_by_time },
-        { "GET", "/sync_by_bytes", get_sync_host_by_bytes },
-        { "GET", "/sync_by_time_or_bytes", get_sync_host_by_time_or_bytes },
-        { "GET", "/sync_by_time_and_bytes", get_sync_host_by_time_and_bytes },
-    };
+    while (!is_pg_monitor_ready()) {
+        sleep(1);
+    }
+
     MHD_Daemon *daemon = start_http_server(
         8000, routes, sizeof(routes) / sizeof(routes[0])
     );
