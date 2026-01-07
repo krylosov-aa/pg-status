@@ -122,17 +122,35 @@ You can download a deb package for linux amd64 from [releases](https://github.co
 
 [Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64.deb)
 
-### Download binary
+```shell
+wget https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64.deb && sudo dpkg -i pg-status_1.2.0_amd64.deb
+```
 
+then run:
+```shell
+pg-status
+```
+
+### Static binary
+
+A statically linked binary is provided you can simply download it and run it without any additional setup.
 You can download pre-built linux amd64 binaries from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
-You can read about the required dependencies below, and also take a very clear look at the docker files,
-which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64_shared)
-
-A statically linked binary is also provided you can simply download it and run it without any additional setup.
 [Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64_static)
 
+```shell
+wget https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64_static && chmod +x pg-status_1.2.0_amd64_static
+```
+
+### Shared binary
+
+A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
+You can read about the required dependencies below, and also take a very look at the docker files,
+which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64_shared)
+
+```shell
+sudo apt-get install libpq5 libmicrohttpd12 libcjson1 && wget https://github.com/krylosov-aa/pg-status/releases/download/1.2.0/pg-status_1.2.0_amd64_shared && chmod +x pg-status_1.2.0_amd64_shared
+```
 
 ### Run a Docker container
 
