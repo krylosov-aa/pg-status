@@ -95,17 +95,20 @@ MonitorHost *get_monitor_host_head(void);
  */
 MonitorStatus *atomic_get_status(const MonitorHost *host);
 
-
-/**
- * Returns a random replica using the round-robin algorithm.
- * If there are no live replicas, it returns the master.
- */
-char *round_robin_replica(void);
-
 /**
  * Describes the interface of the function for searching hosts
  */
 typedef bool (*condition_handler)(const MonitorStatus *);
+
+/**
+ * A function for searching for a host that matches certain conditions using the round-robin algorithm.
+ * @param handler A function that determines whether the specified host has been found
+ * @param master_if_not_found Determines whether to return the master if the desired host is not found by handler
+ * @return Host name corresponding to conditions
+ */
+char *find_host_round_robin(
+    condition_handler handler, bool master_if_not_found
+);
 
 /**
  * A function for searching for a host that matches certain conditions

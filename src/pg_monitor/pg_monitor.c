@@ -24,9 +24,9 @@ static pthread_t monitor_tid;
 MonitorHost *monitor_host_head = nullptr;
 
 /**
- * A pointer to the last replica returned in the round-robin algorithm
+ * A pointer to the last host returned in the round-robin algorithm
  */
-_Atomic (MonitorHost *) last_random_replica = nullptr;
+_Atomic (MonitorHost *) round_robin_cursor = nullptr;
 
 /**
  * pg-monitor parameters. The default parameters are set here.
@@ -315,34 +315,65 @@ bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status) {
 }
 
 /**
- * Returns a random replica using the round-robin algorithm.
- * If there are no live replicas, it returns the master.
+ * It takes the next host from the list, and if it's over,
+ * it starts from the beginning.
  */
-char *round_robin_replica(void) {
-    MonitorHost *cursor = atomic_load_explicit(
-        &last_random_replica, memory_order_acquire
-    );
+MonitorHost *get_next_host_in_circle(MonitorHost *cursor) {
     if (!cursor || !cursor -> next) {
-        cursor = get_monitor_host_head();
+        return get_monitor_host_head();
     }
-    else {
-        cursor = cursor -> next;
-    }
-    const MonitorStatus *status = atomic_get_status(cursor);
+    return cursor -> next;
+}
+
+/**
+ * Moves the cursor of the round-robin algorithm and returns the host from
+ * which to start the crawl
+ */
+MonitorHost *get_next_host_round_robin(void) {
+    MonitorHost *cursor = atomic_load_explicit(
+        &round_robin_cursor, memory_order_acquire
+    );
+    cursor = get_next_host_in_circle(cursor);
+    atomic_store_explicit(&round_robin_cursor, cursor, memory_order_release);
+    return cursor;
+}
+
+/**
+ * A function for searching for a host that matches certain conditions using the round-robin algorithm.
+ * @param handler A function that determines whether the specified host has been found
+ * @param master_if_not_found Determines whether to return the master if the desired host is not found by handler
+ * @return Host name corresponding to conditions
+ */
+char *find_host_round_robin(
+    const condition_handler handler, const bool master_if_not_found
+) {
+    MonitorHost *cursor = get_next_host_round_robin();
     const MonitorHost *start = cursor;
 
-    while (!is_alive_replica(status)) {
-        cursor = cursor -> next;
-        if (!cursor) {
-            cursor = get_monitor_host_head();
+    const MonitorStatus *status = atomic_get_status(cursor);
+    const MonitorHost *master = nullptr;
+    if (status -> master) {
+        master = cursor;
+    }
+
+    while (!handler(status)) {
+        cursor = get_next_host_in_circle(cursor);
+        if (status -> master) {
+            master = cursor;
         }
+
         if (cursor == start) {
-            return find_host(is_master, false);
+            if (master_if_not_found) {
+                if (master) {
+                    return master -> host;
+                }
+                return find_host(is_master, false);
+            }
+            return nullptr;
         }
 
         status = atomic_get_status(cursor);
     }
-    atomic_store_explicit(&last_random_replica, cursor, memory_order_release);
 
     return cursor -> host;
 }

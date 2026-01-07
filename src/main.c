@@ -56,7 +56,7 @@ void return_single_host(HTTPResponse *response, char *host) {
 }
 
 void get_random_replica(MHD_Connection *connection, HTTPResponse *response) {
-    char *host = round_robin_replica();
+    char *host = find_host_round_robin(is_alive_replica, true);
     return_single_host(response, host);
 }
 
@@ -68,28 +68,28 @@ void get_master(MHD_Connection *connection, HTTPResponse *response) {
 void get_sync_host_by_time(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    char *host = find_host(is_sync_replica_by_time, true);
+    char *host = find_host_round_robin(is_sync_replica_by_time, true);
     return_single_host(response, host);
 }
 
 void get_sync_host_by_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    char *host = find_host(is_sync_replica_by_bytes, true);
+    char *host = find_host_round_robin(is_sync_replica_by_bytes, true);
     return_single_host(response, host);
 }
 
 void get_sync_host_by_time_or_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    char *host = find_host(is_sync_replica_by_time_or_bytes, true);
+    char *host = find_host_round_robin(is_sync_replica_by_time_or_bytes, true);
     return_single_host(response, host);
 }
 
 void get_sync_host_by_time_and_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    char *host = find_host(is_sync_replica_by_time_and_bytes, true);
+    char *host = find_host_round_robin(is_sync_replica_by_time_and_bytes, true);
     return_single_host(response, host);
 }
 
