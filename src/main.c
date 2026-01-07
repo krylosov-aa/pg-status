@@ -116,6 +116,19 @@ void get_host_status(MHD_Connection *connection, HTTPResponse *response) {
     cJSON *json_obj = json_object();
     add_bool_to_json_object(json_obj, "master", status -> master);
     add_bool_to_json_object(json_obj, "alive", status -> alive);
+    bool sync_by_time = false;
+    bool sync_by_bytes = false;
+    if (status -> master) {
+        sync_by_time = true;
+        sync_by_bytes = true;
+    }
+    else {
+        sync_by_time = is_sync_replica_by_time(status);
+        sync_by_bytes = is_sync_replica_by_bytes(status);
+    }
+    add_bool_to_json_object(json_obj, "sync_by_time", sync_by_time);
+    add_bool_to_json_object(json_obj, "sync_by_bytes", sync_by_bytes);
+
     response -> response = json_to_str(json_obj);
     response -> memory_mode = MHD_RESPMEM_MUST_FREE;
     response -> content_type = "application/json";
