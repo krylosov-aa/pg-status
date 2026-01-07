@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <unistd.h>
 #include <cjson/cJSON.h>
 
@@ -22,9 +23,9 @@ FileDescriptor open_file(const char *path) {
     }
 
     if (fstat(mfd.fd, &mfd.st) < 0) {
-        printf_error("Failed to get fstat: %s\n", path);
+        printf_error("Failed to get fstat: %s", path);
         if (close(mfd.fd) < 0) {
-            printf_error("Failed to close file: %s\n", path);
+            printf_error("Failed to close file: %s", path);
         }
         mfd.fd = -1;
     }
@@ -45,10 +46,12 @@ int fputs_error(void) {
 void printf_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
+    (void)fputs("\033[31m", stderr);
     (void)vfprintf(stderr, format, args);
     va_end(args);
     (void)fputs(". strerror: ", stderr);
     (void)fputs_error();
+    (void)fputs("\033[0m", stderr);
     (void)fputc('\n', stderr);
 }
 
@@ -56,15 +59,17 @@ void printf_error(const char *format, ...) {
  * Prints the message in red with \n and also adds the
  * error text from errno and exit(1)
  */
-void raise_error(const char *format, ...) {
+noreturn void raise_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
+    (void)fputs("\033[31m", stderr);
     (void)vfprintf(stderr, format, args);
     va_end(args);
     (void)fputs(". strerror: ", stderr);
     (void)fputs_error();
+    (void)fputs("\033[0m", stderr);
     (void)fputc('\n', stderr);
-    _Exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
 }
 
 /**
@@ -76,7 +81,11 @@ char *concatenate_strings(const char *first, const char *second) {
     const size_t len2 = strlen(second);
     char *new = malloc(len1 + len2 + 1);
     if (!new) {
-        return nullptr;
+        raise_error(
+            "Can't allocate memory for concatenate strings %s and %s",
+            first,
+            second
+        );
     }
     strlcpy(new, first, len1 + len2 + 1);
     strlcat(new, second, len1 + len2 + 1);
@@ -106,8 +115,7 @@ char *format_string(const char *format, ...) {
     va_end(args);
 
     if (len < 0) {
-        printf_error("Unable to format_string %s", format);
-        _Exit(EXIT_FAILURE);
+        raise_error("Unable to format_string %s", format);
     }
     return string;
 }
@@ -119,6 +127,12 @@ char *ulong_to_str(const unsigned long value) {
     const int len = snprintf(nullptr, 0, "%lu", value);
     const size_t size = (size_t)len + 1;
     char *str = malloc(size);
+    if (!str) {
+        raise_error(
+            "Can't allocate memory for ulong_to_str %lu",
+            value
+        );
+    }
     (void)snprintf(str, size, "%lu", value);
     return str;
 }
@@ -130,6 +144,12 @@ char *long_to_str(const long value) {
     const int len = snprintf(nullptr, 0, "%ld", value);
     const size_t size = (size_t)len + 1;
     char *str = malloc(size);
+    if (!str) {
+        raise_error(
+            "Can't allocate memory for long_to_str %ld",
+            value
+        );
+    }
     (void)snprintf(str, size, "%ld", value);
     return str;
 }
@@ -141,6 +161,12 @@ char *int_to_str(const int value) {
     const int len = snprintf(nullptr, 0, "%d", value);
     const size_t size = (size_t)len + 1;
     char *str = malloc(size);
+    if (!str) {
+        raise_error(
+            "Can't allocate memory for int_to_str %d",
+            value
+        );
+    }
     (void)snprintf(str, size, "%d", value);
     return str;
 }
@@ -152,6 +178,12 @@ char *uint_to_str(const unsigned int value) {
     const int len = snprintf(nullptr, 0, "%u", value);
     const size_t size = (size_t)len + 1;
     char *str = malloc(size);
+    if (!str) {
+        raise_error(
+            "Can't allocate memory for uint_to_str %u",
+            value
+        );
+    }
     (void)snprintf(str, size, "%u", value);
     return str;
 }
@@ -220,14 +252,33 @@ unsigned long long str_to_ull(const char *value) {
  * Converts string to int
  */
 int str_to_int(const char *value) {
-    return (int) str_to_long(value);
+    const long result = str_to_long(value);
+    if (result < INT_MIN || result > INT_MAX) {
+        raise_error("Failed to convert '%s' to int", value);
+    }
+    return (int) result;
 }
 
 /**
  * Converts string to unsigned int
  */
 unsigned int str_to_uint(const char *value) {
-    return (unsigned int) str_to_ulong(value);
+    const unsigned long result = str_to_ulong(value);
+    if (result > UINT_MAX) {
+        raise_error("Failed to convert '%s' to uint", value);
+    }
+    return (unsigned int) result;
+}
+
+/**
+ * Converts string to unsigned int 16
+ */
+uint16_t str_to_uint16(const char *value) {
+    const unsigned long result = str_to_ulong(value);
+    if (result > UINT16_MAX) {
+        raise_error("Failed to convert '%s' to uint16", value);
+    }
+    return (uint16_t) result;
 }
 
 /**
@@ -272,6 +323,9 @@ void replace_from_env_copy(const char *env_name, char **result) {
     const char *env_val = getenv(env_name);
     if (env_val != nullptr && *env_val) {
         char *env_val_copy = strdup(env_val);
+        if (!env_val_copy) {
+            raise_error("Can't strdup env variable %s", env_name);
+        }
         *result = env_val_copy;
     }
 }
@@ -332,5 +386,8 @@ void add_bool_to_json_object(cJSON * obj, const char *key, const bool val) {
 char *json_to_str(cJSON *json) {
     char *result = cJSON_PrintUnformatted(json);
     cJSON_Delete(json);
+    if (!result) {
+        raise_error("Can't convert json to string");
+    }
     return result;
 }

@@ -98,7 +98,7 @@ MonitorHost *get_monitor_host_head(void);
 /**
  * Atomically returns a pointer to the host status
  */
-MonitorStatus *atomic_get_status(const MonitorHost *host);
+MonitorStatus atomic_get_status(const MonitorHost *host);
 
 /**
  * Describes the interface of the function for searching hosts
@@ -128,7 +128,7 @@ char *find_host(
 /**
  * A function for searching for a host by name
  */
-MonitorStatus *find_host_by_name(const char *host);
+MonitorHost *find_host_by_name(const char *host);
 
 /**
  * condition_handler that searches for a live master

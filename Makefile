@@ -75,3 +75,10 @@ docker-compose := $(shell docker compose version -f docker-compose.yml &> /dev/n
 
 colima_start:
 	colima start --arch aarch64 --vm-type=vz --vz-rosetta --cpu 6 --memory 8
+
+build_push_amd_64:
+	sudo docker build --platform linux/amd64 -f docker/alpine/Dockerfile_shared -t pg-status:${v} .
+	sudo docker tag pg-status:${v} ${r}/pg-status:${v}
+	sudo docker tag pg-status:${v} ${r}/pg-status:latest
+	sudo docker push ${r}/pg-status:${v}
+	sudo docker push ${r}/pg-status:latest

@@ -2,8 +2,10 @@
 #define PG_STATUS_UTILS_H
 
 
+#include <stdint.h>
 #include <sys/stat.h>
 #include <cjson/cJSON.h>
+#include <stdnoreturn.h>
 
 typedef struct FileDescriptor {
     int fd;
@@ -32,7 +34,7 @@ void printf_error(const char *format, ...) __printflike(1, 2);
  * Prints the message in red with \n and also adds the
  * error text from errno and exit(1)
  */
-void raise_error(const char *format, ...) __printflike(1, 2);
+noreturn void raise_error(const char *format, ...) __printflike(1, 2);
 
 /**
  * Concatenates strings and returns the new string.
@@ -95,6 +97,11 @@ int str_to_int(const char *value);
  * Converts string to unsigned int
  */
 unsigned int str_to_uint(const char *value);
+
+/**
+ * Converts string to unsigned int 16
+ */
+uint16_t str_to_uint16(const char *value);
 
 /**
  * Takes a value from the environment variables if it is set,

@@ -178,7 +178,9 @@ void check_host_streaming_replication(
     MonitorHost *host, const unsigned int max_fails
 ) {
     static unsigned long long master_lsn = 0;
-    MonitorStatus *status = atomic_get_status(host);
+    MonitorStatus *status = atomic_load_explicit(
+        &host -> status, memory_order_acquire
+    );
     MonitorStatus *new_status = atomic_load_explicit(
         &host -> not_actual_status, memory_order_acquire
     );

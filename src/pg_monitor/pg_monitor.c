@@ -151,6 +151,9 @@ char *get_connection_string(char *host, char *port) {
  */
 MonitorStatus *init_monitor_status(void) {
     MonitorStatus *status = malloc(sizeof(MonitorStatus));
+    if (!status) {
+        raise_error("Failed to allocate MonitorStatus");
+    }
     status -> delay_ms = 0;
     status -> delay_bytes = 0;
     status -> master = false;
@@ -163,6 +166,9 @@ MonitorStatus *init_monitor_status(void) {
  */
 MonitorHost *init_monitor_host(char *host, char *port) {
     MonitorHost *monitor_host = calloc(1, sizeof(MonitorHost));
+    if (!monitor_host) {
+        raise_error("Failed to allocate MonitorHost");
+    }
     monitor_host -> host = strdup(host);
     monitor_host -> connection_str = get_connection_string(host, port);
     monitor_host -> next = nullptr;
@@ -217,12 +223,17 @@ void init_monitor_host_linked_list(void) {
 }
 
 /**
- * Atomically returns a pointer to the host status
+ * Atomically returns MonitorStatus.
+ *
+ * To avoid a very unlikely UB when the reader gets stuck with a pointer that
+ * the second iteration of the loop is already underway and the structure is
+ * starting to update, the reader is working with a copy on the stack.
  */
-MonitorStatus *atomic_get_status(const MonitorHost *host) {
-    return atomic_load_explicit(
+MonitorStatus atomic_get_status(const MonitorHost *host) {
+    const MonitorStatus *ptr = atomic_load_explicit(
         &host -> status, memory_order_acquire
     );
+    return *ptr;
 }
 
 /**
@@ -237,13 +248,13 @@ char *find_host(
     const MonitorHost *cursor = monitor_host_head;
     const MonitorHost *master = nullptr;
     while (cursor) {
-        const MonitorStatus *status = atomic_get_status(cursor);
+        const MonitorStatus status = atomic_get_status(cursor);
 
-        if (handler(status)) {
+        if (handler(&status)) {
             return cursor -> host;
         }
 
-        if (status -> master) {
+        if (status.master) {
             master = cursor;
         }
 
@@ -260,12 +271,12 @@ char *find_host(
 /**
  * A function for searching for a host by name
  */
-MonitorStatus *find_host_by_name(const char *host) {
-    const MonitorHost *cursor = monitor_host_head;
+MonitorHost *find_host_by_name(const char *host) {
+    MonitorHost *cursor = monitor_host_head;
 
     while (cursor) {
         if (is_equal_strings(cursor -> host, host)) {
-            return atomic_get_status(cursor);
+            return cursor;
         }
         cursor = cursor -> next;
     }
@@ -367,15 +378,16 @@ char *find_host_round_robin(
     MonitorHost *cursor = get_next_host_round_robin();
     const MonitorHost *start = cursor;
 
-    const MonitorStatus *status = atomic_get_status(cursor);
+    MonitorStatus status = atomic_get_status(cursor);
     const MonitorHost *master = nullptr;
-    if (status -> master) {
+    if (status.master) {
         master = cursor;
     }
 
-    while (!handler(status)) {
+    while (!handler(&status)) {
         cursor = get_next_host_in_circle(cursor);
-        if (status -> master) {
+        status = atomic_get_status(cursor);
+        if (status.master) {
             master = cursor;
         }
 
@@ -389,7 +401,6 @@ char *find_host_round_robin(
             return nullptr;
         }
 
-        status = atomic_get_status(cursor);
     }
 
     return cursor -> host;
@@ -451,6 +462,9 @@ pthread_t start_pg_monitor() {
         raise_error("Failed to start pg_monitor");
     }
 
+    while (!is_pg_monitor_ready()) {
+        sleep(1);
+    }
     printf("pg_monitor started\n");
     return monitor_tid;
 }
