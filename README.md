@@ -109,24 +109,13 @@ You can configure various parameters using environment variables:
 - `pg_status__pg_database` — The name of the database to connect to. Default: `postgres`
 - `pg_status__hosts` — A list of PostgreSQL hosts, separated by the character specified in `pg_status__delimiter`.
 - `pg_status__delimiter` — The delimiter used to separate hosts. Default: `,`
-- `pg_status__port` — The connection port. You can specify separate ports for individual hosts using the same delimiter. Default: `5432`
+- `pg_status__pg_port` — The connection port. You can specify separate ports for individual hosts using the same delimiter. Default: `5432`
 - `pg_status__connect_timeout` — The time limit (in seconds) for establishing a connection to PostgreSQL. Default: `2`
 - `pg_status__max_fails` — The number of consecutive errors allowed when checking a host’s status before it is considered dead. Default: `3`
 - `pg_status__sleep` — The delay (in seconds) between consecutive host status checks. Default: `5`
 - `pg_status__sync_max_lag_ms` — The maximum acceptable replication lag (in milliseconds) for a replica to still be considered time-synchronous. Default: `1000`
 - `pg_status__sync_max_lag_bytes` — The maximum acceptable lag (in bytes) for a replica to still be considered byte-synchronous. Default: `1000000` (1 MB)
-
-You can configure the port on which the http server will listen (default is `8000`) via the startup arguments. For example:
-
-```shell
-pg-status -port 12345
-```
-
-or
-
-```shell
-pg-status --port 12345
-```
+- `pg_status__http_port` — the port on which the http server will listen. Default: `8000`
 
 
 # Installation
@@ -137,10 +126,10 @@ You can currently set up and run the project in the following ways:
 
 You can download a deb package for linux amd64 from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64.deb)
+[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64.deb)
 
 ```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64.deb && sudo dpkg -i pg-status_1.3.2_amd64.deb
+wget https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64.deb && sudo dpkg -i pg-status_1.4.0_amd64.deb
 ```
 
 then run:
@@ -153,20 +142,20 @@ pg-status
 A statically linked binary is provided you can simply download it and run it without any additional setup.
 You can download pre-built linux amd64 binaries from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64_static)
+[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_static)
 
 ```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64_static && chmod +x pg-status_1.3.2_amd64_static
+wget https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_static && chmod +x pg-status_1.4.0_amd64_static
 ```
 
 ## Shared binary
 
 A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
 You can read about the required dependencies below, and also take a very look at the docker files,
-which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64_shared)
+which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_shared)
 
 ```shell
-sudo apt-get install libpq5 libmicrohttpd12 libcjson1 && wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64_shared && chmod +x pg-status_1.3.2_amd64_shared
+sudo apt-get install libpq5 libmicrohttpd12 libcjson1 && wget https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_shared && chmod +x pg-status_1.4.0_amd64_shared
 ```
 
 ## Run a Docker container

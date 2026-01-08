@@ -83,7 +83,7 @@ void get_values_from_env(void) {
     replace_from_env("pg_status__pg_password", &parameters.password);
     replace_from_env("pg_status__delimiter", &parameters.hosts_delimiter);
     replace_from_env("pg_status__connect_timeout", &parameters.connect_timeout);
-    replace_from_env("pg_status__port", &parameters.port);
+    replace_from_env("pg_status__pg_port", &parameters.port);
     replace_from_env_uint("pg_status__sleep", &parameters.sleep);
     replace_from_env_uint("pg_status__max_fails", &parameters.max_fails);
     replace_from_env_ull(

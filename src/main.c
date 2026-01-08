@@ -162,42 +162,13 @@ void wait_for_termination_signal(const sigset_t *sigset) {
     }
 }
 
-typedef struct {
-    uint16_t port;
-} Config;
 
-noreturn void print_help(void) {
-    printf(
-        "Options:\n"
-        "  -port,  --port PORT   HTTP Server port (default: 8000)\n"
-        "  -help , --help        Show this help message\n"
-    );
-    exit(EXIT_SUCCESS);
-}
-
-Config parse_args(int argc, char *argv[]) {
-    Config config = {
-        .port = 8000,
-    };
-
-    static struct option long_options[] = {
-        {"port", required_argument, 0, 'p'},
-        {"help", no_argument,       0, 'h'},
-        {0,      0,                 0,  0 }
-    };
-
-    int opt;
-    while ((opt = getopt_long_only(argc, argv, "", long_options, nullptr)) != -1) {
-        switch (opt) {
-            case 'p':
-                config.port = str_to_uint16(optarg);
-                break;
-            default:
-                print_help();
-        }
+uint16_t get_port() {
+    const char *env_val = getenv("pg_status__http_port");
+    if (env_val && *env_val) {
+        return str_to_uint16(getenv("pg_status__http_port"));
     }
-
-    return config;
+    return 8000;
 }
 
 Route routes[] = {
@@ -211,15 +182,13 @@ Route routes[] = {
     { "GET", "/sync_by_time_and_bytes", get_sync_host_by_time_and_bytes },
 };
 
-int main(int argc, char *argv[]) {
+int main() {
     sigset_t sigset;
     block_termination_signals(&sigset);
 
-    const Config conf = parse_args(argc, argv);
-
     start_pg_monitor();
     MHD_Daemon *daemon = start_http_server(
-        conf.port, routes, sizeof(routes) / sizeof(routes[0])
+        get_port(), routes, sizeof(routes) / sizeof(routes[0])
     );
 
     wait_for_termination_signal(&sigset);

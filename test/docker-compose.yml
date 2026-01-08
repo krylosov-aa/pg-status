@@ -15,7 +15,7 @@ services:
       - pg_status__pg_database=postgres
       - pg_status__pg_password=postgres
       - pg_status__pg_user=postgres
-      - pg_status__port=5432
+      - pg_status__pg_port=5432
       - pg_status__sleep=5
 
   postgres_master:

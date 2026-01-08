@@ -24,7 +24,7 @@ RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=builder /app/build/src/pg-status /pg-status_1.3.2_amd64_shared
+COPY --from=builder /app/build/src/pg-status /pg-status_1.4.0_amd64_shared
 
 # -------- Run --------
 FROM ubuntu:latest
