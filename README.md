@@ -116,7 +116,7 @@ You can configure various parameters using environment variables:
 - `pg_status__sync_max_lag_ms` — The maximum acceptable replication lag (in milliseconds) for a replica to still be considered time-synchronous. Default: `1000`
 - `pg_status__sync_max_lag_bytes` — The maximum acceptable lag (in bytes) for a replica to still be considered byte-synchronous. Default: `1000000` (1 MB)
 
-You can configure the port on which the http server will listen via the startup arguments. For example:
+You can configure the port on which the http server will listen (default is `8000`) via the startup arguments. For example:
 
 ```shell
 pg-status -port 12345
