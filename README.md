@@ -13,12 +13,12 @@ interface that can be used to retrieve a list of hosts meeting given conditions.
 It always serves data directly from memory and responds extremely quickly, so it can be safely used on every request.
 
 
-## Usage
+# Usage
 
 Run the application on the same host next to the main service or actually anywhere you want.
 After it starts, the HTTP API will be available.
 
-### API
+## API
 
 The service provides several HTTP endpoints for retrieving host information.
 
@@ -32,36 +32,36 @@ If the API cannot find a matching host, it will return a 404 status code.
 In this case, the response body will be empty for plain text mode, and `{"host": null}` for json mode.
 
 
-#### `GET /master`
+### `GET /master`
 
 Returns the host of the current master, if one exists. If no master is available, it returns null.
 
-#### `GET /replica`
+### `GET /replica`
 
 Returns the host of a replica, selected using the round-robin algorithm.
 If no replicas are available, the master’s host is returned instead.
 
-#### `GET /sync_by_time`
+### `GET /sync_by_time`
 
 Returns the host of a replica (selected using the round-robin algorithm) considered time-synchronous — that is, its time lag is less than the value specified in `pg_status__sync_max_lag_ms`.
 If no replica meets this condition, the master’s host is returned.
 
-#### `GET /sync_by_bytes`
+### `GET /sync_by_bytes`
 
 Returns the host of a replica (selected using the round-robin algorithm) considered byte-synchronous — that is, according to the WAL LSN, its lag is less than the value specified in `pg_status__sync_max_lag_bytes`.
 If no replica meets this condition, the master’s host is returned.
 
-#### `GET /sync_by_time_or_bytes`
+### `GET /sync_by_time_or_bytes`
 
 Returns the host of a replica (selected using the round-robin algorithm) that is considered synchronous either by time or by bytes.
 If no such replica exists, the master’s host is returned.
 
-#### `GET /sync_by_time_and_bytes`
+### `GET /sync_by_time_and_bytes`
 
 Returns the host of a replica (selected using the round-robin algorithm) that is considered synchronous by both time and bytes.
 If no such replica exists, the master’s host is returned.
 
-#### `GET /hosts`
+### `GET /hosts`
 
 Returns a list of all hosts with their status information in json format.
 
@@ -86,7 +86,7 @@ For example:
 ]
 ```
 
-#### `GET /status`
+### `GET /status`
 
 Returns status of a host that you specified in the get parameter.
 
@@ -129,18 +129,18 @@ pg-status --port 12345
 ```
 
 
-## Installation
+# Installation
 
 You can currently set up and run the project in the following ways:
 
-### Install deb package
+## Install deb package
 
 You can download a deb package for linux amd64 from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.3.0/pg-status_1.3.0_amd64.deb)
+[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64.deb)
 
 ```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.0/pg-status_1.3.0_amd64.deb && sudo dpkg -i pg-status_1.3.0_amd64.deb
+wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64.deb && sudo dpkg -i pg-status_1.3.1_amd64.deb
 ```
 
 then run:
@@ -148,40 +148,40 @@ then run:
 pg-status
 ```
 
-### Static binary
+## Static binary
 
 A statically linked binary is provided you can simply download it and run it without any additional setup.
 You can download pre-built linux amd64 binaries from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.0/pg-status_1.3.0_amd64_static)
+[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64_static)
 
 ```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.0/pg-status_1.3.0_amd64_static && chmod +x pg-status_1.3.0_amd64_static
+wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64_static && chmod +x pg-status_1.3.1_amd64_static
 ```
 
-### Shared binary
+## Shared binary
 
 A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
 You can read about the required dependencies below, and also take a very look at the docker files,
-which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.0/pg-status_1.3.0_amd64_shared)
+which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64_shared)
 
 ```shell
-sudo apt-get install libpq5 libmicrohttpd12 libcjson1 && wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.0/pg-status_1.3.0_amd64_shared && chmod +x pg-status_1.3.0_amd64_shared
+sudo apt-get install libpq5 libmicrohttpd12 libcjson1 && wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64_shared && chmod +x pg-status_1.3.1_amd64_shared
 ```
 
-### Run a Docker container
+## Run a Docker container
 
 There are several available options:
 
-#### docker-hub:
+### docker-hub:
 - [Fast build, very lightweight container](https://hub.docker.com/r/krylosovaa/pg-status)
 
-#### Alpine
+### Alpine
 - [Fast build, very lightweight container](docker/alpine/Dockerfile_shared)
 - [The lightest container, but takes slightly longer to build](docker/alpine/Dockerfile_shared_disabled_https)
 - [The heaviest among the lightweight options, but provides a static binary](docker/alpine/Dockerfile_static)
 
-#### Ubuntu
+### Ubuntu
 - [With dynamic linking](docker/ubuntu/Dockerfile_shared)
 - [Static binary](docker/ubuntu/Dockerfile_static)
 
@@ -190,13 +190,13 @@ Each Dockerfile describes a build process (which you can adapt if you’re not u
 build a binary and either export it to the host or run it directly inside the container.
 
 
-### Build with CMake
+## Build with CMake
 
 You can compile the project from source for any platform using CMake.
 You can refer to the Dockerfiles for examples of how to install dependencies and configure the build,
 depending on whether you prefer a dynamically linked or static binary.
 
-### Dependencies
+## Dependencies
 
 This project depends on three external libraries:
 - [libmicrohttpd](https://www.gnu.org/software/libmicrohttpd/) under [GNU LGPL v2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
@@ -204,7 +204,7 @@ This project depends on three external libraries:
 - [CJson](https://github.com/DaveGamble/cJSON)
 
 
-## Testing the service
+# Testing the service
 
 You can start the containers and test the application however you like.
 
@@ -231,7 +231,7 @@ Helper shell scripts are provided for this purpose:
 - [test/pg-proxy-2_is_master.sh](test/pg-proxy-2_is_master.sh)
 
 
-## Performance
+# Performance
 
 The measurements were taken using [this Docker compose setup](test/docker-compose.yml)
 with [this container](docker/alpine/Dockerfile_shared).
@@ -288,6 +288,30 @@ Details (average, fastest, slowest):
 
 Status code distribution:
   [200] 51370 responses
+```
+
+# Logging
+
+The service writes to stdout and stderr. All errors, such as connection errors to pg hosts,
+are written to stderr.
+
+Informational messages about service startup and shutdown are written to stdout.
+
+More importantly, information about host status changes is written to stdout:
+
+If a host is dead, the message will be: `<host-name>: dead`
+
+If a host is revived or becomes a master after failover, the message will be: `<host-name>: master`
+
+If a host is revived or becomes a replica after failover, the message will be: `<host-name>: replica`
+
+For replicas, there are also messages about replica synchronicity:
+
+```
+<host-name>: synchronous in time
+<host-name>: out of sync in time
+<host-name>: synchronous in bytes
+<host-name>: out of sync in bytes
 ```
 
 # Third‑party components

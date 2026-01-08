@@ -416,7 +416,6 @@ void check_hosts(void) {
         check_host_streaming_replication(cursor, parameters.max_fails);
         cursor = cursor -> next;
     }
-    printf("\n");
     (void)fflush(stdout);
 }
 

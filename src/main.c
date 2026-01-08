@@ -112,8 +112,8 @@ void get_host_status(MHD_Connection *connection, HTTPResponse *response) {
         response -> status_code = 404;
         return;
     }
-    MonitorStatus status = atomic_get_status(mon_host);
 
+    const MonitorStatus status = atomic_get_status(mon_host);
     cJSON *json_obj = json_object();
     add_bool_to_json_object(json_obj, "master", status.master);
     add_bool_to_json_object(json_obj, "alive", status.alive);

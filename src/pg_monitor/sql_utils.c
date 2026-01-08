@@ -161,6 +161,78 @@ unsigned long long max_lsn(unsigned long long  a, unsigned long long  b) {
 }
 
 /**
+ * Logs changes to stdout if there have been changes in the lag in time
+ */
+void log_time_lag_changes(
+    const MonitorHost *host,
+    const MonitorStatus *new_status,
+    const MonitorStatus *status
+) {
+    const bool is_sync = is_sync_replica_by_time(new_status);
+    if (is_sync != is_sync_replica_by_time(status)) {
+        if (is_sync) {
+            printf("%s: synchronous in time\n", host -> host);
+        }
+        else {
+            printf("%s: out of sync in time\n", host -> host);
+        }
+    }
+}
+
+/**
+ * Logs changes to stdout if there have been changes in the lag in bytes
+ */
+void log_bytes_lag_changes(
+    const MonitorHost *host,
+    const MonitorStatus *new_status,
+    const MonitorStatus *status
+) {
+    const bool is_sync = is_sync_replica_by_bytes(new_status);
+    if (is_sync != is_sync_replica_by_bytes(status)) {
+        if (is_sync) {
+            printf("%s: synchronous in bytes\n", host -> host);
+        }
+        else {
+            printf("%s: out of sync in bytes\n", host -> host);
+        }
+    }
+}
+
+/**
+ * Logs changes to stdout if there have been changes in the status
+ */
+void log_changes(
+    const MonitorHost *host,
+    const MonitorStatus *new_status,
+    const MonitorStatus *status
+) {
+    if (new_status -> alive != status -> alive) {
+        if (!new_status -> alive) {
+            printf("%s: dead\n", host -> host);
+            return;
+        }
+        if (new_status -> master) {
+            printf("%s: master\n", host -> host);
+            return;
+        }
+        printf("%s: replica\n", host -> host);
+        log_time_lag_changes(host, new_status, status);
+        log_bytes_lag_changes(host, new_status, status);
+        return;
+    }
+
+    if (new_status -> master != status -> master) {
+        if (new_status -> master) {
+            printf("%s: master\n", host -> host);
+            return;
+        }
+        printf("%s: replica\n", host -> host);
+        log_time_lag_changes(host, new_status, status);
+        log_bytes_lag_changes(host, new_status, status);
+    }
+}
+
+/**
  * Updates the host status
  *
  * Updating the status is filling `not_actual_status` and atomically
@@ -192,7 +264,6 @@ void check_host_streaming_replication(
     }
 
     if (!q_res) {
-        printf("%s: dead\n", host -> host);
         host -> failed_connections++;
         if (host -> failed_connections > max_fails) {
             new_status -> alive = false;
@@ -205,7 +276,6 @@ void check_host_streaming_replication(
 
         const bool is_replica = is_t(PQgetvalue(q_res, 0, 0));
         if (is_replica) {
-            printf("%s: replica\n", host -> host);
             new_status -> master = false;
             new_status -> delay_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
 
@@ -220,7 +290,6 @@ void check_host_streaming_replication(
             );
         }
         else {
-            printf("%s: master\n", host -> host);
             new_status -> master = true;
             new_status -> delay_ms = 0;
             new_status -> delay_bytes = 0;
@@ -230,6 +299,7 @@ void check_host_streaming_replication(
 
     atomic_store_explicit(&host -> status, new_status, memory_order_release);
     atomic_store_explicit(&host -> not_actual_status, status, memory_order_release);
+    log_changes(host, new_status, status);
 
     if (q_res) {
         PQclear(q_res);
