@@ -30,6 +30,11 @@ atomic_bool pg_monitor_ready = false;
 MonitorHost *monitor_host_head = nullptr;
 
 /**
+ * Just a master host to find it asap
+ */
+_Atomic (char *) master_host = nullptr;
+
+/**
  * A pointer to the last host returned in the round-robin algorithm
  */
 _Atomic (MonitorHost *) round_robin_cursor = nullptr;
@@ -222,6 +227,19 @@ void init_monitor_host_linked_list(void) {
     free(ports);
 }
 
+
+char *get_master_host(void) {
+    return atomic_load_explicit(
+        &master_host, memory_order_acquire
+    );
+}
+
+void save_master_host(char *host) {
+    atomic_store_explicit(
+        &master_host, host, memory_order_release
+    );
+}
+
 /**
  * Atomically returns MonitorStatus.
  *
@@ -234,38 +252,6 @@ MonitorStatus atomic_get_status(const MonitorHost *host) {
         &host -> status, memory_order_acquire
     );
     return *ptr;
-}
-
-/**
- * A function for searching for a host that matches certain conditions
- * @param handler A function that determines whether the specified host has been found
- * @param master_if_not_found Determines whether to return the master if the desired host is not found by handler
- * @return Host name corresponding to conditions
- */
-char *find_host(
-    const condition_handler handler, const bool master_if_not_found
-) {
-    const MonitorHost *cursor = monitor_host_head;
-    const MonitorHost *master = nullptr;
-    while (cursor) {
-        const MonitorStatus status = atomic_get_status(cursor);
-
-        if (handler(&status)) {
-            return cursor -> host;
-        }
-
-        if (status.master) {
-            master = cursor;
-        }
-
-        cursor = cursor -> next;
-    }
-
-    if (master_if_not_found && master) {
-        return master -> host;
-    }
-
-    return nullptr;
 }
 
 /**
@@ -379,24 +365,14 @@ char *find_host_round_robin(
     const MonitorHost *start = cursor;
 
     MonitorStatus status = atomic_get_status(cursor);
-    const MonitorHost *master = nullptr;
-    if (status.master) {
-        master = cursor;
-    }
 
     while (!handler(&status)) {
         cursor = get_next_host_in_circle(cursor);
         status = atomic_get_status(cursor);
-        if (status.master) {
-            master = cursor;
-        }
 
         if (cursor == start) {
             if (master_if_not_found) {
-                if (master) {
-                    return master -> host;
-                }
-                return find_host(is_master, false);
+                return get_master_host();
             }
             return nullptr;
         }
@@ -412,10 +388,21 @@ char *find_host_round_robin(
 void check_hosts(void) {
     MonitorHost *cursor = monitor_host_head;
 
+    char *master = nullptr;
+
     while (cursor) {
         check_host_streaming_replication(cursor, parameters.max_fails);
+
+        if (!master) {
+            MonitorStatus status = atomic_get_status(cursor);
+            if (is_master(&status)) {
+                master = cursor -> host;
+            }
+        }
+
         cursor = cursor -> next;
     }
+    save_master_host(master);
     (void)fflush(stdout);
 }
 
@@ -424,8 +411,6 @@ void check_hosts(void) {
  * does host checks
  */
 void *pg_monitor_thread(void *arg) {
-    (void)arg;
-
     get_values_from_env();
     init_monitor_host_linked_list();
 

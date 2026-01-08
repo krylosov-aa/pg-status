@@ -137,10 +137,10 @@ You can currently set up and run the project in the following ways:
 
 You can download a deb package for linux amd64 from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64.deb)
+[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64.deb)
 
 ```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64.deb && sudo dpkg -i pg-status_1.3.1_amd64.deb
+wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64.deb && sudo dpkg -i pg-status_1.3.2_amd64.deb
 ```
 
 then run:
@@ -153,20 +153,20 @@ pg-status
 A statically linked binary is provided you can simply download it and run it without any additional setup.
 You can download pre-built linux amd64 binaries from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64_static)
+[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64_static)
 
 ```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64_static && chmod +x pg-status_1.3.1_amd64_static
+wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64_static && chmod +x pg-status_1.3.2_amd64_static
 ```
 
 ## Shared binary
 
 A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
 You can read about the required dependencies below, and also take a very look at the docker files,
-which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64_shared)
+which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64_shared)
 
 ```shell
-sudo apt-get install libpq5 libmicrohttpd12 libcjson1 && wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.1/pg-status_1.3.1_amd64_shared && chmod +x pg-status_1.3.1_amd64_shared
+sudo apt-get install libpq5 libmicrohttpd12 libcjson1 && wget https://github.com/krylosov-aa/pg-status/releases/download/1.3.2/pg-status_1.3.2_amd64_shared && chmod +x pg-status_1.3.2_amd64_shared
 ```
 
 ## Run a Docker container
@@ -233,62 +233,13 @@ Helper shell scripts are provided for this purpose:
 
 # Performance
 
-The measurements were taken using [this Docker compose setup](test/docker-compose.yml)
-with [this container](docker/alpine/Dockerfile_shared).
+Memory - 9Mib
 
-The performance of http responses is not affected by pg monitoring because a
-lock free solution is used to update the status of hosts.
+- CPU: 0.1, Requests/sec: 1881
+- CPU: 1, Requests/sec: 8578
 
-- CPU - 0.1
-- Memory - 9Mib
+[Detailed performance reports](docs/performance.md)
 
-The load was generated from the host machine using `hey -z 30s -c 100 -q 50 http://localhost:8000/master`.
-
-Results:
-```
-Summary:
-  Total:        30.0533 secs
-  Slowest:      0.1966 secs
-  Fastest:      0.0006 secs
-  Average:      0.0562 secs
-  Requests/sec: 1709.2979
-
-  Total data:   513700 bytes
-  Size/request: 10 bytes
-
-Response time histogram:
-  0.001 [1]     |
-  0.020 [21530] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-  0.040 [58]    |
-  0.059 [0]     |
-  0.079 [358]   |■
-  0.099 [26568] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-  0.118 [2636]  |■■■■
-  0.138 [0]     |
-  0.157 [0]     |
-  0.177 [0]     |
-  0.197 [219]   |
-
-
-Latency distribution:
-  10% in 0.0058 secs
-  25% in 0.0079 secs
-  50% in 0.0858 secs
-  75% in 0.0910 secs
-  90% in 0.0954 secs
-  95% in 0.0991 secs
-  99% in 0.1043 secs
-
-Details (average, fastest, slowest):
-  DNS+dialup:   0.0013 secs, 0.0006 secs, 0.1966 secs
-  DNS-lookup:   0.0007 secs, 0.0000 secs, 0.0100 secs
-  req write:    0.0004 secs, 0.0000 secs, 0.0137 secs
-  resp wait:    0.0537 secs, 0.0001 secs, 0.1941 secs
-  resp read:    0.0009 secs, 0.0000 secs, 0.0107 secs
-
-Status code distribution:
-  [200] 51370 responses
-```
 
 # Logging
 

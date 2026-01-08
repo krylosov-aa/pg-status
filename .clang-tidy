@@ -16,7 +16,8 @@ Checks: >
   -misc-include-cleaner,
   -concurrency-mt-unsafe,
   -misc-unused-parameters,
-  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -readability-non-const-parameter
 
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'src/.*'

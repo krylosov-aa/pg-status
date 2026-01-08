@@ -62,7 +62,7 @@ void get_random_replica(MHD_Connection *connection, HTTPResponse *response) {
 }
 
 void get_master(MHD_Connection *connection, HTTPResponse *response) {
-    char *host = find_host(is_master, false);
+    char *host = get_master_host();
     return_single_host(response, host);
 }
 

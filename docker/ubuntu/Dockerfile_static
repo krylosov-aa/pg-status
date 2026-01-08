@@ -79,7 +79,7 @@ RUN cmake -B build -G Ninja \
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=builder /app/build/src/pg-status /pg-status_1.3.1_amd64_static
+COPY --from=builder /app/build/src/pg-status /pg-status_1.3.2_amd64_static
 
 # -------- Run --------
 FROM ubuntu:latest AS runner

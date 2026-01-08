@@ -288,7 +288,9 @@ MHD_Daemon *start_http_server(
         answer_to_connection, nullptr,
         MHD_OPTION_NOTIFY_COMPLETED, request_completed, nullptr,
         // MHD_OPTION_NOTIFY_CONNECTION, notify_connection_callback, nullptr,
-        MHD_OPTION_CONNECTION_MEMORY_LIMIT, 16 * 1024,
+        MHD_OPTION_LISTEN_BACKLOG_SIZE, 512,
+        MHD_OPTION_CONNECTION_LIMIT, 1000,
+        MHD_OPTION_CONNECTION_MEMORY_LIMIT, 8 * 1024,
         MHD_OPTION_END
     );
     if (!daemon) {
