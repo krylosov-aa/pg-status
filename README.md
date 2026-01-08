@@ -235,8 +235,11 @@ Helper shell scripts are provided for this purpose:
 
 Memory - 9Mib
 
-- CPU: 0.1, Requests/sec: 1881
-- CPU: 1, Requests/sec: 8578
+Depending on the API being called and the format selected
+(plain `/master` is the fastest, json `/hosts` is the slowest):
+
+- 0.1 CPU — Requests/sec: ~1600-2000
+- 1 CPU — Requests/sec: ~8600-9000
 
 [Detailed performance reports](docs/performance.md)
 
