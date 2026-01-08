@@ -120,105 +120,11 @@ You can configure various parameters using environment variables:
 
 # Installation
 
-You can currently set up and run the project in the following ways:
-
-## Install deb package
-
-You can download a deb package for linux amd64 from [releases](https://github.com/krylosov-aa/pg-status/releases/).
-
-[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64.deb)
-
-```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64.deb && sudo dpkg -i pg-status_1.4.0_amd64.deb
-```
-
-then run:
-```shell
-pg-status
-```
-
-## Static binary
-
-A statically linked binary is provided you can simply download it and run it without any additional setup.
-You can download pre-built linux amd64 binaries from [releases](https://github.com/krylosov-aa/pg-status/releases/).
-
-[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_static)
-
-```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_static && chmod +x pg-status_1.4.0_amd64_static
-```
-
-## Shared binary
-
-A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
-You can read about the required dependencies below, and also take a very look at the docker files,
-which demonstrate the installation. [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_shared)
-
-```shell
-sudo apt-get install libpq5 libmicrohttpd12 libcjson1 && wget https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_shared && chmod +x pg-status_1.4.0_amd64_shared
-```
-
-## Run a Docker container
-
-There are several available options:
-
-### docker-hub:
-- [Fast build, very lightweight container](https://hub.docker.com/r/krylosovaa/pg-status)
-
-### Alpine
-- [Fast build, very lightweight container](docker/alpine/Dockerfile_shared)
-- [The lightest container, but takes slightly longer to build](docker/alpine/Dockerfile_shared_disabled_https)
-- [The heaviest among the lightweight options, but provides a static binary](docker/alpine/Dockerfile_static)
-
-### Ubuntu
-- [With dynamic linking](docker/ubuntu/Dockerfile_shared)
-- [Static binary](docker/ubuntu/Dockerfile_static)
-
-The [Makefile](Makefile) contains several ready-to-use commands that you can either run directly or use as a reference.
-Each Dockerfile describes a build process (which you can adapt if you’re not using these files) that allows you to
-build a binary and either export it to the host or run it directly inside the container.
-
-
-## Build with CMake
-
-You can compile the project from source for any platform using CMake.
-You can refer to the Dockerfiles for examples of how to install dependencies and configure the build,
-depending on whether you prefer a dynamically linked or static binary.
-
-## Dependencies
-
-This project depends on three external libraries:
-- [libmicrohttpd](https://www.gnu.org/software/libmicrohttpd/) under [GNU LGPL v2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
-- [postgresql libpq](https://www.postgresql.org/docs/current/libpq.html)
-- [CJson](https://github.com/DaveGamble/cJSON)
-
-
-# Testing the service
-
-You can start the containers and test the application however you like.
-
-### make build_up
-
-Builds [the lightweight container]((docker/alpine/Dockerfile_shared)) using parameters defined in
-[docker-compose.yml](docker-compose.yml).
-
-You can create and populate a `.env` file using [the provided example](.env_example), or specify the required
-parameters directly in [docker-compose.yml](docker-compose.yml).
-This allows you to test the application with your own database setup.
-
-### make build_up_test
-
-Builds [the lightweight container](docker/alpine/Dockerfile_shared)
-with parameters defined in [test/docker-compose.yml](test/docker-compose.yml).
-
-In addition to the main service, this setup launches two PostgreSQL instances: one acting as the master and the other as a replica.
-To simulate host failover or disconnection, proxy services are used.
-This approach allows you to test master-switch scenarios without actually stopping PostgreSQL — you can simply switch the proxy’s target instead.
-
-Helper shell scripts are provided for this purpose:
-- [test/pg-proxy-1_is_master.sh](test/pg-proxy-1_is_master.sh)
-- [test/pg-proxy-2_is_master.sh](test/pg-proxy-2_is_master.sh)
-
+In short: there is a [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64.deb),
+there are [static](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_static)
+and [shared](https://github.com/krylosov-aa/pg-status/releases/download/1.4.0/pg-status_1.4.0_amd64_shared) binaries,
+as well as various [docker containers](docker) and [one published in the docker hub](https://hub.docker.com/r/krylosovaa/pg-status).
+For more information, go to the [docs/installation.md](docs/installation.md) section.
 
 # Performance
 
@@ -256,6 +162,34 @@ For replicas, there are also messages about replica synchronicity:
 <host-name>: synchronous in bytes
 <host-name>: out of sync in bytes
 ```
+
+
+# Testing the service
+
+You can start the containers and test the application however you like.
+
+### make build_up
+
+Builds [the lightweight container]((docker/alpine/Dockerfile_shared)) using parameters defined in
+[docker-compose.yml](docker-compose.yml).
+
+You can create and populate a `.env` file using [the provided example](.env_example), or specify the required
+parameters directly in [docker-compose.yml](docker-compose.yml).
+This allows you to test the application with your own database setup.
+
+### make build_up_test
+
+Builds [the lightweight container](docker/alpine/Dockerfile_shared)
+with parameters defined in [test/docker-compose.yml](test/docker-compose.yml).
+
+In addition to the main service, this setup launches two PostgreSQL instances: one acting as the master and the other as a replica.
+To simulate host failover or disconnection, proxy services are used.
+This approach allows you to test master-switch scenarios without actually stopping PostgreSQL — you can simply switch the proxy’s target instead.
+
+Helper shell scripts are provided for this purpose:
+- [test/pg-proxy-1_is_master.sh](test/pg-proxy-1_is_master.sh)
+- [test/pg-proxy-2_is_master.sh](test/pg-proxy-2_is_master.sh)
+
 
 # Third‑party components
 
