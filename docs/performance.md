@@ -1,7 +1,7 @@
 # Performance
 
-The measurements were taken using [this Docker compose setup](test/docker-compose.yml)
-with [this container](docker/alpine/Dockerfile_shared).
+The measurements were taken using [this Docker compose setup](../test/docker-compose.yml)
+with [this container](../docker/alpine/Dockerfile_shared).
 
 Host machine:
 - Ubuntu 24.04 LTS

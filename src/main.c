@@ -7,7 +7,6 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <cjson/cJSON.h>
-#include <getopt.h>
 
 void add_host_to_json(cJSON *json_obj, char *host) {
     if (!host) {

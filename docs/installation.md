@@ -46,15 +46,15 @@ There are several available options:
 - [Fast build, very lightweight container](https://hub.docker.com/r/krylosovaa/pg-status)
 
 ### Alpine
-- [Fast build, very lightweight container](docker/alpine/Dockerfile_shared)
-- [The lightest container, but takes slightly longer to build](docker/alpine/Dockerfile_shared_disabled_https)
-- [The heaviest among the lightweight options, but provides a static binary](docker/alpine/Dockerfile_static)
+- [Fast build, very lightweight container](../docker/alpine/Dockerfile_shared)
+- [The lightest container, but takes slightly longer to build](../docker/alpine/Dockerfile_shared_disabled_https)
+- [The heaviest among the lightweight options, but provides a static binary](../docker/alpine/Dockerfile_static)
 
 ### Ubuntu
-- [With dynamic linking](docker/ubuntu/Dockerfile_shared)
-- [Static binary](docker/ubuntu/Dockerfile_static)
+- [With dynamic linking](../docker/ubuntu/Dockerfile_shared)
+- [Static binary](../docker/ubuntu/Dockerfile_static)
 
-The [Makefile](Makefile) contains several ready-to-use commands that you can either run directly or use as a reference.
+The [Makefile](../Makefile) contains several ready-to-use commands that you can either run directly or use as a reference.
 Each Dockerfile describes a build process (which you can adapt if you’re not using these files) that allows you to
 build a binary and either export it to the host or run it directly inside the container.
 
