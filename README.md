@@ -120,10 +120,14 @@ You can configure various parameters using environment variables:
 
 # Installation
 
-In short: there is a [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.4.1/pg-status_1.4.1_amd64.deb),
-there are [static](https://github.com/krylosov-aa/pg-status/releases/download/1.4.1/pg-status_1.4.1_amd64_static)
-and [shared](https://github.com/krylosov-aa/pg-status/releases/download/1.4.1/pg-status_1.4.1_amd64_shared) binaries,
-as well as various [docker containers](docker) and [one published in the docker hub](https://hub.docker.com/r/krylosovaa/pg-status).
+In short there is:
+- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.4.1/pg-status_1.4.1_amd64.deb)
+- [published container to Docker Hub](https://hub.docker.com/r/krylosovaa/pg-status)
+- various [docker containers](docker)
+- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.4.1/pg-status_1.4.1_linux_amd64_static.tar.gz)
+- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.4.1/pg-status_1.4.1_linux_amd64_shared.tar.gz)
+
+
 For more information, go to the [docs/installation.md](docs/installation.md) section.
 
 # Performance
