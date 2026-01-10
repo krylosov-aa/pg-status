@@ -75,7 +75,7 @@ then run:
 ## Build with CMake
 
 You can compile the project from source for any platform using CMake.
-You can refer to the Dockerfiles for examples of how to install dependencies and configure the build,
+You can refer to the [Dockerfiles](../docker) for examples of how to install dependencies and configure the build,
 depending on whether you prefer a dynamically linked or static binary.
 
 
