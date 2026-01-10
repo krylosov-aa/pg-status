@@ -18,7 +18,8 @@ RUN curl -LO https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-1.0.2.tar.gz &&
     cd libmicrohttpd-1.0.2 && \
     ./configure --disable-https --enable-static --disable-shared && \
     make -j$(nproc) && \
-    make install
+    make install && \
+    cp COPYING /tmp/LICENSE-libmicrohttpd
 
 # ---- cJSON ----
 RUN curl -LO https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz && \
@@ -30,15 +31,16 @@ RUN curl -LO https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.g
         -DENABLE_CJSON_TEST=OFF \
         -DBUILD_SHARED_LIBS=OFF \
         -DCMAKE_BUILD_TYPE=Release . && \
-    cmake --build build --target install
+    cmake --build build --target install && \
+    cp LICENSE /tmp/LICENSE-cJSON
 
 # ---- OpenSSL ----
 RUN curl -LO https://www.openssl.org/source/openssl-3.3.1.tar.gz && \
     tar xf openssl-3.3.1.tar.gz && \
     cd openssl-3.3.1 && \
     env CC=gcc ./Configure linux-x86_64 no-shared no-dso no-tests --prefix=/usr/local && \
-    make -j$(nproc) && make install_sw
-
+    make -j$(nproc) && make install_sw && \
+    cp LICENSE.txt /tmp/LICENSE-OpenSSL
 
 # ---- libpq ----
 RUN curl -LO https://ftp.postgresql.org/pub/source/v18.1/postgresql-18.1.tar.gz && \
@@ -54,7 +56,34 @@ RUN curl -LO https://ftp.postgresql.org/pub/source/v18.1/postgresql-18.1.tar.gz 
     cp src/interfaces/libpq/libpq-fe.h src/include/postgres_ext.h \
        src/include/libpq/pqcomm.h \
        src/include/libpq/libpq-fs.h \
-       /usr/local/include/postgresql/
+       /usr/local/include/postgresql/ && \
+    cp COPYRIGHT /tmp/LICENSE-PostgreSQL
+
+# ---- zlib license ----
+RUN <<'EOF' cat > /tmp/LICENSE-zlib
+zlib License
+
+Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
+
+Jean-loup Gailly        Mark Adler
+jloup@gzip.org          madler@alumni.caltech.edu
+EOF
 
 # ---- Build app ----
 WORKDIR /app
@@ -77,9 +106,127 @@ RUN cmake -B build -G Ninja \
         . && \
     cmake --build build
 
+# -------- Package Archive --------
+FROM ubuntu:latest AS packager
+
+RUN apt-get update && apt-get install -y --no-install-recommends tar gzip && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /archive
+
+COPY --from=builder /app/build/src/pg-status pg-status
+COPY --from=builder /tmp/LICENSE-libmicrohttpd licenses/LICENSE-libmicrohttpd
+COPY --from=builder /tmp/LICENSE-cJSON licenses/LICENSE-cJSON
+COPY --from=builder /tmp/LICENSE-OpenSSL licenses/LICENSE-OpenSSL
+COPY --from=builder /tmp/LICENSE-PostgreSQL licenses/LICENSE-PostgreSQL
+COPY --from=builder /tmp/LICENSE-zlib licenses/LICENSE-zlib
+
+RUN <<'EOF' cat > LICENSE
+MIT License
+
+Copyright (c) 2025 krylosov-aa
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+EOF
+
+RUN <<'EOF' cat > THIRD-PARTY-NOTICES
+Third-Party Software Notices
+============================
+
+This binary statically links the following libraries.
+Full license texts are included in the "licenses" directory.
+
+--------------------------------------------------------------------------------
+libpq (PostgreSQL Client Library) - v18.1
+--------------------------------------------------------------------------------
+License: PostgreSQL License
+License File: licenses/LICENSE-PostgreSQL
+Website: https://www.postgresql.org/
+
+--------------------------------------------------------------------------------
+libmicrohttpd - v1.0.2
+--------------------------------------------------------------------------------
+License: GNU Lesser General Public License v2.1 or later (LGPL-2.1-or-later)
+License File: licenses/LICENSE-libmicrohttpd
+Website: https://www.gnu.org/software/libmicrohttpd/
+
+IMPORTANT: This software is statically linked with libmicrohttpd which is
+licensed under LGPL-2.1-or-later. To comply with LGPL requirements, the
+complete source code for pg-status is available at:
+https://github.com/krylosov-aa/pg-status
+
+You may relink this application with a modified version of libmicrohttpd
+by building from source.
+
+--------------------------------------------------------------------------------
+cJSON - v1.7.19
+--------------------------------------------------------------------------------
+License: MIT License
+License File: licenses/LICENSE-cJSON
+Website: https://github.com/DaveGamble/cJSON
+
+--------------------------------------------------------------------------------
+OpenSSL - v3.3.1
+--------------------------------------------------------------------------------
+License: Apache License 2.0
+License File: licenses/LICENSE-OpenSSL
+Website: https://www.openssl.org/
+
+--------------------------------------------------------------------------------
+zlib - v1.3.1
+--------------------------------------------------------------------------------
+License: zlib License
+License File: licenses/LICENSE-zlib
+Website: https://zlib.net/
+EOF
+
+# README
+RUN <<'EOF' cat > README
+pg-status v1.4.1 (static build)
+===============================
+
+A microservice (sidecar) that helps instantly determine the status of your
+PostgreSQL hosts including whether they are alive, which one is the master,
+which ones are replicas, and how far each replica is lagging behind the master.
+
+This is a statically linked binary with no external dependencies.
+
+Licenses
+--------
+See LICENSE for the pg-status license.
+See THIRD-PARTY-NOTICES and the licenses/ directory for third-party licenses.
+
+Source Code
+-----------
+https://github.com/krylosov-aa/pg-status
+EOF
+
+RUN tar -czvf /pg-status_1.4.1_linux_amd64_static.tar.gz \
+    pg-status \
+    LICENSE \
+    THIRD-PARTY-NOTICES \
+    README \
+    licenses/
+
 # -------- Export --------
 FROM scratch AS export
-COPY --from=builder /app/build/src/pg-status /pg-status_1.4.0_amd64_static
+COPY --from=packager /pg-status_1.4.1_linux_amd64_static.tar.gz /
 
 # -------- Run --------
 FROM ubuntu:latest AS runner
