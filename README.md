@@ -12,6 +12,13 @@ interface that can be used to retrieve a list of hosts meeting given conditions.
 
 It always serves data directly from memory and responds extremely quickly, so it can be safely used on every request.
 
+To learn more about why this project exists and
+what problem it solves, you can read the article on one of the
+platforms that are convenient for you:
+
+- [dev.to](https://dev.to/krylosov-aa/pg-status-a-lightweight-microservice-for-checking-postgresql-host-status-32jd)
+- [medium](https://medium.com/@krylosov.andrew/pg-status-a-lightweight-microservice-for-checking-postgresql-host-status-a70f8944302a)
+
 
 # Usage
 
