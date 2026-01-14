@@ -22,7 +22,7 @@ static pthread_t monitor_tid;
  * A sign that all data have been initialized and pg_status is ready
  * to provide information about hosts.
  */
-atomic_bool pg_monitor_ready = false;
+bool pg_monitor_ready = false;
 
 /**
  * A pointer to the head of the linked list of hosts
@@ -55,17 +55,6 @@ MonitorParameters parameters = {
     .sync_max_lag_ms = 1000,
     .sync_max_lag_bytes = 1000000,  // 1 mb
 };
-
-
-/**
- * A sign that all data have been initialized and pg_status is ready
- * to provide information about hosts.
- */
-bool is_pg_monitor_ready(void) {
-    return atomic_load_explicit(
-        &pg_monitor_ready, memory_order_acquire
-    );
-}
 
 /**
  * Returns a pointer to the head of the linked list of hosts.
@@ -415,10 +404,12 @@ void *pg_monitor_thread(void *arg) {
     init_monitor_host_linked_list();
 
     check_hosts();
-    atomic_store_explicit(&pg_monitor_ready, true, memory_order_release);
 
     struct timespec ts;
     pthread_mutex_lock(&monitor_mutex);
+    pg_monitor_ready = true;
+    pthread_cond_broadcast(&monitor_cond);
+
     while (monitor_running) {
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_sec += parameters.sleep;
@@ -446,9 +437,11 @@ pthread_t start_pg_monitor() {
         raise_error("Failed to start pg_monitor");
     }
 
-    while (!is_pg_monitor_ready()) {
-        sleep(1);
+    pthread_mutex_lock(&monitor_mutex);
+    while (!pg_monitor_ready) {
+        pthread_cond_wait(&monitor_cond, &monitor_mutex);
     }
+    pthread_mutex_unlock(&monitor_mutex);
     printf("pg_monitor started\n");
     return monitor_tid;
 }
