@@ -34,7 +34,7 @@ COPY --from=builder /app/build/src/pg-status usr/bin/pg-status
 RUN <<'EOF' bash
 cat > DEBIAN/control <<CONTROL
 Package: pg-status
-Version: 1.4.2
+Version: 1.4.3
 Section: utils
 Priority: optional
 Architecture: amd64
@@ -81,8 +81,8 @@ EOF
 
 RUN chmod 755 usr/bin/pg-status && chmod 755 DEBIAN
 
-RUN dpkg-deb --build . /pg-status_1.4.2_amd64.deb
+RUN dpkg-deb --build . /pg-status_1.4.3_amd64.deb
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=packager /pg-status_1.4.2_amd64.deb /
+COPY --from=packager /pg-status_1.4.3_amd64.deb /

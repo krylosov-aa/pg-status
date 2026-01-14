@@ -5,32 +5,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <fcntl.h>
 #include <limits.h>
 #include <unistd.h>
 #include <cjson/cJSON.h>
 
-/**
- * Opens file descriptor in blocking mode and gets fstat
- */
-FileDescriptor open_file(const char *path) {
-    FileDescriptor mfd = {};
-
-    mfd.fd = open(path, O_RDONLY);
-    if (mfd.fd < 0) {
-        printf_error("Failed to open file: %s", path);
-        return mfd;
-    }
-
-    if (fstat(mfd.fd, &mfd.st) < 0) {
-        printf_error("Failed to get fstat: %s", path);
-        if (close(mfd.fd) < 0) {
-            printf_error("Failed to close file: %s", path);
-        }
-        mfd.fd = -1;
-    }
-    return mfd;
-}
 
 int fputs_error(void) {
     char buf[256];

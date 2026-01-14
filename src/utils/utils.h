@@ -7,16 +7,6 @@
 #include <cjson/cJSON.h>
 #include <stdnoreturn.h>
 
-typedef struct FileDescriptor {
-    int fd;
-    struct stat st;
-} FileDescriptor;
-
-/**
- * Opens file descriptor in blocking mode and gets fstat
- */
-FileDescriptor open_file(const char *path);
-
 #ifndef __printflike
 #  ifdef __GNUC__
 #    define __printflike(fmtpos, argpos) __attribute__((format(printf, fmtpos, argpos)))

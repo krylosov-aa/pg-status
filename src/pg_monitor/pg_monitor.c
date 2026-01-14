@@ -429,15 +429,16 @@ void *pg_monitor_thread(void *arg) {
  * Starts a host monitoring thread
  */
 pthread_t start_pg_monitor() {
+    pthread_mutex_lock(&monitor_mutex);
     const int started = pthread_create(
         &monitor_tid, nullptr, pg_monitor_thread, nullptr
     );
 
     if (started != 0) {
+        pthread_mutex_unlock(&monitor_mutex);
         raise_error("Failed to start pg_monitor");
     }
 
-    pthread_mutex_lock(&monitor_mutex);
     while (!pg_monitor_ready) {
         pthread_cond_wait(&monitor_cond, &monitor_mutex);
     }
@@ -451,8 +452,8 @@ pthread_t start_pg_monitor() {
  */
 void stop_pg_monitor(void) {
     pthread_mutex_lock(&monitor_mutex);
-        monitor_running = false;
-        pthread_cond_signal(&monitor_cond);
+    monitor_running = false;
+    pthread_cond_signal(&monitor_cond);
     pthread_mutex_unlock(&monitor_mutex);
 
     pthread_join(monitor_tid, nullptr);
