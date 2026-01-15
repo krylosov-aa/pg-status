@@ -151,4 +151,18 @@ void add_bool_to_json_object(cJSON * obj, const char *key, bool val);
  */
 char *json_to_str(cJSON *json);
 
+/**
+ * Counts how many occurrences of some char in a string
+ */
+unsigned int count_chars_with_threshold(
+    const char *string, char countable, unsigned int threshold
+);
+
+/**
+ * Counts how many occurrences of some char in a string
+ */
+unsigned int count_chars(
+    const char *string, char countable
+);
+
 #endif //PG_STATUS_UTILS_H

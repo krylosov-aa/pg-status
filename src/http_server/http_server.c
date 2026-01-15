@@ -9,7 +9,7 @@
 /**
  * list of routes
  */
-typedef struct Routes {
+typedef struct {
     Route *routes;
     unsigned int cnt;
 } Routes;
@@ -17,13 +17,13 @@ typedef struct Routes {
 /**
  * list of routes registered for processing
  */
-Routes *routes_list = nullptr;
+static Routes *routes_list = nullptr;
 
 
 /**
  * The default handler if no matching route is found is to return a 404.
  */
-void not_found(MHD_Connection *connection, HTTPResponse *response) {
+static void not_found(MHD_Connection *connection, HTTPResponse *response) {
     MHD_Response *mhd_response = MHD_create_response_from_buffer(
         0, NULL, MHD_RESPMEM_PERSISTENT
     );
@@ -34,7 +34,7 @@ void not_found(MHD_Connection *connection, HTTPResponse *response) {
 /**
  * Sends a response to the mhd queue for sending the response
  */
-MHD_Result queue_response(
+static MHD_Result queue_response(
     MHD_Connection *connection,
     HTTPResponse *response,
     const char *path, const char *method
@@ -95,7 +95,7 @@ MHD_Result queue_response(
 /**
  * Handler at the end of request processing
  */
-void request_completed(
+static void request_completed(
     void *cls,
     MHD_Connection *connection,
     void **req_cls,
@@ -130,28 +130,9 @@ void request_completed(
 }
 
 /**
- * Handler at the start of client connection
- */
-void notify_connection_callback(
-    void *cls,
-    MHD_Connection *connection,
-    void **socket_context,
-    enum MHD_ConnectionNotificationCode toe
-) {
-    switch (toe) {
-        case MHD_CONNECTION_NOTIFY_STARTED:
-            printf("Connection started\n");
-            break;
-        case MHD_CONNECTION_NOTIFY_CLOSED:
-            printf("Connection closed\n");
-            break;
-    }
-}
-
-/**
  * Searches for a suitable route among registered routes
  */
-request_handler_t find_handler(const char *method, const char *path) {
+static request_handler_t find_handler(const char *method, const char *path) {
     for (unsigned int i = 0; i < routes_list -> cnt; i++) {
         Route *routes = routes_list -> routes;
 
@@ -168,7 +149,7 @@ request_handler_t find_handler(const char *method, const char *path) {
 /**
  * Starts execution of the handler registered in the route.
  */
-MHD_Result process_handler(
+static MHD_Result process_handler(
   const char *path,
   const char *method,
   HTTPResponse *response,
@@ -193,7 +174,7 @@ MHD_Result process_handler(
 /**
  * Prepares a structure with default parameters to store the response
  */
-HTTPResponse *allocate_response(void) {
+static HTTPResponse *allocate_response(void) {
     HTTPResponse *response = malloc(sizeof(HTTPResponse));
     if (response != nullptr) {
         response -> mhd_response = nullptr;
@@ -208,7 +189,7 @@ HTTPResponse *allocate_response(void) {
 /**
  * Processing a get request
  */
-MHD_Result process_get(
+static MHD_Result process_get(
   void *cls,
   MHD_Connection *connection,
   const char *path,
@@ -224,33 +205,9 @@ MHD_Result process_get(
 }
 
 /**
- * Processing a post request
- */
-MHD_Result process_post(
-  void *cls,
-  MHD_Connection *connection,
-  const char *path,
-  const char *method,
-  const char *version,
-  const char *upload_data,
-  size_t *upload_data_size,
-  void **req_cls
-) {
-    HTTPResponse *response;
-    if (*req_cls == nullptr) {
-        response = allocate_response();
-        *req_cls = (void *) response;
-        return MHD_YES;
-    }
-    response = (HTTPResponse *) *req_cls;
-
-    return process_handler(path, method, response, connection);
-}
-
-/**
  * Processing a request
  */
-MHD_Result answer_to_connection(
+static MHD_Result answer_to_connection(
   void *cls,
   MHD_Connection *connection,
   const char *path,

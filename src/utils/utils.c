@@ -10,7 +10,7 @@
 #include <cjson/cJSON.h>
 
 
-int fputs_error(void) {
+static int fputs_error(void) {
     char buf[256];
     if (strerror_r(errno, buf, sizeof(buf)) == 0) {
         return fputs(buf, stderr);

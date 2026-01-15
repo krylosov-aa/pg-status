@@ -114,8 +114,7 @@ You can configure various parameters using environment variables:
 - `pg_status__pg_user` — The user under which SQL queries to PostgreSQL will be executed. Default: `postgres`
 - `pg_status__pg_password` — The password for the PostgreSQL user. Default: `postgres`
 - `pg_status__pg_database` — The name of the database to connect to. Default: `postgres`
-- `pg_status__hosts` — A list of PostgreSQL hosts, separated by the character specified in `pg_status__delimiter`.
-- `pg_status__delimiter` — The delimiter used to separate hosts. Default: `,`
+- `pg_status__hosts` — A list of PostgreSQL hosts, separated by the `,`.
 - `pg_status__pg_port` — The connection port. You can specify separate ports for individual hosts using the same delimiter. Default: `5432`
 - `pg_status__connect_timeout` — The time limit (in seconds) for establishing a connection to PostgreSQL. Default: `2`
 - `pg_status__max_fails` — The number of consecutive errors allowed when checking a host’s status before it is considered dead. Default: `3`

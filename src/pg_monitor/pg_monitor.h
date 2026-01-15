@@ -2,6 +2,7 @@
 #define PG_STATUS_PG_MONITOR_H
 
 #include <pthread.h>
+#include <stdint.h>
 
 /**
  * The maximum number of hosts monitored by pg-status
@@ -21,7 +22,7 @@ void stop_pg_monitor(void);
 /**
  * List of all monitoring parameters
  */
-typedef struct MonitorParameters {
+typedef struct {
     //pg user
     char *user;
 
@@ -30,9 +31,6 @@ typedef struct MonitorParameters {
 
     // pg database name
     char *database;
-
-    // delimiter. For example: ,
-    char *hosts_delimiter;
 
     // pg hosts, separated by hosts_delimiter.
     char *hosts;
@@ -60,7 +58,7 @@ typedef struct MonitorParameters {
 /**
  * Host status. Separated into a structure for atomic access.
  */
-typedef struct MonitorStatus {
+typedef struct {
     unsigned long long delay_ms;
     unsigned long long delay_bytes;
     bool master;
@@ -74,20 +72,29 @@ typedef struct MonitorStatus {
  *  host status checking.
  *  Hosts form a linked list.
  */
-typedef struct MonitorHost {
+typedef struct {
     char *host;
     char *connection_str;
-    struct MonitorHost *next;
     _Atomic(MonitorStatus *) status;
     _Atomic(MonitorStatus *) not_actual_status;
     unsigned int failed_connections;
 } MonitorHost;
 
-/**
- * Returns a pointer to the head of the linked list of hosts.
- */
-MonitorHost *get_monitor_host_head(void);
 
+/**
+ * The actual number of hosts
+ */
+extern uint8_t host_count;
+
+/**
+ * Array of monitoring hosts
+ */
+extern MonitorHost monitor_host_list[MAX_HOSTS];
+
+/**
+ * pg-monitor parameters. The default parameters are set here.
+ */
+extern MonitorParameters parameters;
 
 /**
  * Atomically returns a pointer to the host status
@@ -113,6 +120,11 @@ char *find_host_round_robin(
  * A function for searching for a host by name
  */
 MonitorHost *find_host_by_name(const char *host);
+
+/**
+ * condition_handler that searches for a live master
+ */
+bool is_master(const MonitorStatus *status);
 
 /**
  * condition_handler that searches for a live replica

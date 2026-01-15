@@ -1,4 +1,7 @@
 #include "pg_monitor.h"
+
+#include <assert.h>
+
 #include "utils.h"
 
 #include <pthread.h>
@@ -22,22 +25,27 @@ static pthread_t monitor_tid;
  * A sign that all data have been initialized and pg_status is ready
  * to provide information about hosts.
  */
-bool pg_monitor_ready = false;
+static bool pg_monitor_ready = false;
 
 /**
- * A pointer to the head of the linked list of hosts
+ * The actual number of hosts
  */
-MonitorHost *monitor_host_head = nullptr;
+uint8_t host_count = 0;
+
+/**
+ * Array of monitoring hosts
+ */
+MonitorHost monitor_host_list[MAX_HOSTS] = {0};
 
 /**
  * Just a master host to find it asap
  */
-_Atomic (char *) master_host = nullptr;
+static _Atomic (char *) master_host = nullptr;
 
 /**
  * A pointer to the last host returned in the round-robin algorithm
  */
-_Atomic (MonitorHost *) round_robin_cursor = nullptr;
+static atomic_uint_least8_t round_robin_cursor = 0;
 
 /**
  * pg-monitor parameters. The default parameters are set here.
@@ -46,7 +54,6 @@ MonitorParameters parameters = {
     .user = "postgres",
     .password = "postgres",
     .database = "postgres",
-    .hosts_delimiter = ",",
     .hosts = nullptr,
     .port = "5432",
     .connect_timeout = "2",
@@ -57,20 +64,12 @@ MonitorParameters parameters = {
 };
 
 /**
- * Returns a pointer to the head of the linked list of hosts.
- */
-MonitorHost *get_monitor_host_head(void) {
-    return monitor_host_head;
-}
-
-/**
  * Overrides default parameters if they are set in environment variables.
  */
-void get_values_from_env(void) {
+static void get_values_from_env(void) {
     replace_from_env("pg_status__pg_user", &parameters.user);
     replace_from_env("pg_status__pg_database", &parameters.database);
     replace_from_env("pg_status__pg_password", &parameters.password);
-    replace_from_env("pg_status__delimiter", &parameters.hosts_delimiter);
     replace_from_env("pg_status__connect_timeout", &parameters.connect_timeout);
     replace_from_env("pg_status__pg_port", &parameters.port);
     replace_from_env_uint("pg_status__sleep", &parameters.sleep);
@@ -83,7 +82,7 @@ void get_values_from_env(void) {
     );
 
     replace_from_env("pg_status__hosts", &parameters.hosts);
-    if (parameters.hosts == nullptr) {
+    if (!parameters.hosts || !*parameters.hosts) {
         raise_error("pg_status__hosts not set");
     }
 }
@@ -92,15 +91,15 @@ void get_values_from_env(void) {
  * Returns hosts sequentially. When no more hosts are available,
  * it returns nullptr.
  */
-char *next_host(char *hosts) {
+static char *next_host(char *hosts) {
     static char *save_ptr = nullptr;
     static char *host = nullptr;
 
     if (host == nullptr) {
-        host = strtok_r(hosts, parameters.hosts_delimiter, &save_ptr);
+        host = strtok_r(hosts, ",", &save_ptr);
     }
     else {
-        host = strtok_r(nullptr, parameters.hosts_delimiter, &save_ptr);
+        host = strtok_r(nullptr, ",", &save_ptr);
     }
     return host;
 }
@@ -110,16 +109,16 @@ char *next_host(char *hosts) {
  * it continues returning the last one.
  * This allows a single port to be used for all hosts.
  */
-char *next_port(char *ports) {
+static char *next_port(char *ports) {
     static char *last_port = nullptr;
     static char *save_ptr = nullptr;
     static char *port = nullptr;
 
     if (port == nullptr) {
-        port = strtok_r(ports, parameters.hosts_delimiter, &save_ptr);
+        port = strtok_r(ports, ",", &save_ptr);
     }
     else {
-        port = strtok_r(nullptr, parameters.hosts_delimiter, &save_ptr);
+        port = strtok_r(nullptr, ",", &save_ptr);
     }
 
     if (port != nullptr) {
@@ -131,7 +130,7 @@ char *next_port(char *ports) {
 /**
  * Returns the string to connect to pg
  */
-char *get_connection_string(char *host, char *port) {
+static char *get_connection_string(char *host, char *port) {
     return format_string(
         "user=%s password=%s host=%s port=%s "
         "dbname=%s connect_timeout=%s",
@@ -143,7 +142,7 @@ char *get_connection_string(char *host, char *port) {
 /**
  * Initializes MonitorStatus to its initial value.
  */
-MonitorStatus *init_monitor_status(void) {
+static MonitorStatus *init_monitor_status(void) {
     MonitorStatus *status = malloc(sizeof(MonitorStatus));
     if (!status) {
         raise_error("Failed to allocate MonitorStatus");
@@ -158,24 +157,20 @@ MonitorStatus *init_monitor_status(void) {
 /**
  * Initializes MonitorHost to its initial value.
  */
-MonitorHost *init_monitor_host(char *host, char *port) {
-    MonitorHost *monitor_host = calloc(1, sizeof(MonitorHost));
-    if (!monitor_host) {
-        raise_error("Failed to allocate MonitorHost");
-    }
-    monitor_host -> host = strdup(host);
-    monitor_host -> connection_str = get_connection_string(host, port);
-    monitor_host -> next = nullptr;
-    monitor_host -> failed_connections = 0;
+static MonitorHost init_monitor_host(char *host, char *port) {
+    MonitorHost monitor_host;
+    monitor_host.host = strdup(host);
+    monitor_host.connection_str = get_connection_string(host, port);
+    monitor_host.failed_connections = 0;
 
     atomic_store_explicit(
-        &monitor_host -> status,
+        &monitor_host.status,
         init_monitor_status(),
         memory_order_release
     );
 
     atomic_store_explicit(
-        &monitor_host -> not_actual_status,
+        &monitor_host.not_actual_status,
         init_monitor_status(),
         memory_order_release
     );
@@ -186,30 +181,22 @@ MonitorHost *init_monitor_host(char *host, char *port) {
 /**
  * Initializes MonitorHost linked list to its initial value.
  */
-void init_monitor_host_linked_list(void) {
+static void init_monitor_host_list(void) {
     char *hosts = strdup(parameters.hosts);
     char *host = next_host(hosts);
 
     char *ports = strdup(parameters.port);
     char *port = next_port(ports);
 
-    monitor_host_head = init_monitor_host(host, port);
-    MonitorHost *cursor = monitor_host_head;
-    host = next_host(hosts);
-    port = next_port(ports);
-    unsigned int cnt = 1;
-
     while (host) {
-        if (cnt == MAX_HOSTS) {
+        if (host_count == MAX_HOSTS) {
             raise_error("Too many hosts. Maximum value = %d", MAX_HOSTS);
         }
-
-        cursor -> next = init_monitor_host(host, port);
-        cursor = cursor -> next;
+        monitor_host_list[host_count] = init_monitor_host(host, port);
 
         host = next_host(hosts);
         port = next_port(ports);
-        cnt++;
+        host_count++;
     }
 
     free(hosts);
@@ -247,15 +234,12 @@ MonitorStatus atomic_get_status(const MonitorHost *host) {
  * A function for searching for a host by name
  */
 MonitorHost *find_host_by_name(const char *host) {
-    MonitorHost *cursor = monitor_host_head;
-
-    while (cursor) {
-        if (is_equal_strings(cursor -> host, host)) {
-            return cursor;
+    for (uint8_t i = 0; i < host_count; i++) {
+        MonitorHost *item = &monitor_host_list[i];
+        if (is_equal_strings(item -> host, host)) {
+            return item;
         }
-        cursor = cursor -> next;
     }
-
     return nullptr;
 }
 
@@ -321,24 +305,19 @@ bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status) {
  * It takes the next host from the list, and if it's over,
  * it starts from the beginning.
  */
-MonitorHost *get_next_host_in_circle(MonitorHost *cursor) {
-    if (!cursor || !cursor -> next) {
-        return get_monitor_host_head();
-    }
-    return cursor -> next;
+static uint8_t get_next_cursor_in_circle(const uint8_t cursor) {
+    assert(cursor <= host_count);
+    return (cursor + 1) % host_count;
 }
 
 /**
  * Moves the cursor of the round-robin algorithm and returns the host from
  * which to start the crawl
  */
-MonitorHost *get_next_host_round_robin(void) {
-    MonitorHost *cursor = atomic_load_explicit(
-        &round_robin_cursor, memory_order_acquire
-    );
-    cursor = get_next_host_in_circle(cursor);
-    atomic_store_explicit(&round_robin_cursor, cursor, memory_order_release);
-    return cursor;
+static uint8_t get_next_cursor_round_robin(void) {
+    return atomic_fetch_add_explicit(
+        &round_robin_cursor, 1, memory_order_relaxed
+    ) % host_count;
 }
 
 /**
@@ -350,16 +329,18 @@ MonitorHost *get_next_host_round_robin(void) {
 char *find_host_round_robin(
     const condition_handler handler, const bool master_if_not_found
 ) {
-    MonitorHost *cursor = get_next_host_round_robin();
-    const MonitorHost *start = cursor;
+    uint8_t cursor = get_next_cursor_round_robin();
+    const uint8_t start_cursor = cursor;
 
-    MonitorStatus status = atomic_get_status(cursor);
+    const MonitorHost *mon_host = &monitor_host_list[cursor];
+    MonitorStatus status = atomic_get_status(mon_host);
 
     while (!handler(&status)) {
-        cursor = get_next_host_in_circle(cursor);
-        status = atomic_get_status(cursor);
+        cursor = get_next_cursor_in_circle(cursor);
+        mon_host = &monitor_host_list[cursor];
+        status = atomic_get_status(mon_host);
 
-        if (cursor == start) {
+        if (cursor == start_cursor) {
             if (master_if_not_found) {
                 return get_master_host();
             }
@@ -368,28 +349,25 @@ char *find_host_round_robin(
 
     }
 
-    return cursor -> host;
+    return mon_host -> host;
 }
 
 /**
  * One iteration of host checking
  */
-void check_hosts(void) {
-    MonitorHost *cursor = monitor_host_head;
-
+static void check_hosts(void) {
     char *master = nullptr;
-
-    while (cursor) {
-        check_host_streaming_replication(cursor, parameters.max_fails);
+    for (uint8_t i = 0; i < host_count; i++) {
+        MonitorHost *item = &monitor_host_list[i];
+        check_host_streaming_replication(item, parameters.max_fails);
 
         if (!master) {
-            MonitorStatus status = atomic_get_status(cursor);
+            MonitorStatus status = atomic_get_status(item);
             if (is_master(&status)) {
-                master = cursor -> host;
+                master = item -> host;
             }
         }
 
-        cursor = cursor -> next;
     }
     save_master_host(master);
     (void)fflush(stdout);
@@ -399,9 +377,9 @@ void check_hosts(void) {
  * The main monitoring thread, which runs continuously and periodically
  * does host checks
  */
-void *pg_monitor_thread(void *arg) {
+static void *pg_monitor_thread(void *arg) {
     get_values_from_env();
-    init_monitor_host_linked_list();
+    init_monitor_host_list();
 
     check_hosts();
 

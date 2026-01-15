@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <cjson/cJSON.h>
 
-void add_host_to_json(cJSON *json_obj, char *host) {
+static void add_host_to_json(cJSON *json_obj, char *host) {
     if (!host) {
         add_null_to_json_object(json_obj, "host");
     }
@@ -18,10 +18,9 @@ void add_host_to_json(cJSON *json_obj, char *host) {
 }
 
 void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
-    const MonitorHost *mon_host = get_monitor_host_head();
     cJSON *arr = json_array();
-
-    while (mon_host) {
+    for (uint8_t i = 0; i < host_count; i++) {
+        MonitorHost *mon_host = &monitor_host_list[i];
         cJSON *json_obj = json_object();
         add_host_to_json(json_obj, mon_host -> host);
 
@@ -30,7 +29,6 @@ void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
         add_bool_to_json_object(json_obj, "alive", status.alive);
 
         cJSON_AddItemToArray(arr, json_obj);
-        mon_host = mon_host -> next;
     }
 
     response -> response = json_to_str(arr);
@@ -38,7 +36,7 @@ void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
     response -> content_type = "application/json";
 }
 
-void return_single_host(HTTPResponse *response, char *host) {
+static void return_single_host(HTTPResponse *response, char *host) {
     if (!host) {
         response -> status_code = 404;
     }
@@ -55,38 +53,38 @@ void return_single_host(HTTPResponse *response, char *host) {
     }
 }
 
-void get_random_replica(MHD_Connection *connection, HTTPResponse *response) {
+static void get_random_replica(MHD_Connection *connection, HTTPResponse *response) {
     char *host = find_host_round_robin(is_alive_replica, true);
     return_single_host(response, host);
 }
 
-void get_master(MHD_Connection *connection, HTTPResponse *response) {
+static void get_master(MHD_Connection *connection, HTTPResponse *response) {
     char *host = get_master_host();
     return_single_host(response, host);
 }
 
-void get_sync_host_by_time(
+static void get_sync_host_by_time(
     MHD_Connection *connection, HTTPResponse *response
 ) {
     char *host = find_host_round_robin(is_sync_replica_by_time, true);
     return_single_host(response, host);
 }
 
-void get_sync_host_by_bytes(
+static void get_sync_host_by_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
     char *host = find_host_round_robin(is_sync_replica_by_bytes, true);
     return_single_host(response, host);
 }
 
-void get_sync_host_by_time_or_bytes(
+static void get_sync_host_by_time_or_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
     char *host = find_host_round_robin(is_sync_replica_by_time_or_bytes, true);
     return_single_host(response, host);
 }
 
-void get_sync_host_by_time_and_bytes(
+static void get_sync_host_by_time_and_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
     char *host = find_host_round_robin(is_sync_replica_by_time_and_bytes, true);
@@ -94,7 +92,7 @@ void get_sync_host_by_time_and_bytes(
 }
 
 
-void get_host_status(MHD_Connection *connection, HTTPResponse *response) {
+static void get_host_status(MHD_Connection *connection, HTTPResponse *response) {
     const char *host = MHD_lookup_connection_value(
         connection,
         MHD_GET_ARGUMENT_KIND,
@@ -134,7 +132,7 @@ void get_host_status(MHD_Connection *connection, HTTPResponse *response) {
     response -> content_type = "application/json";
 }
 
-void block_termination_signals(sigset_t *sigset) {
+static void block_termination_signals(sigset_t *sigset) {
     sigemptyset(sigset);
     sigaddset(sigset, SIGINT);
     sigaddset(sigset, SIGTERM);
@@ -144,7 +142,7 @@ void block_termination_signals(sigset_t *sigset) {
     }
 }
 
-void wait_for_termination_signal(const sigset_t *sigset) {
+static void wait_for_termination_signal(const sigset_t *sigset) {
     int sig;
 
     if (sigwait(sigset, &sig) == 0) {
@@ -162,7 +160,7 @@ void wait_for_termination_signal(const sigset_t *sigset) {
 }
 
 
-uint16_t get_port() {
+static uint16_t get_port() {
     const char *env_val = getenv("pg_status__http_port");
     if (env_val && *env_val) {
         return str_to_uint16(getenv("pg_status__http_port"));
@@ -170,7 +168,7 @@ uint16_t get_port() {
     return 8000;
 }
 
-Route routes[] = {
+static Route routes[] = {
     { "GET", "/master", get_master },
     { "GET", "/replica", get_random_replica },
     { "GET", "/hosts", get_all_hosts },
