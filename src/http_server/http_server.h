@@ -16,10 +16,16 @@ typedef enum MHD_ResponseMemoryMode MHD_ResponseMemoryMode;
  */
 typedef struct HTTPResponse {
     // For simple cases, just form a string, and the server itself will
-    // convert it to MHD_Response
+    // convert it to MHD_Response. Use memory_mode for memory management.
     char *response;
 
-    // For complex cases, you can manually generate MHD_Response
+    // For simple cases, just form a string, and the server itself will
+    // convert it to MHD_Response. memory_mode is not used in this case,
+    // but is considered MHD_RESPMEM_PERSISTENT.
+    const char *const_response;
+
+    // For complex cases, you can manually generate MHD_Response.
+    // Use memory_mode for memory management.
     MHD_Response *mhd_response;
 
     // Response type. It can be set by the server or specified by handler.

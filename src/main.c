@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <cjson/cJSON.h>
 
-static void add_host_to_json(cJSON *json_obj, char *host) {
+static void add_host_to_json(cJSON *json_obj, const char *host) {
     if (!host) {
         add_null_to_json_object(json_obj, "host");
     }
@@ -36,7 +36,9 @@ void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
     response -> content_type = "application/json";
 }
 
-static void return_single_host(HTTPResponse *response, char *host) {
+static void return_single_host(
+    HTTPResponse *response, const char *host
+) {
     if (!host) {
         response -> status_code = 404;
     }
@@ -48,46 +50,50 @@ static void return_single_host(HTTPResponse *response, char *host) {
         response -> memory_mode = MHD_RESPMEM_MUST_FREE;
     }
     else {
-        response -> response = host;
+        response -> const_response = host;
         response -> memory_mode = MHD_RESPMEM_PERSISTENT;
     }
 }
 
 static void get_random_replica(MHD_Connection *connection, HTTPResponse *response) {
-    char *host = find_host_round_robin(is_alive_replica, true);
+    const char *host = find_host_round_robin(is_alive_replica, true);
     return_single_host(response, host);
 }
 
 static void get_master(MHD_Connection *connection, HTTPResponse *response) {
-    char *host = get_master_host();
+    const char *host = get_master_host();
     return_single_host(response, host);
 }
 
 static void get_sync_host_by_time(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    char *host = find_host_round_robin(is_sync_replica_by_time, true);
+    const char *host = find_host_round_robin(is_sync_replica_by_time, true);
     return_single_host(response, host);
 }
 
 static void get_sync_host_by_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    char *host = find_host_round_robin(is_sync_replica_by_bytes, true);
+    const char *host = find_host_round_robin(is_sync_replica_by_bytes, true);
     return_single_host(response, host);
 }
 
 static void get_sync_host_by_time_or_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    char *host = find_host_round_robin(is_sync_replica_by_time_or_bytes, true);
+    const char *host = find_host_round_robin(
+        is_sync_replica_by_time_or_bytes, true
+    );
     return_single_host(response, host);
 }
 
 static void get_sync_host_by_time_and_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    char *host = find_host_round_robin(is_sync_replica_by_time_and_bytes, true);
+    const char *host = find_host_round_robin(
+        is_sync_replica_by_time_and_bytes, true
+    );
     return_single_host(response, host);
 }
 
@@ -104,7 +110,7 @@ static void get_host_status(MHD_Connection *connection, HTTPResponse *response) 
         response -> memory_mode = MHD_RESPMEM_PERSISTENT;
         return;
     }
-    MonitorHost *mon_host = find_host_by_name(host);
+    const MonitorHost *mon_host = find_host_by_name(host);
     if (!mon_host) {
         response -> status_code = 404;
         return;

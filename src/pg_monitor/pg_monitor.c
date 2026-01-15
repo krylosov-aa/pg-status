@@ -204,7 +204,7 @@ static void init_monitor_host_list(void) {
 }
 
 
-char *get_master_host(void) {
+const char *get_master_host(void) {
     return atomic_load_explicit(
         &master_host, memory_order_acquire
     );
@@ -233,7 +233,7 @@ MonitorStatus atomic_get_status(const MonitorHost *host) {
 /**
  * A function for searching for a host by name
  */
-MonitorHost *find_host_by_name(const char *host) {
+const MonitorHost *find_host_by_name(const char *host) {
     for (uint8_t i = 0; i < host_count; i++) {
         MonitorHost *item = &monitor_host_list[i];
         if (is_equal_strings(item -> host, host)) {
@@ -326,7 +326,7 @@ static uint8_t get_next_cursor_round_robin(void) {
  * @param master_if_not_found Determines whether to return the master if the desired host is not found by handler
  * @return Host name corresponding to conditions
  */
-char *find_host_round_robin(
+const char *find_host_round_robin(
     const condition_handler handler, const bool master_if_not_found
 ) {
     uint8_t cursor = get_next_cursor_round_robin();

@@ -112,14 +112,14 @@ typedef bool (*condition_handler)(const MonitorStatus *);
  * @param master_if_not_found Determines whether to return the master if the desired host is not found by handler
  * @return Host name corresponding to conditions
  */
-char *find_host_round_robin(
+const char *find_host_round_robin(
     condition_handler handler, bool master_if_not_found
 );
 
 /**
  * A function for searching for a host by name
  */
-MonitorHost *find_host_by_name(const char *host);
+const MonitorHost *find_host_by_name(const char *host);
 
 /**
  * condition_handler that searches for a live master
@@ -163,7 +163,7 @@ void check_host_streaming_replication(
     MonitorHost *host, unsigned int max_fails
 );
 
-char *get_master_host(void);
+const char *get_master_host(void);
 
 void save_master_host(char *host);
 
