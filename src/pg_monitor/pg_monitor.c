@@ -45,7 +45,7 @@ static _Atomic (char *) master_host = nullptr;
 /**
  * A pointer to the last host returned in the round-robin algorithm
  */
-static atomic_uint_least8_t round_robin_cursor = 0;
+static atomic_size_t round_robin_cursor = 0;
 
 /**
  * pg-monitor parameters. The default parameters are set here.
@@ -306,7 +306,7 @@ bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status) {
  * it starts from the beginning.
  */
 static uint8_t get_next_cursor_in_circle(const uint8_t cursor) {
-    assert(cursor <= host_count);
+    assert(cursor < host_count);
     return (cursor + 1) % host_count;
 }
 
