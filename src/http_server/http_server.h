@@ -1,3 +1,7 @@
+/**
+ * HTTP server
+ */
+
 #ifndef PG_STATUS_HTTP_SERVER_H
 #define PG_STATUS_HTTP_SERVER_H
 

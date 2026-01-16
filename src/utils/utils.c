@@ -1,3 +1,7 @@
+/**
+ * General purpose utilities
+ */
+
 #include "utils.h"
 
 #include <errno.h>

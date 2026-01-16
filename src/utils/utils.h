@@ -1,3 +1,7 @@
+/**
+ * General purpose utilities
+ */
+
 #ifndef PG_STATUS_UTILS_H
 #define PG_STATUS_UTILS_H
 
@@ -15,6 +19,9 @@
 #  endif
 #endif
 
+
+// ------------------------ Errors ------------------------
+
 /**
  * Prints the message in red with \n and also adds the error text from errno
  */
@@ -25,6 +32,9 @@ void printf_error(const char *format, ...) __printflike(1, 2);
  * error text from errno and exit(1)
  */
 noreturn void raise_error(const char *format, ...) __printflike(1, 2);
+
+
+// ------------------------ Strings ------------------------
 
 /**
  * Concatenates strings and returns the new string.
@@ -99,6 +109,9 @@ uint16_t str_to_uint16(const char *value);
  */
 void replace_from_env(const char *env_name, char **result);
 
+
+// ------------------------ Environment variables ------------------------
+
 /**
  * Takes a value from the environment variables if it is set,
  * pastes it by the result pointer.
@@ -117,6 +130,9 @@ void replace_from_env_ull(const char *env_name, unsigned long long *result);
  * The string must be freed by the caller.
  */
 void replace_from_env_copy(const char *env_name, char **result);
+
+
+// ------------------------ JSON ------------------------
 
 /**
  * Creates a new json array object
@@ -138,8 +154,6 @@ void add_str_to_json_object(cJSON * obj, const char *key, const char *val);
  */
 void add_null_to_json_object(cJSON * obj, const char *key);
 
-
-
 /**
  * Adds a new key and bool value to json
  */
@@ -150,19 +164,5 @@ void add_bool_to_json_object(cJSON * obj, const char *key, bool val);
  * The string must be freed by the caller.
  */
 char *json_to_str(cJSON *json);
-
-/**
- * Counts how many occurrences of some char in a string
- */
-unsigned int count_chars_with_threshold(
-    const char *string, char countable, unsigned int threshold
-);
-
-/**
- * Counts how many occurrences of some char in a string
- */
-unsigned int count_chars(
-    const char *string, char countable
-);
 
 #endif //PG_STATUS_UTILS_H

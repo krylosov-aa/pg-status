@@ -1,3 +1,7 @@
+/**
+ * HTTP server
+ */
+
 #include "http_server.h"
 
 #include "utils.h"

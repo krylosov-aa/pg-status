@@ -63,7 +63,6 @@ void set_parameters_from_env(void);
 
 // ------------------------ Start/Stop monitoring ------------------------
 
-
 /**
  * Starts a host monitoring thread
  */
@@ -76,7 +75,6 @@ void stop_pg_monitor(void);
 
 
 // ------------------------ Host list ------------------------
-
 
 /**
  * The actual number of hosts
@@ -129,7 +127,6 @@ void save_master_host(char *host);
 
 
 // ------------------------ Lookup utils ------------------------
-
 
 /**
  * Atomically returns a pointer to the host status
@@ -192,7 +189,6 @@ bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status);
 
 
 // ------------------------ Host checking utils ------------------------
-
 
 /**
  * Updates the host status
