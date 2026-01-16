@@ -13,19 +13,21 @@
 #include <sys/types.h>
 
 
-/**
- * Parameters for stopping a thread
- */
-static pthread_mutex_t monitor_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  monitor_cond  = PTHREAD_COND_INITIALIZER;
-static bool monitor_running = true;
 static pthread_t monitor_tid;
 
 /**
- * A sign that all data have been initialized and pg_status is ready
- * to provide information about hosts.
+ * Parameters for start a thread
  */
+static pthread_mutex_t start_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  start_cond  = PTHREAD_COND_INITIALIZER;
 static bool pg_monitor_ready = false;
+
+/**
+ * Parameters for stop a thread
+ */
+static pthread_mutex_t stop_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  stop_cond  = PTHREAD_COND_INITIALIZER;
+static bool monitor_running = true;
 
 /**
  * The actual number of hosts
@@ -383,23 +385,25 @@ static void *pg_monitor_thread(void *arg) {
 
     check_hosts();
 
-    struct timespec ts;
-    pthread_mutex_lock(&monitor_mutex);
+    pthread_mutex_lock(&start_mutex);
     pg_monitor_ready = true;
-    pthread_cond_broadcast(&monitor_cond);
+    pthread_cond_broadcast(&start_cond);
+    pthread_mutex_unlock(&start_mutex);
 
+    struct timespec ts;
+    pthread_mutex_lock(&stop_mutex);
     while (monitor_running) {
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_sec += parameters.sleep;
 
-        pthread_cond_timedwait(&monitor_cond, &monitor_mutex, &ts);
+        pthread_cond_timedwait(&stop_cond, &stop_mutex, &ts);
         if (!monitor_running) {
             break;
         };
 
         check_hosts();
     }
-    pthread_mutex_unlock(&monitor_mutex);
+    pthread_mutex_unlock(&stop_mutex);
     return nullptr;
 }
 
@@ -407,20 +411,20 @@ static void *pg_monitor_thread(void *arg) {
  * Starts a host monitoring thread
  */
 pthread_t start_pg_monitor() {
-    pthread_mutex_lock(&monitor_mutex);
+    pthread_mutex_lock(&start_mutex);
     const int started = pthread_create(
         &monitor_tid, nullptr, pg_monitor_thread, nullptr
     );
 
     if (started != 0) {
-        pthread_mutex_unlock(&monitor_mutex);
+        pthread_mutex_unlock(&start_mutex);
         raise_error("Failed to start pg_monitor");
     }
 
     while (!pg_monitor_ready) {
-        pthread_cond_wait(&monitor_cond, &monitor_mutex);
+        pthread_cond_wait(&start_cond, &start_mutex);
     }
-    pthread_mutex_unlock(&monitor_mutex);
+    pthread_mutex_unlock(&start_mutex);
     printf("pg_monitor started\n");
     return monitor_tid;
 }
@@ -429,10 +433,10 @@ pthread_t start_pg_monitor() {
  * Stops a host monitoring thread
  */
 void stop_pg_monitor(void) {
-    pthread_mutex_lock(&monitor_mutex);
+    pthread_mutex_lock(&stop_mutex);
     monitor_running = false;
-    pthread_cond_signal(&monitor_cond);
-    pthread_mutex_unlock(&monitor_mutex);
+    pthread_cond_signal(&stop_cond);
+    pthread_mutex_unlock(&stop_mutex);
 
     pthread_join(monitor_tid, nullptr);
     printf("pg_monitor stopped\n");

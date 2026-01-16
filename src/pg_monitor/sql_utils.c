@@ -15,16 +15,9 @@
 
 
 /**
- * Converts pg false to bool false
- */
-bool is_f(const char *pg_val) {
-    return is_equal_strings(pg_val, "f");
-}
-
-/**
  * Converts pg true to bool true
  */
-bool is_t(const char *pg_val) {
+static bool is_t(const char *pg_val) {
     return is_equal_strings(pg_val, "t");
 }
 
@@ -32,7 +25,7 @@ bool is_t(const char *pg_val) {
 /**
  * Creates a connection to pg
  */
-PGconn *db_connect(const char *connection_str) {
+static PGconn *db_connect(const char *connection_str) {
     PGconn *conn = PQconnectdb(connection_str);
     if (PQstatus(conn) != CONNECTION_OK) {
         printf_error(
@@ -48,7 +41,7 @@ PGconn *db_connect(const char *connection_str) {
 /**
  * Checks that the pg answer is valid. Fails with an error if it's not.
  */
-int check_exec_result(const PGconn *conn, const PGresult *result) {
+static int check_exec_result(const PGconn *conn, const PGresult *result) {
     const ExecStatusType resStatus = PQresultStatus(result);
     if (resStatus != PGRES_TUPLES_OK && resStatus != PGRES_COMMAND_OK) {
         printf_error(
@@ -63,7 +56,7 @@ int check_exec_result(const PGconn *conn, const PGresult *result) {
 /**
  * Executes sql query with verification that there is a correct pg answer
  */
-PGresult *execute_sql(PGconn *conn, const char *query) {
+static PGresult *execute_sql(PGconn *conn, const char *query) {
     PGresult *res = PQexec(conn, query);
     const int check_result = check_exec_result(conn, res);
     if (check_result == 1) {
@@ -74,39 +67,9 @@ PGresult *execute_sql(PGconn *conn, const char *query) {
 }
 
 /**
- * Extracts a bool value from the first column of the first row.
- */
-int extract_bool_value(PGresult *q_res, bool *result) {
-    if (q_res == nullptr) {
-        return 1;
-    }
-
-    if (PQntuples(q_res) > 0 && PQnfields(q_res) > 0) {
-        *result = is_t(PQgetvalue(q_res, 0, 0));
-    }
-    else {
-        return 1;
-    }
-
-    PQclear(q_res);
-    return 0;
-}
-
-/**
- * Executes sql query and extracts a bool value from the first column of the
- * first row
- */
-int execute_sql_bool(PGconn *conn, const char *query, bool *result) {
-    PGresult *q_res = execute_sql(conn, query);
-    const int out = extract_bool_value(q_res, result);
-    PQfinish(conn);
-    return out;
-}
-
-/**
  * sql query to get host status
  */
-const char *streaming_replication_query =
+static const char *streaming_replication_query =
     "with is_in_recovery as (\n"
     "  select pg_is_in_recovery() is_replica\n"
     ")\n"
@@ -124,7 +87,7 @@ const char *streaming_replication_query =
 /**
  * Converts pg lsn to bytes
  */
-unsigned long long parse_lsn(const char *lsn) {
+static unsigned long long parse_lsn(const char *lsn) {
     if (!lsn) {
         return 0;
     }
@@ -156,14 +119,14 @@ unsigned long long parse_lsn(const char *lsn) {
 /**
  * Selects the maximum lsn
  */
-unsigned long long max_lsn(unsigned long long  a, unsigned long long  b) {
+static unsigned long long max_lsn(unsigned long long  a, unsigned long long  b) {
     return a > b ? a : b;
 }
 
 /**
  * Logs changes to stdout if there have been changes in the lag in time
  */
-void log_time_lag_changes(
+static void log_time_lag_changes(
     const MonitorHost *host,
     const MonitorStatus *new_status,
     const MonitorStatus *status
@@ -182,7 +145,7 @@ void log_time_lag_changes(
 /**
  * Logs changes to stdout if there have been changes in the lag in bytes
  */
-void log_bytes_lag_changes(
+static void log_bytes_lag_changes(
     const MonitorHost *host,
     const MonitorStatus *new_status,
     const MonitorStatus *status
@@ -201,7 +164,7 @@ void log_bytes_lag_changes(
 /**
  * Logs changes to stdout if there have been changes in the status
  */
-void log_changes(
+static void log_changes(
     const MonitorHost *host,
     const MonitorStatus *new_status,
     const MonitorStatus *status
