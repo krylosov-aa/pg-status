@@ -1,23 +1,19 @@
+/**
+ * Monitoring of postgresql hosts
+ */
+
 #ifndef PG_STATUS_PG_MONITOR_H
 #define PG_STATUS_PG_MONITOR_H
 
 #include <pthread.h>
 #include <stdint.h>
 
+// ------------------------ Parameters ------------------------
+
 /**
  * The maximum number of hosts monitored by pg-status
  */
 # define MAX_HOSTS 10
-
-/**
- * Starts a host monitoring thread
- */
-pthread_t start_pg_monitor();
-
-/**
- * Stops a host monitoring thread
- */
-void stop_pg_monitor(void);
 
 /**
  * List of all monitoring parameters
@@ -54,6 +50,43 @@ typedef struct {
     unsigned int max_fails;
 } MonitorParameters;
 
+/**
+ * pg-monitor parameters. The default parameters are set here.
+ */
+extern MonitorParameters parameters;
+
+/**
+ * Overrides default parameters if they are set in environment variables.
+ */
+void set_parameters_from_env(void);
+
+
+// ------------------------ Start/Stop monitoring ------------------------
+
+
+/**
+ * Starts a host monitoring thread
+ */
+pthread_t start_pg_monitor();
+
+/**
+ * Stops a host monitoring thread
+ */
+void stop_pg_monitor(void);
+
+
+// ------------------------ Host list ------------------------
+
+
+/**
+ * The actual number of hosts
+ */
+extern uint8_t host_count;
+
+/**
+ * Just a master host to find it asap
+ */
+extern _Atomic (char *) master_host;
 
 /**
  * Host status. Separated into a structure for atomic access.
@@ -64,7 +97,6 @@ typedef struct {
     bool master;
     bool alive;
 } MonitorStatus;
-
 
 /**
  *  Host parameters, including a double buffer (status and not_actual_status)
@@ -80,21 +112,24 @@ typedef struct {
     unsigned int failed_connections;
 } MonitorHost;
 
-
-/**
- * The actual number of hosts
- */
-extern uint8_t host_count;
-
 /**
  * Array of monitoring hosts
  */
 extern MonitorHost monitor_host_list[MAX_HOSTS];
 
 /**
- * pg-monitor parameters. The default parameters are set here.
+ * Initializes MonitorHost linked list to its initial value.
  */
-extern MonitorParameters parameters;
+void init_monitor_host_list(void);
+
+/**
+ * Atomically saves the current master's host
+ */
+void save_master_host(char *host);
+
+
+// ------------------------ Lookup utils ------------------------
+
 
 /**
  * Atomically returns a pointer to the host status
@@ -156,6 +191,9 @@ bool is_sync_replica_by_time_or_bytes(const MonitorStatus *status);
 bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status);
 
 
+// ------------------------ Host checking utils ------------------------
+
+
 /**
  * Updates the host status
  */
@@ -163,8 +201,9 @@ void check_host_streaming_replication(
     MonitorHost *host, unsigned int max_fails
 );
 
+/**
+ * Atomic acquisition of the current master
+ */
 const char *get_master_host(void);
-
-void save_master_host(char *host);
 
 #endif //PG_STATUS_PG_MONITOR_H

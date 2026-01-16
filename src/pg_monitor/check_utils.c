@@ -1,3 +1,7 @@
+/**
+ * Utilities for checking the status of a host
+ */
+
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -261,7 +265,9 @@ void check_host_streaming_replication(
     }
 
     atomic_store_explicit(&host -> status, new_status, memory_order_release);
-    atomic_store_explicit(&host -> not_actual_status, status, memory_order_release);
+    atomic_store_explicit(
+        &host -> not_actual_status, status, memory_order_release
+    );
     log_changes(host, new_status, status);
 
     if (q_res) {

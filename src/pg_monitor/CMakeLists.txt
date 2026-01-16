@@ -1,6 +1,9 @@
 add_library(pg_monitor
-        sql_utils.c
+        check_utils.c
         pg_monitor.c
+        lookup_utils.c
+        host_list.c
+        parameters.c
 )
 
 target_link_libraries(pg_monitor PUBLIC common_warnings utils)
