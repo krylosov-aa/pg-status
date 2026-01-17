@@ -37,6 +37,11 @@ noreturn void raise_error(const char *format, ...) __printflike(1, 2);
 // ------------------------ Strings ------------------------
 
 /**
+ * Copies a string. The result must be freed by the caller.
+ */
+char *copy_string(const char *str);
+
+/**
  * Concatenates strings and returns the new string.
  * The result must be freed by the caller.
  */

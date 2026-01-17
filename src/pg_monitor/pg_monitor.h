@@ -90,8 +90,8 @@ extern _Atomic (char *) master_host;
  * Host status. Separated into a structure for atomic access.
  */
 typedef struct {
-    unsigned long long delay_ms;
-    unsigned long long delay_bytes;
+    bool sync_by_time;
+    bool sync_by_bytes;
     bool master;
     bool alive;
 } MonitorStatus;
@@ -105,10 +105,10 @@ typedef struct {
 typedef struct {
     char *host;
     char *connection_str;
-    _Atomic(MonitorStatus *) status;
-    _Atomic(MonitorStatus *) not_actual_status;
+    _Atomic MonitorStatus status;
     unsigned int failed_connections;
 } MonitorHost;
+
 
 /**
  * Array of monitoring hosts
@@ -136,7 +136,7 @@ MonitorStatus atomic_get_status(const MonitorHost *host);
 /**
  * Describes the interface of the function for searching hosts
  */
-typedef bool (*condition_handler)(const MonitorStatus *);
+typedef bool (*condition_handler)(MonitorStatus);
 
 /**
  * A function for searching for a host that matches certain conditions using the round-robin algorithm.
@@ -156,36 +156,36 @@ const MonitorHost *find_host_by_name(const char *host);
 /**
  * condition_handler that searches for a live master
  */
-bool is_master(const MonitorStatus *status);
+bool is_master(MonitorStatus status);
 
 /**
  * condition_handler that searches for a live replica
  */
-bool is_alive_replica(const MonitorStatus *status);
+bool is_alive_replica(MonitorStatus status);
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous
  */
-bool is_sync_replica_by_time(const MonitorStatus *status);
+bool is_sync_replica_by_time(MonitorStatus status);
 
 /**
  * condition_handler that searches for a live replica that is considered
  * byte-synchronous
  */
-bool is_sync_replica_by_bytes(const MonitorStatus *status);
+bool is_sync_replica_by_bytes(MonitorStatus status);
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous or byte-synchronous
  */
-bool is_sync_replica_by_time_or_bytes(const MonitorStatus *status);
+bool is_sync_replica_by_time_or_bytes(MonitorStatus status);
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous and byte-synchronous
  */
-bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status);
+bool is_sync_replica_by_time_and_bytes(MonitorStatus status);
 
 
 // ------------------------ Host checking utils ------------------------

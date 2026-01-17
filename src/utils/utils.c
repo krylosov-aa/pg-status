@@ -23,6 +23,17 @@ static int fputs_error(void) {
 }
 
 /**
+ * Copies a string. The result must be freed by the caller.
+ */
+char *copy_string(const char *str) {
+    char *result = strdup(str);
+    if (!result) {
+        raise_error("Error when trying to copy a string");
+    }
+    return result;
+}
+
+/**
  * Prints the message in red with \n and also adds the error text from errno
  */
 void printf_error(const char *format, ...) {
@@ -304,10 +315,7 @@ void replace_from_env_ull(const char *env_name, unsigned long long *result) {
 void replace_from_env_copy(const char *env_name, char **result) {
     const char *env_val = getenv(env_name);
     if (env_val != nullptr && *env_val) {
-        char *env_val_copy = strdup(env_val);
-        if (!env_val_copy) {
-            raise_error("Can't strdup env variable %s", env_name);
-        }
+        char *env_val_copy = copy_string(env_val);
         *result = env_val_copy;
     }
 }

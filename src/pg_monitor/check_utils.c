@@ -132,8 +132,8 @@ static unsigned long long max_lsn(unsigned long long  a, unsigned long long  b) 
  */
 static void log_time_lag_changes(
     const MonitorHost *host,
-    const MonitorStatus *new_status,
-    const MonitorStatus *status
+    const MonitorStatus new_status,
+    const MonitorStatus status
 ) {
     const bool is_sync = is_sync_replica_by_time(new_status);
     if (is_sync != is_sync_replica_by_time(status)) {
@@ -151,8 +151,8 @@ static void log_time_lag_changes(
  */
 static void log_bytes_lag_changes(
     const MonitorHost *host,
-    const MonitorStatus *new_status,
-    const MonitorStatus *status
+    const MonitorStatus new_status,
+    const MonitorStatus status
 ) {
     const bool is_sync = is_sync_replica_by_bytes(new_status);
     if (is_sync != is_sync_replica_by_bytes(status)) {
@@ -170,15 +170,15 @@ static void log_bytes_lag_changes(
  */
 static void log_changes(
     const MonitorHost *host,
-    const MonitorStatus *new_status,
-    const MonitorStatus *status
+    const MonitorStatus new_status,
+    const MonitorStatus status
 ) {
-    if (new_status -> alive != status -> alive) {
-        if (!new_status -> alive) {
+    if (new_status.alive != status.alive) {
+        if (!new_status.alive) {
             printf("%s: dead\n", host -> host);
             return;
         }
-        if (new_status -> master) {
+        if (new_status.master) {
             printf("%s: master\n", host -> host);
             return;
         }
@@ -188,8 +188,8 @@ static void log_changes(
         return;
     }
 
-    if (new_status -> master != status -> master) {
-        if (new_status -> master) {
+    if (new_status.master != status.master) {
+        if (new_status.master) {
             printf("%s: master\n", host -> host);
             return;
         }
@@ -197,6 +197,37 @@ static void log_changes(
         log_time_lag_changes(host, new_status, status);
         log_bytes_lag_changes(host, new_status, status);
     }
+}
+
+
+static MonitorStatus dead_status(void) {
+    return (MonitorStatus) {
+        .alive = false,
+        .master = false,
+        .sync_by_time = false,
+        .sync_by_bytes = false
+    };
+}
+
+static MonitorStatus master_status(void) {
+    return (MonitorStatus) {
+        .alive = true,
+        .master = true,
+        .sync_by_time = true,
+        .sync_by_bytes = true
+    };
+}
+
+static MonitorStatus replica_status(
+    const unsigned long long delay_ms,
+    const unsigned long long delay_bytes
+) {
+    return (MonitorStatus) {
+        .alive = true,
+        .master = false,
+        .sync_by_time = delay_ms <= parameters.sync_max_lag_ms,
+        .sync_by_bytes = delay_bytes <= parameters.sync_max_lag_bytes
+    };
 }
 
 /**
@@ -217,12 +248,10 @@ void check_host_streaming_replication(
     MonitorHost *host, const unsigned int max_fails
 ) {
     static unsigned long long master_lsn = 0;
-    MonitorStatus *status = atomic_load_explicit(
-        &host -> status, memory_order_acquire
+    const MonitorStatus status = atomic_load_explicit(
+        &host -> status, memory_order_relaxed
     );
-    MonitorStatus *new_status = atomic_load_explicit(
-        &host -> not_actual_status, memory_order_acquire
-    );
+    MonitorStatus new_status = status;
 
     PGresult *q_res = nullptr;
     PGconn *conn = db_connect(host -> connection_str);
@@ -233,18 +262,15 @@ void check_host_streaming_replication(
     if (!q_res) {
         host -> failed_connections++;
         if (host -> failed_connections > max_fails) {
-            new_status -> alive = false;
-            new_status -> master = false;
+            new_status = dead_status();
         }
     }
     else {
-        new_status -> alive = true;
         host -> failed_connections = 0;
 
         const bool is_replica = is_t(PQgetvalue(q_res, 0, 0));
         if (is_replica) {
-            new_status -> master = false;
-            new_status -> delay_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
+            const unsigned long long delay_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
 
             const unsigned long long replica_received_lsn = parse_lsn(
                 PQgetvalue(q_res, 0, 2)
@@ -252,22 +278,18 @@ void check_host_streaming_replication(
             const unsigned long long replica_lsn = parse_lsn(
                 PQgetvalue(q_res, 0, 3)
             );
-            new_status -> delay_bytes = (
+            const unsigned long long delay_bytes = (
                 max_lsn(master_lsn, replica_received_lsn) - replica_lsn
             );
+            new_status = replica_status(delay_ms, delay_bytes);
         }
         else {
-            new_status -> master = true;
-            new_status -> delay_ms = 0;
-            new_status -> delay_bytes = 0;
+            new_status = master_status();
             master_lsn = parse_lsn(PQgetvalue(q_res, 0, 1));
         }
     }
 
-    atomic_store_explicit(&host -> status, new_status, memory_order_release);
-    atomic_store_explicit(
-        &host -> not_actual_status, status, memory_order_release
-    );
+    atomic_store_explicit(&host -> status, new_status, memory_order_relaxed);
     log_changes(host, new_status, status);
 
     if (q_res) {

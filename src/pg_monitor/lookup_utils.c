@@ -10,17 +10,12 @@
 
 
 /**
- * Atomically returns MonitorStatus.
- *
- * To avoid a very unlikely UB when the reader gets stuck with a pointer that
- * the second iteration of the loop is already underway and the structure is
- * starting to update, the reader is working with a copy on the stack.
+ * Atomically returns MonitorStatus
  */
 MonitorStatus atomic_get_status(const MonitorHost *host) {
-    const MonitorStatus *ptr = atomic_load_explicit(
-        &host -> status, memory_order_acquire
+    return atomic_load_explicit(
+        &host -> status, memory_order_relaxed
     );
-    return *ptr;
 }
 
 /**
@@ -28,7 +23,7 @@ MonitorStatus atomic_get_status(const MonitorHost *host) {
  */
 const char *get_master_host(void) {
     return atomic_load_explicit(
-        &master_host, memory_order_acquire
+        &master_host, memory_order_relaxed
     );
 }
 
@@ -48,44 +43,38 @@ const MonitorHost *find_host_by_name(const char *host) {
 /**
  * condition_handler that searches for a live master
  */
-bool is_master(const MonitorStatus *status) {
-    return status -> alive && status -> master;
+bool is_master(const MonitorStatus status) {
+    return status.alive && status.master;
 }
 
 /**
  * condition_handler that searches for a live replica
  */
-bool is_alive_replica(const MonitorStatus *status) {
-    return status -> alive && !status -> master;
+bool is_alive_replica(const MonitorStatus status) {
+    return status.alive && !status.master;
 }
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous
  */
-bool is_sync_replica_by_time(const MonitorStatus *status) {
-    return (
-        is_alive_replica(status) &&
-        status -> delay_ms <= parameters.sync_max_lag_ms
-    );
+bool is_sync_replica_by_time(const MonitorStatus status) {
+    return is_alive_replica(status) && status.sync_by_time;
 }
 
 /**
  * condition_handler that searches for a live replica that is considered
  * byte-synchronous
  */
-bool is_sync_replica_by_bytes(const MonitorStatus *status) {
-    return (
-        is_alive_replica(status) &&
-        status -> delay_bytes <= parameters.sync_max_lag_bytes
-    );
+bool is_sync_replica_by_bytes(const MonitorStatus status) {
+    return is_alive_replica(status)  && status.sync_by_bytes;
 }
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous or byte-synchronous
  */
-bool is_sync_replica_by_time_or_bytes(const MonitorStatus *status) {
+bool is_sync_replica_by_time_or_bytes(const MonitorStatus status) {
     return (
         is_sync_replica_by_time(status) ||
         is_sync_replica_by_bytes(status)
@@ -96,7 +85,7 @@ bool is_sync_replica_by_time_or_bytes(const MonitorStatus *status) {
  * condition_handler that searches for a live replica that is considered
  * time-synchronous and byte-synchronous
  */
-bool is_sync_replica_by_time_and_bytes(const MonitorStatus *status) {
+bool is_sync_replica_by_time_and_bytes(const MonitorStatus status) {
     return (
         is_sync_replica_by_time(status) &&
         is_sync_replica_by_bytes(status)
@@ -142,7 +131,7 @@ const char *find_host_round_robin(
     const MonitorHost *mon_host = &monitor_host_list[cursor];
     MonitorStatus status = atomic_get_status(mon_host);
 
-    while (!handler(&status)) {
+    while (!handler(status)) {
         cursor = get_next_cursor_in_circle(cursor);
         mon_host = &monitor_host_list[cursor];
         status = atomic_get_status(mon_host);

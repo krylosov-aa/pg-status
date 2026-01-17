@@ -79,41 +79,24 @@ static char *get_connection_string(char *host, char *port) {
 }
 
 /**
- * Initializes MonitorStatus to its initial value.
- */
-static MonitorStatus *init_monitor_status(void) {
-    MonitorStatus *status = malloc(sizeof(MonitorStatus));
-    if (!status) {
-        raise_error("Failed to allocate MonitorStatus");
-    }
-    status -> delay_ms = 0;
-    status -> delay_bytes = 0;
-    status -> master = false;
-    status -> alive = false;
-    return status;
-}
-
-/**
  * Initializes MonitorHost to its initial value.
  */
 static MonitorHost init_monitor_host(char *host, char *port) {
     MonitorHost monitor_host;
-    monitor_host.host = strdup(host);
+    monitor_host.host = copy_string(host);
     monitor_host.connection_str = get_connection_string(host, port);
     monitor_host.failed_connections = 0;
 
     atomic_store_explicit(
         &monitor_host.status,
-        init_monitor_status(),
-        memory_order_release
+        (MonitorStatus) {
+            .alive = false,
+            .master = false,
+            .sync_by_time = false,
+            .sync_by_bytes = false
+        },
+        memory_order_relaxed
     );
-
-    atomic_store_explicit(
-        &monitor_host.not_actual_status,
-        init_monitor_status(),
-        memory_order_release
-    );
-
     return monitor_host;
 }
 
@@ -121,10 +104,10 @@ static MonitorHost init_monitor_host(char *host, char *port) {
  * Initializes MonitorHost linked list to its initial value.
  */
 void init_monitor_host_list(void) {
-    char *hosts = strdup(parameters.hosts);
+    char *hosts = copy_string(parameters.hosts);
     char *host = next_host(hosts);
 
-    char *ports = strdup(parameters.port);
+    char *ports = copy_string(parameters.port);
     char *port = next_port(ports);
 
     while (host) {
@@ -137,7 +120,9 @@ void init_monitor_host_list(void) {
         port = next_port(ports);
         host_count++;
     }
-
+    if (host_count == 0) {
+        raise_error("host count must be greater then 0");
+    }
     free(hosts);
     free(ports);
 }
@@ -147,6 +132,6 @@ void init_monitor_host_list(void) {
  */
 void save_master_host(char *host) {
     atomic_store_explicit(
-        &master_host, host, memory_order_release
+        &master_host, host, memory_order_relaxed
     );
 }

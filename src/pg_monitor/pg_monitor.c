@@ -38,8 +38,8 @@ static void check_hosts(void) {
         check_host_streaming_replication(item, parameters.max_fails);
 
         if (!master) {
-            MonitorStatus status = atomic_get_status(item);
-            if (is_master(&status)) {
+            const MonitorStatus status = atomic_get_status(item);
+            if (status.master) {
                 master = item -> host;
             }
         }
