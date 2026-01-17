@@ -88,6 +88,13 @@ extern _Atomic (char *) master_host;
 
 /**
  * Host status. Separated into a structure for atomic access.
+ *
+ * This way, concurrent threads can read the current status lock-free,
+ * and the writer can perform lock-free writes.
+ *
+ * But the downside of this solution is the inconsistency: if the writer
+ * has started updating the hosts but hasn't finished updating all of
+ * them, some hosts may have the new data while others still have the old data.
  */
 typedef struct {
     bool sync_by_time;
@@ -97,10 +104,7 @@ typedef struct {
 } MonitorStatus;
 
 /**
- *  Host parameters, including a double buffer (status and not_actual_status)
- *  that is atomically replaced during the next iteration of
- *  host status checking.
- *  Hosts form a linked list.
+ *  Host parameters
  */
 typedef struct {
     char *host;

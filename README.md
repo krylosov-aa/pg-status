@@ -148,6 +148,21 @@ Depending on the API being called and the format selected
 
 [Detailed performance reports](docs/performance.md)
 
+# Implementation Details
+
+There is one writer and many readers in the program. To ensure the fastest possible response for readers and to allow
+the writer to record new host statuses without delay, a lock-free approach was chosen.
+
+The writer goes through all the hosts listed in `pg_status__hosts` every `pg_status__sleep` seconds, attempting to
+connect to each host and read its status. Upon successfully receiving a response from a host, its status is updated
+immediately. This means if the writer has started traversing the hosts but hasn't finished yet, there will be
+inconsistency in the data: some hosts will have new data, while others will not. Thanks to the lock-free design,
+the writer cannot be blocked for long, so the window of inconsistency is quite small; however, it can grow depending
+on the value of `pg_status__connect_timeout`.
+
+For this project, it was more important to achieve the fastest response times and the most up-to-date data possible,
+so consistency was intentionally sacrificed.
+
 
 # Logging
 

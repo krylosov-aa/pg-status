@@ -232,12 +232,13 @@ static MonitorStatus replica_status(
 
 /**
  * Updates the host status
+*
+ * This way, concurrent threads can read the current status lock-free,
+ * and the writer can perform lock-free writes.
  *
- * Updating the status is filling `not_actual_status` and atomically
- * replacing the pointer in `status`. The former `status` then atomically
- * becomes `not_actual_status`. This way, concurrent threads can atomically
- * read the current status. And even if there's a thread that
- * has an old pointer, it won't be broken.
+ * But the downside of this solution is the inconsistency: if the writer
+ * has started updating the hosts but hasn't finished updating all of
+ * them, some hosts may have the new data while others still have the old data.
  *
  * A replica’s lsn lag is defined as the difference between its own lsn and
  * the greater of the lsn received by the replica or the lsn on the master.
