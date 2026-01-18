@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -26,7 +27,19 @@ static bool pg_monitor_ready = false;
  */
 static pthread_mutex_t stop_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  stop_cond  = PTHREAD_COND_INITIALIZER;
-static bool monitor_running = true;
+static atomic_bool monitor_running = true;
+
+/**
+ * A function to atomically get a flag indicating whether the thread should
+ * run. This is intentionally implemented using an atomic bool so that
+ * even with sleep=0, the thread stops correctly, even if stop_pg_monitor
+ * can’t acquire the lock.
+ */
+static bool is_running(void) {
+    return atomic_load_explicit(
+        &monitor_running, memory_order_relaxed
+    );
+}
 
 /**
  * One iteration of host checking
@@ -66,12 +79,12 @@ static void *pg_monitor_thread(void *arg) {
 
     struct timespec ts;
     pthread_mutex_lock(&stop_mutex);
-    while (monitor_running) {
+    while (is_running()) {
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_sec += parameters.sleep;
 
         pthread_cond_timedwait(&stop_cond, &stop_mutex, &ts);
-        if (!monitor_running) {
+        if (!is_running()) {
             break;
         };
 
@@ -107,8 +120,11 @@ pthread_t start_pg_monitor() {
  * Stops a host monitoring thread
  */
 void stop_pg_monitor(void) {
+    atomic_store_explicit(
+        &monitor_running, false, memory_order_seq_cst
+    );
+
     pthread_mutex_lock(&stop_mutex);
-    monitor_running = false;
     pthread_cond_broadcast(&stop_cond);
     pthread_mutex_unlock(&stop_mutex);
 
