@@ -107,6 +107,11 @@ For example: `http://127.0.0.1:8000/status?host=host-1`
 }
 ```
 
+### `GET /version`
+
+Returns the pg-status semver
+
+
 ### Parameters
 
 You can configure various parameters using environment variables:
@@ -127,11 +132,11 @@ You can configure various parameters using environment variables:
 # Installation
 
 In short there is:
-- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.5.0/pg-status_1.5.0_amd64.deb)
+- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.5.1/pg-status_1.5.1_amd64.deb)
 - [published container to Docker Hub](https://hub.docker.com/r/krylosovaa/pg-status)
 - various [docker containers](docker)
-- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.5.0/pg-status_1.5.0_linux_amd64_static.tar.gz)
-- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.5.0/pg-status_1.5.0_linux_amd64_shared.tar.gz)
+- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.5.1/pg-status_1.5.1_linux_amd64_static.tar.gz)
+- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.5.1/pg-status_1.5.1_linux_amd64_shared.tar.gz)
 
 
 For more information, go to the [docs/installation.md](docs/installation.md) section.

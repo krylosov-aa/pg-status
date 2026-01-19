@@ -20,11 +20,11 @@ static void add_host_to_json(cJSON *json_obj, const char *host) {
 void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
     cJSON *arr = json_array();
     for (uint8_t i = 0; i < host_count; i++) {
-        MonitorHost *mon_host = &monitor_host_list[i];
+        const MonitorHost *mon_host = &monitor_host_list[i];
         cJSON *json_obj = json_object();
         add_host_to_json(json_obj, mon_host -> host);
 
-        MonitorStatus status = atomic_get_status(mon_host);
+        const MonitorStatus status = atomic_get_status(mon_host);
         add_bool_to_json_object(json_obj, "master", status.master);
         add_bool_to_json_object(json_obj, "alive", status.alive);
 
@@ -51,7 +51,6 @@ static void return_single_host(
     }
     else {
         response -> const_response = host;
-        response -> memory_mode = MHD_RESPMEM_PERSISTENT;
     }
 }
 
@@ -106,8 +105,7 @@ static void get_host_status(MHD_Connection *connection, HTTPResponse *response) 
     );
     if (!host) {
         response -> status_code = 400;
-        response -> response = "{\"error_text\": \"Get parameter 'host' wasn't passed\"}";
-        response -> memory_mode = MHD_RESPMEM_PERSISTENT;
+        response -> const_response = "{\"error_text\": \"Get parameter 'host' wasn't passed\"}";
         return;
     }
     const MonitorHost *mon_host = find_host_by_name(host);
@@ -137,6 +135,14 @@ static void block_termination_signals(sigset_t *sigset) {
         raise_error("pthread_sigmask");
     }
 }
+
+
+static void get_version(
+    MHD_Connection *connection, HTTPResponse *response
+) {
+    response -> const_response = "1.5.1";
+}
+
 
 static void wait_for_termination_signal(const sigset_t *sigset) {
     int sig;
@@ -173,6 +179,7 @@ static Route routes[] = {
     { "GET", "/sync_by_bytes", get_sync_host_by_bytes },
     { "GET", "/sync_by_time_or_bytes", get_sync_host_by_time_or_bytes },
     { "GET", "/sync_by_time_and_bytes", get_sync_host_by_time_and_bytes },
+    { "GET", "/version", get_version },
 };
 
 int main() {
