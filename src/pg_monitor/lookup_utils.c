@@ -22,9 +22,11 @@ MonitorStatus atomic_get_status(const MonitorHost *host) {
  * Atomic acquisition of the current master
  */
 const char *get_master_host(void) {
-    return atomic_load_explicit(
-        &master_host, memory_order_relaxed
-    );
+    const int master_i = get_master_index();
+    if (master_i == -1) {
+        return nullptr;
+    }
+    return monitor_host_list[master_i].host;
 }
 
 /**
@@ -32,19 +34,12 @@ const char *get_master_host(void) {
  */
 const MonitorHost *find_host_by_name(const char *host) {
     for (uint8_t i = 0; i < host_count; i++) {
-        MonitorHost *item = &monitor_host_list[i];
+        const MonitorHost *item = &monitor_host_list[i];
         if (is_equal_strings(item -> host, host)) {
             return item;
         }
     }
     return nullptr;
-}
-
-/**
- * condition_handler that searches for a live master
- */
-bool is_master(const MonitorStatus status) {
-    return status.alive && status.master;
 }
 
 /**
@@ -108,21 +103,38 @@ static atomic_size_t round_robin_cursor = 0;
 
 /**
  * Moves the cursor of the round-robin algorithm and returns the host from
- * which to start the crawl
+ * which to start the crawl. Special logic to skip the master host so it
+ * doesn't interfere with fair load balancing across the replicas.
  */
 static uint8_t get_next_cursor_round_robin(void) {
-    return atomic_fetch_add_explicit(
-        &round_robin_cursor, 1, memory_order_relaxed
-    ) % host_count;
+    size_t cursor;
+    uint8_t new_cursor;
+    const int master_i = get_master_index();
+    do {
+        cursor = atomic_load_explicit(
+            &round_robin_cursor, memory_order_relaxed
+        );
+        new_cursor = (cursor + 1) % host_count;
+        if (master_i != -1 && new_cursor == master_i) {
+            new_cursor = get_next_cursor_in_circle(new_cursor);
+        }
+    } while (!atomic_compare_exchange_weak(
+        &round_robin_cursor, &cursor, new_cursor
+    ));
+
+    return new_cursor;
 }
 
 /**
- * A function for searching for a host that matches certain conditions using the round-robin algorithm.
- * @param handler A function that determines whether the specified host has been found
- * @param master_if_not_found Determines whether to return the master if the desired host is not found by handler
+ * A function for searching for a replica host that matches certain
+ * conditions using the round-robin algorithm.
+ * @param handler A function that determines whether the specified host
+ * has been found
+ * @param master_if_not_found Determines whether to return the master if
+ * the desired host is not found by handler
  * @return Host name corresponding to conditions
  */
-const char *find_host_round_robin(
+const char *find_replica_round_robin(
     const condition_handler handler, const bool master_if_not_found
 ) {
     uint8_t cursor = get_next_cursor_round_robin();

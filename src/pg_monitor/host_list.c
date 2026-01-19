@@ -21,9 +21,19 @@ uint8_t host_count = 0;
 MonitorHost monitor_host_list[MAX_HOSTS] = {0};
 
 /**
- * Just a master host to find it asap
+ * Just a master host index in the array to find it asap
  */
-_Atomic (char *) master_host = nullptr;
+atomic_int master_index = -1;
+
+
+/**
+ * Atomically gets the current master position in the array
+ */
+int get_master_index(void) {
+    return atomic_load_explicit(
+        &master_index, memory_order_relaxed
+    );
+}
 
 
 /**
@@ -130,8 +140,8 @@ void init_monitor_host_list(void) {
 /**
  * Atomically saves the current master's host
  */
-void save_master_host(char *host) {
+void save_master_index(const int i) {
     atomic_store_explicit(
-        &master_host, host, memory_order_relaxed
+        &master_index, i, memory_order_relaxed
     );
 }

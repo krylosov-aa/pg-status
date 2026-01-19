@@ -45,20 +45,21 @@ static bool is_running(void) {
  * One iteration of host checking
  */
 static void check_hosts(void) {
-    char *master = nullptr;
-    for (uint8_t i = 0; i < host_count; i++) {
+    int master_i = -1;
+
+    for (int i = 0; i < host_count; i++) {
         MonitorHost *item = &monitor_host_list[i];
         check_host_streaming_replication(item, parameters.max_fails);
 
-        if (!master) {
+        if (master_i == -1) {
             const MonitorStatus status = atomic_get_status(item);
             if (status.master) {
-                master = item -> host;
+                master_i = i;
             }
         }
 
     }
-    save_master_host(master);
+    save_master_index(master_i);
     (void)fflush(stdout);
 }
 

@@ -259,6 +259,10 @@ static MHD_Result answer_to_connection(
 
 /**
  * Starts http server daemon
+ *
+ * Although all the code is thread-safe, the HTTP server runs in
+ * single-threaded mode simply because the GET endpoints are so
+ * fast that using multiple threads only makes things slower.
  */
 MHD_Daemon *start_http_server(
     const uint16_t port,

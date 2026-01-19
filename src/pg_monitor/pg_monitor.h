@@ -82,9 +82,9 @@ void stop_pg_monitor(void);
 extern uint8_t host_count;
 
 /**
- * Just a master host to find it asap
+ * Atomically gets the current master position in the array
  */
-extern _Atomic (char *) master_host;
+int get_master_index(void);
 
 /**
  * Host status. Separated into a structure for atomic access.
@@ -127,10 +127,15 @@ void init_monitor_host_list(void);
 /**
  * Atomically saves the current master's host
  */
-void save_master_host(char *host);
+void save_master_index(int i);
 
 
 // ------------------------ Lookup utils ------------------------
+
+/**
+ * Atomic acquisition of the current master
+ */
+const char *get_master_host(void);
 
 /**
  * Atomically returns a pointer to the host status
@@ -148,7 +153,7 @@ typedef bool (*condition_handler)(MonitorStatus);
  * @param master_if_not_found Determines whether to return the master if the desired host is not found by handler
  * @return Host name corresponding to conditions
  */
-const char *find_host_round_robin(
+const char *find_replica_round_robin(
     condition_handler handler, bool master_if_not_found
 );
 
@@ -156,11 +161,6 @@ const char *find_host_round_robin(
  * A function for searching for a host by name
  */
 const MonitorHost *find_host_by_name(const char *host);
-
-/**
- * condition_handler that searches for a live master
- */
-bool is_master(MonitorStatus status);
 
 /**
  * condition_handler that searches for a live replica
@@ -200,10 +200,5 @@ bool is_sync_replica_by_time_and_bytes(MonitorStatus status);
 void check_host_streaming_replication(
     MonitorHost *host, unsigned int max_fails
 );
-
-/**
- * Atomic acquisition of the current master
- */
-const char *get_master_host(void);
 
 #endif //PG_STATUS_PG_MONITOR_H

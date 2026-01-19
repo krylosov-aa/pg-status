@@ -55,7 +55,7 @@ static void return_single_host(
 }
 
 static void get_random_replica(MHD_Connection *connection, HTTPResponse *response) {
-    const char *host = find_host_round_robin(is_alive_replica, true);
+    const char *host = find_replica_round_robin(is_alive_replica, true);
     return_single_host(response, host);
 }
 
@@ -67,21 +67,21 @@ static void get_master(MHD_Connection *connection, HTTPResponse *response) {
 static void get_sync_host_by_time(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    const char *host = find_host_round_robin(is_sync_replica_by_time, true);
+    const char *host = find_replica_round_robin(is_sync_replica_by_time, true);
     return_single_host(response, host);
 }
 
 static void get_sync_host_by_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    const char *host = find_host_round_robin(is_sync_replica_by_bytes, true);
+    const char *host = find_replica_round_robin(is_sync_replica_by_bytes, true);
     return_single_host(response, host);
 }
 
 static void get_sync_host_by_time_or_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    const char *host = find_host_round_robin(
+    const char *host = find_replica_round_robin(
         is_sync_replica_by_time_or_bytes, true
     );
     return_single_host(response, host);
@@ -90,7 +90,7 @@ static void get_sync_host_by_time_or_bytes(
 static void get_sync_host_by_time_and_bytes(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    const char *host = find_host_round_robin(
+    const char *host = find_replica_round_robin(
         is_sync_replica_by_time_and_bytes, true
     );
     return_single_host(response, host);
@@ -140,7 +140,7 @@ static void block_termination_signals(sigset_t *sigset) {
 static void get_version(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    response -> const_response = "1.5.1";
+    response -> const_response = "1.5.2";
 }
 
 
