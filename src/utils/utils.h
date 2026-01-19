@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <cjson/cJSON.h>
 #include <stdnoreturn.h>
+#include <pthread.h>
 
 #ifndef __printflike
 #  ifdef __GNUC__
@@ -171,3 +172,40 @@ void add_bool_to_json_object(cJSON * obj, const char *key, bool val);
 char *json_to_str(cJSON *json);
 
 #endif //PG_STATUS_UTILS_H
+
+
+// ------------------------ THREADS ------------------------
+
+/**
+ * pthread_mutex_lock with abort if something is wrong
+ */
+void mutex_lock(pthread_mutex_t *mutex_var);
+
+/**
+ * pthread_mutex_unlock with abort if something is wrong
+ */
+void mutex_unlock(pthread_mutex_t *mutex_var);
+
+/**
+ * pthread_cond_broadcast with abort if something is wrong
+ */
+void cond_broadcast(pthread_cond_t *cond_var);
+
+/**
+ * pthread_cond_wait with abort if something is wrong
+ */
+void cond_wait(pthread_cond_t *cond_var, pthread_mutex_t *mutex_var);
+
+/**
+ * pthread_cond_timedwait with abort if something is wrong
+ */
+void cond_timedwait(
+    pthread_cond_t *cond_var,
+    pthread_mutex_t *mutex_var,
+    const struct timespec * ts
+);
+
+/**
+ * pthread_join with abort if something is wrong
+ */
+void thread_join(pthread_t tid, void **return_val);

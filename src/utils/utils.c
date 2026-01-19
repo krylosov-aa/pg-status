@@ -11,7 +11,6 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <unistd.h>
-#include <cjson/cJSON.h>
 
 
 static int fputs_error(void) {
@@ -34,35 +33,31 @@ char *copy_string(const char *str) {
 }
 
 /**
- * Prints the message in red with \n and also adds the error text from errno
+ * Prints the message with \n and also adds the error text from errno
  */
 void printf_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    (void)fputs("\033[31m", stderr);
     (void)vfprintf(stderr, format, args);
     va_end(args);
     (void)fputs(". strerror: ", stderr);
     (void)fputs_error();
-    (void)fputs("\033[0m", stderr);
     (void)fputc('\n', stderr);
 }
 
 /**
- * Prints the message in red with \n and also adds the
- * error text from errno and exit(1)
+ * Prints the message with \n and also adds the
+ * error text from errno and abort
  */
 noreturn void raise_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    (void)fputs("\033[31m", stderr);
     (void)vfprintf(stderr, format, args);
     va_end(args);
     (void)fputs(". strerror: ", stderr);
     (void)fputs_error();
-    (void)fputs("\033[0m", stderr);
     (void)fputc('\n', stderr);
-    exit(EXIT_FAILURE);
+    abort();
 }
 
 /**
@@ -380,4 +375,68 @@ char *json_to_str(cJSON *json) {
         raise_error("Can't convert json to string");
     }
     return result;
+}
+
+/**
+ * pthread_mutex_lock with abort if something is wrong
+ */
+void mutex_lock(pthread_mutex_t *mutex_var) {
+    const int code = pthread_mutex_lock(mutex_var);
+    if (code != 0) {
+        raise_error("pthread_mutex_lock error %d", code);
+    }
+}
+
+/**
+ * pthread_mutex_unlock with abort if something is wrong
+ */
+void mutex_unlock(pthread_mutex_t *mutex_var) {
+    const int code = pthread_mutex_unlock(mutex_var);
+    if (code != 0) {
+        raise_error("pthread_mutex_unlock error %d", code);
+    }
+}
+
+/**
+ * pthread_cond_broadcast with abort if something is wrong
+ */
+void cond_broadcast(pthread_cond_t *cond_var) {
+    const int code = pthread_cond_broadcast(cond_var);
+    if (code != 0) {
+        raise_error("pthread_cond_broadcast error %d", code);
+    }
+}
+
+/**
+ * pthread_cond_wait with abort if something is wrong
+ */
+void cond_wait(pthread_cond_t *cond_var, pthread_mutex_t *mutex_var) {
+    const int code = pthread_cond_wait(cond_var, mutex_var);
+    if (code != 0) {
+        raise_error("pthread_cond_wait error: %d", code);
+    }
+}
+
+/**
+ * pthread_cond_timedwait with abort if something is wrong
+ */
+void cond_timedwait(
+    pthread_cond_t *cond_var,
+    pthread_mutex_t *mutex_var,
+    const struct timespec * ts
+) {
+    const int code = pthread_cond_timedwait(cond_var, mutex_var, ts);
+    if (code != 0 && code != ETIMEDOUT) {
+        raise_error("pthread_cond_timedwait error: %d", code);
+    }
+}
+
+/**
+ * pthread_join with abort if something is wrong
+ */
+void thread_join(const pthread_t tid, void **return_val) {
+    const int code = pthread_join(tid, return_val);
+    if (code != 0) {
+        raise_error("pthread_join error: %d", code);
+    }
 }
