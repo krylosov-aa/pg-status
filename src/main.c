@@ -140,7 +140,7 @@ static void block_termination_signals(sigset_t *sigset) {
 static void get_version(
     MHD_Connection *connection, HTTPResponse *response
 ) {
-    response -> const_response = "1.6.0";
+    response -> const_response = "1.6.1";
 }
 
 

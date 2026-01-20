@@ -134,11 +134,11 @@ You can configure various parameters using environment variables:
 # Installation
 
 In short there is:
-- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.6.0/pg-status_1.6.0_amd64.deb)
+- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.6.1/pg-status_1.6.1_amd64.deb)
 - [published container to Docker Hub](https://hub.docker.com/r/krylosovaa/pg-status)
 - various [docker containers](docker)
-- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.6.0/pg-status_1.6.0_linux_amd64_static.tar.gz)
-- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.6.0/pg-status_1.6.0_linux_amd64_shared.tar.gz)
+- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.6.1/pg-status_1.6.1_linux_amd64_static.tar.gz)
+- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.6.1/pg-status_1.6.1_linux_amd64_shared.tar.gz)
 
 
 For more information, go to the [docs/installation.md](docs/installation.md) section.
@@ -184,6 +184,12 @@ hasn't yet exceeded `pg_status__max_fails`, we mark it as possibly dead, and thi
 - When selecting a replica, preference is given to live hosts. However, if no live replicas meet a search criteria, a
 potentially dead replica will be returned. This means that for up to `pg_status__max_fails` attempts, the
 fairness of load balancing between replicas can be disrupted.
+
+## Split-brain
+
+With the client-side master detection approach, there’s a problem: in the case of a split-brain scenario,
+we can’t reliably determine who "should" be master. In our case, the first alive master wins.
+The order is defined by `pg_status__hosts`.
 
 
 # Logging
