@@ -91,7 +91,7 @@ bool is_sync_replica_by_time_and_bytes(const MonitorStatus status) {
  * It takes the next host from the list, and if it's over,
  * it starts from the beginning.
  */
-static uint8_t get_next_cursor_in_circle(const uint8_t cursor) {
+static uint8_t next_cursor_in_circle(const uint8_t cursor) {
     assert(cursor < host_count);
     return (cursor + 1) % host_count;
 }
@@ -106,17 +106,17 @@ static atomic_size_t round_robin_cursor = 0;
  * which to start the crawl. Special logic to skip the master host so it
  * doesn't interfere with fair load balancing across the replicas.
  */
-static uint8_t get_next_cursor_round_robin(void) {
+static uint8_t next_cursor_round_robin(void) {
     size_t cursor;
     uint8_t new_cursor;
-    const int master_i = get_master_index();
     do {
         cursor = atomic_load_explicit(
             &round_robin_cursor, memory_order_relaxed
         );
         new_cursor = (cursor + 1) % host_count;
+        const int master_i = get_master_index();
         if (master_i != -1 && new_cursor == master_i) {
-            new_cursor = get_next_cursor_in_circle(new_cursor);
+            new_cursor = next_cursor_in_circle(new_cursor);
         }
     } while (!atomic_compare_exchange_weak(
         &round_robin_cursor, &cursor, new_cursor
@@ -137,25 +137,33 @@ static uint8_t get_next_cursor_round_robin(void) {
 const char *find_replica_round_robin(
     const condition_handler handler, const bool master_if_not_found
 ) {
-    uint8_t cursor = get_next_cursor_round_robin();
+    uint8_t cursor = next_cursor_round_robin();
     const uint8_t start_cursor = cursor;
+    const MonitorHost *possible_mon_host = nullptr;
 
-    const MonitorHost *mon_host = &monitor_host_list[cursor];
-    MonitorStatus status = atomic_get_status(mon_host);
+    do {
+        const MonitorHost *mon_host = &monitor_host_list[cursor];
+        const MonitorStatus status = atomic_get_status(mon_host);
 
-    while (!handler(status)) {
-        cursor = get_next_cursor_in_circle(cursor);
-        mon_host = &monitor_host_list[cursor];
-        status = atomic_get_status(mon_host);
-
-        if (cursor == start_cursor) {
-            if (master_if_not_found) {
-                return get_master_host();
+        if (handler(status)) {
+            if (!status.possible_dead) {
+                return mon_host->host;
             }
-            return nullptr;
+            if (!possible_mon_host) {
+                possible_mon_host = mon_host;
+            }
         }
 
+        cursor = next_cursor_in_circle(cursor);
+    } while (cursor != start_cursor);
+
+    if (possible_mon_host) {
+        return possible_mon_host->host;
     }
 
-    return mon_host -> host;
+    if (master_if_not_found) {
+        return get_master_host();
+    }
+
+    return nullptr;
 }

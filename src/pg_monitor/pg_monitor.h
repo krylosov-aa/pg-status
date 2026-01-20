@@ -101,6 +101,7 @@ typedef struct {
     bool sync_by_bytes;
     bool master;
     bool alive;
+    bool possible_dead;
 } MonitorStatus;
 
 /**

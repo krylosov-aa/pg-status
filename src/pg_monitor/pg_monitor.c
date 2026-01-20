@@ -46,15 +46,17 @@ static bool is_running(void) {
  */
 static void check_hosts(void) {
     int master_i = -1;
+    MonitorStatus master_status = {};
 
     for (int i = 0; i < host_count; i++) {
         MonitorHost *item = &monitor_host_list[i];
         check_host_streaming_replication(item, parameters.max_fails);
 
-        if (master_i == -1) {
+        if (master_i == -1  || master_status.possible_dead) {
             const MonitorStatus status = atomic_get_status(item);
             if (status.master) {
                 master_i = i;
+                master_status = status;
             }
         }
 
@@ -64,7 +66,7 @@ static void check_hosts(void) {
 }
 
 /**
- * The main monitoring thread, which runs continuously and periodically
+ * The monitoring thread, which runs continuously and periodically
  * does host checks
  */
 static void *pg_monitor_thread(void *arg) {

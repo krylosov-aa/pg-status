@@ -198,7 +198,7 @@ EOF
 
 # README
 RUN <<'EOF' cat > README
-pg-status v1.5.2 (static build)
+pg-status v1.6.0 (static build)
 ===============================
 
 A microservice (sidecar) that helps instantly determine the status of your
@@ -217,7 +217,7 @@ Source Code
 https://github.com/krylosov-aa/pg-status
 EOF
 
-RUN tar -czvf /pg-status_1.5.2_linux_amd64_static.tar.gz \
+RUN tar -czvf /pg-status_1.6.0_linux_amd64_static.tar.gz \
     pg-status \
     LICENSE \
     THIRD-PARTY-NOTICES \
@@ -226,7 +226,7 @@ RUN tar -czvf /pg-status_1.5.2_linux_amd64_static.tar.gz \
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=packager /pg-status_1.5.2_linux_amd64_static.tar.gz /
+COPY --from=packager /pg-status_1.6.0_linux_amd64_static.tar.gz /
 
 # -------- Run --------
 FROM ubuntu:latest AS runner

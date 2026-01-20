@@ -33,7 +33,7 @@ static PGconn *db_connect(const char *connection_str) {
     PGconn *conn = PQconnectdb(connection_str);
     if (PQstatus(conn) != CONNECTION_OK) {
         printf_error(
-            "\033[0;31m connect error: \033[0m %s \n ", PQerrorMessage(conn)
+            "connect error: %s \n ", PQerrorMessage(conn)
         );
         PQfinish(conn);
         return nullptr;
@@ -48,10 +48,7 @@ static PGconn *db_connect(const char *connection_str) {
 static int check_exec_result(const PGconn *conn, const PGresult *result) {
     const ExecStatusType resStatus = PQresultStatus(result);
     if (resStatus != PGRES_TUPLES_OK && resStatus != PGRES_COMMAND_OK) {
-        printf_error(
-            "\033[0;31m execute sql error: \033[0m %s \n ",
-            PQerrorMessage(conn)
-        );
+        printf_error("execute sql error: %s \n ", PQerrorMessage(conn));
 
         return 1;
     }
@@ -96,23 +93,19 @@ static unsigned long long parse_lsn(const char *lsn) {
         return 0;
     }
 
-    char *slash;
-    unsigned long hi;
-    unsigned long lo;
-
-    slash = strchr(lsn, '/');
+    char *slash = strchr(lsn, '/');
     if (!slash) {
         return 0;
     }
 
     errno = 0;
-    hi = strtoul(lsn, NULL, 16);
+    const unsigned long hi = strtoul(lsn, NULL, 16);
     if (errno != 0) {
         return 0;
     }
 
     errno = 0;
-    lo = strtoul(slash + 1, NULL, 16);
+    const unsigned long lo = strtoul(slash + 1, NULL, 16);
     if (errno != 0) {
         return 0;
     }
@@ -123,7 +116,10 @@ static unsigned long long parse_lsn(const char *lsn) {
 /**
  * Selects the maximum lsn
  */
-static unsigned long long max_lsn(unsigned long long  a, unsigned long long  b) {
+static unsigned long long max_lsn(
+    const unsigned long long a,
+    const unsigned long long b
+) {
     return a > b ? a : b;
 }
 
@@ -173,6 +169,11 @@ static void log_changes(
     const MonitorStatus new_status,
     const MonitorStatus status
 ) {
+    if (new_status.possible_dead != status.possible_dead && new_status.possible_dead) {
+        printf("%s: possible dead\n", host -> host);
+        return;
+    }
+
     if (new_status.alive != status.alive) {
         if (!new_status.alive) {
             printf("%s: dead\n", host -> host);
@@ -254,20 +255,23 @@ void check_host_streaming_replication(
     );
     MonitorStatus new_status = status;
 
-    PGresult *q_res = nullptr;
     PGconn *conn = db_connect(host -> connection_str);
+
+    PGresult *q_res = nullptr;
     if (conn) {
         q_res = execute_sql(conn, streaming_replication_query);
     }
 
     if (!q_res) {
         host -> failed_connections++;
-        if (host -> failed_connections > max_fails) {
+        new_status.possible_dead = true;
+        if (host -> failed_connections >= max_fails) {
             new_status = dead_status();
         }
     }
     else {
         host -> failed_connections = 0;
+        new_status.possible_dead = false;
 
         const bool is_replica = is_t(PQgetvalue(q_res, 0, 0));
         if (is_replica) {

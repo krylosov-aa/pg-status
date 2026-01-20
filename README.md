@@ -97,6 +97,8 @@ For example:
 
 Returns status of a host that you specified in the get parameter.
 
+You can also use this API to poll pg-status to check if it has started up and is alive.
+
 For example: `http://127.0.0.1:8000/status?host=host-1`
 ```json
 {
@@ -132,11 +134,11 @@ You can configure various parameters using environment variables:
 # Installation
 
 In short there is:
-- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.5.2/pg-status_1.5.2_amd64.deb)
+- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.6.0/pg-status_1.6.0_amd64.deb)
 - [published container to Docker Hub](https://hub.docker.com/r/krylosovaa/pg-status)
 - various [docker containers](docker)
-- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.5.2/pg-status_1.5.2_linux_amd64_static.tar.gz)
-- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.5.2/pg-status_1.5.2_linux_amd64_shared.tar.gz)
+- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.6.0/pg-status_1.6.0_linux_amd64_static.tar.gz)
+- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.6.0/pg-status_1.6.0_linux_amd64_shared.tar.gz)
 
 
 For more information, go to the [docs/installation.md](docs/installation.md) section.
@@ -155,6 +157,8 @@ Depending on the API being called and the format selected
 
 # Implementation Details
 
+## Consistency
+
 There is one writer and many readers in the program. To ensure the fastest possible response for readers and to allow
 the writer to record new host statuses without delay, a lock-free approach was chosen.
 
@@ -167,6 +171,19 @@ on the value of `pg_status__connect_timeout`.
 
 For this project, it was more important to achieve the fastest response times and the most up-to-date data possible,
 so consistency was intentionally sacrificed.
+
+## Reaction speed to host unavailability
+
+If a host doesn't respond to a request, it could mean either a temporary issue or that the host is actually down.
+To avoid marking a host as dead prematurely, a host is only considered dead after `pg_status__max_fails` attempts.
+
+To speed up our reaction to possible host unavailability, if a host doesn't respond and the number of attempts
+hasn't yet exceeded `pg_status__max_fails`, we mark it as possibly dead, and this affects which hosts get returned:
+
+- If the current master is marked as possibly dead and there’s already a new master, we immediately switch to the new master.
+- When selecting a replica, preference is given to live hosts. However, if no live replicas meet a search criteria, a
+potentially dead replica will be returned. This means that for up to `pg_status__max_fails` attempts, the
+fairness of load balancing between replicas can be disrupted.
 
 
 # Logging
@@ -203,7 +220,7 @@ You can start the containers and test the application however you like.
 Builds [the lightweight container]((docker/alpine/Dockerfile_shared)) using parameters defined in
 [docker-compose.yml](docker-compose.yml).
 
-You can create and populate a `.env` file using [the provided example](.env_example), or specify the required
+You can create a `.env` file using [the provided example](.env_example), or specify the required
 parameters directly in [docker-compose.yml](docker-compose.yml).
 This allows you to test the application with your own database setup.
 
