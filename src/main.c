@@ -19,7 +19,7 @@ static void add_host_to_json(cJSON *json_obj, const char *host) {
 
 void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
     cJSON *arr = json_array();
-    for (uint8_t i = 0; i < host_count; i++) {
+    for (unsigned int i = 0; i < host_count; i++) {
         const MonitorHost *mon_host = &monitor_host_list[i];
         cJSON *json_obj = json_object();
         add_host_to_json(json_obj, mon_host -> host);

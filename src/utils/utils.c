@@ -49,7 +49,7 @@ void printf_error(const char *format, ...) {
 
 /**
  * Prints the message to stderr with \n and also adds the
- * error text from errno and exit(1)
+ * error text from errno and abort
  */
 void raise_error(const char *format, ...) {
     va_list args;

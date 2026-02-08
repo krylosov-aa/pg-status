@@ -13,7 +13,7 @@
 /**
  * The maximum number of hosts monitored by pg-status
  */
-# define MAX_HOSTS 10
+constexpr unsigned int MAX_HOSTS = 10;
 
 /**
  * List of all monitoring parameters
@@ -79,7 +79,7 @@ void stop_pg_monitor(void);
 /**
  * The actual number of hosts
  */
-extern uint8_t host_count;
+extern unsigned int host_count;
 
 /**
  * Atomically gets the current master position in the array
@@ -97,11 +97,11 @@ int get_master_index(void);
  * them, some hosts may have the new data while others still have the old data.
  */
 typedef struct {
-    bool sync_by_time;
-    bool sync_by_bytes;
-    bool master;
-    bool alive;
-    bool possible_dead;
+    bool sync_by_time : 1;
+    bool sync_by_bytes : 1;
+    bool master : 1;
+    bool alive : 1;
+    bool possible_dead : 1;
 } MonitorStatus;
 
 /**
@@ -110,8 +110,8 @@ typedef struct {
 typedef struct {
     char *host;
     char *connection_str;
-    _Atomic MonitorStatus status;
     unsigned int failed_connections;
+    _Atomic MonitorStatus status;
 } MonitorHost;
 
 

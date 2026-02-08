@@ -48,7 +48,7 @@ static void check_hosts(void) {
     int master_i = -1;
     int possible_master = -1;
 
-    for (int i = 0; i < host_count; i++) {
+    for (unsigned int i = 0; i < host_count; i++) {
         MonitorHost *item = &monitor_host_list[i];
         check_host_streaming_replication(item, parameters.max_fails);
 
@@ -56,11 +56,11 @@ static void check_hosts(void) {
             const MonitorStatus status = atomic_get_status(item);
             if (status.master) {
                 if (!status.possible_dead) {
-                    master_i = i;
+                    master_i = (int)i;
                     save_master_index(master_i);
                 }
                 else {
-                    possible_master = i;
+                    possible_master = (int)i;
                     // We don’t need to update master_index if the master is marked
                     // as possible dead, because it’s already stored in there
                 }

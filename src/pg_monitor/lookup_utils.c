@@ -33,7 +33,7 @@ const char *get_master_host(void) {
  * A function for searching for a host by name
  */
 const MonitorHost *find_host_by_name(const char *host) {
-    for (uint8_t i = 0; i < host_count; i++) {
+    for (unsigned int i = 0; i < host_count; i++) {
         const MonitorHost *item = &monitor_host_list[i];
         if (is_equal_strings(item -> host, host)) {
             return item;
@@ -91,7 +91,7 @@ bool is_sync_replica_by_time_and_bytes(const MonitorStatus status) {
  * It takes the next host from the list, and if it's over,
  * it starts from the beginning.
  */
-static uint8_t next_cursor_in_circle(const uint8_t cursor) {
+static unsigned int next_cursor_in_circle(const unsigned int cursor) {
     assert(cursor < host_count);
     return (cursor + 1) % host_count;
 }
@@ -106,16 +106,16 @@ static atomic_size_t round_robin_cursor = 0;
  * which to start the crawl. Special logic to skip the master host so it
  * doesn't interfere with fair load balancing across the replicas.
  */
-static uint8_t next_cursor_round_robin(void) {
+static unsigned int next_cursor_round_robin(void) {
     size_t cursor;
-    uint8_t new_cursor;
+    unsigned int new_cursor;
     do {
         cursor = atomic_load_explicit(
             &round_robin_cursor, memory_order_relaxed
         );
         new_cursor = (cursor + 1) % host_count;
         const int master_i = get_master_index();
-        if (master_i != -1 && new_cursor == master_i) {
+        if (master_i != -1 && new_cursor == (unsigned int)master_i) {
             new_cursor = next_cursor_in_circle(new_cursor);
         }
     } while (!atomic_compare_exchange_weak(
@@ -137,8 +137,8 @@ static uint8_t next_cursor_round_robin(void) {
 const char *find_replica_round_robin(
     const condition_handler handler, const bool master_if_not_found
 ) {
-    uint8_t cursor = next_cursor_round_robin();
-    const uint8_t start_cursor = cursor;
+    unsigned int cursor = next_cursor_round_robin();
+    const unsigned int start_cursor = cursor;
     const MonitorHost *possible_mon_host = nullptr;
 
     do {

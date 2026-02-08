@@ -13,7 +13,7 @@
 /**
  * The actual number of hosts
  */
-uint8_t host_count = 0;
+unsigned int host_count = 0;
 
 /**
  * Array of monitoring hosts
