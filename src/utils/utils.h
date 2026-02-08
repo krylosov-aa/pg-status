@@ -7,32 +7,22 @@
 
 
 #include <stdint.h>
-#include <sys/stat.h>
 #include <cjson/cJSON.h>
-#include <stdnoreturn.h>
-#include <pthread.h>
-
-#ifndef __printflike
-#  ifdef __GNUC__
-#    define __printflike(fmtpos, argpos) __attribute__((format(printf, fmtpos, argpos)))
-#  else
-#    define __printflike(fmtpos, argpos)
-#  endif
-#endif
-
 
 // ------------------------ Errors ------------------------
 
 /**
- * Prints the message in red with \n and also adds the error text from errno
+ * Prints the message to stderr with \n and also adds the error text from errno
  */
-void printf_error(const char *format, ...) __printflike(1, 2);
+[[gnu::format(printf, 1, 2)]]
+void printf_error(const char *format, ...);
 
 /**
- * Prints the message in red with \n and also adds the
+ * Prints the message to stderr with \n and also adds the
  * error text from errno and exit(1)
  */
-noreturn void raise_error(const char *format, ...) __printflike(1, 2);
+[[noreturn, gnu::format(printf, 1, 2)]]
+void raise_error(const char *format, ...);
 
 
 // ------------------------ Strings ------------------------
@@ -57,7 +47,8 @@ bool is_equal_strings(const char *first, const char *second);
  * Forms a new string and substitutes arguments in printf style.
  * The result must be freed by the caller.
  */
-char *format_string(const char *format, ...) __attribute__((format(printf, 1, 2)));
+[[gnu::format(printf, 1, 2)]]
+char *format_string(const char *format, ...);
 
 /**
  * Converts unsigned long to string. The result must be freed by the caller.

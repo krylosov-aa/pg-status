@@ -4,6 +4,7 @@
 
 #include "utils.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -25,6 +26,7 @@ static int fputs_error(void) {
  * Copies a string. The result must be freed by the caller.
  */
 char *copy_string(const char *str) {
+    assert(str);
     char *result = strdup(str);
     if (!result) {
         raise_error("Error when trying to copy a string");
@@ -33,7 +35,7 @@ char *copy_string(const char *str) {
 }
 
 /**
- * Prints the message with \n and also adds the error text from errno
+ * Prints the message to stderr with \n and also adds the error text from errno
  */
 void printf_error(const char *format, ...) {
     va_list args;
@@ -46,10 +48,10 @@ void printf_error(const char *format, ...) {
 }
 
 /**
- * Prints the message with \n and also adds the
- * error text from errno and abort
+ * Prints the message to stderr with \n and also adds the
+ * error text from errno and exit(1)
  */
-noreturn void raise_error(const char *format, ...) {
+void raise_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
     (void)vfprintf(stderr, format, args);
@@ -65,6 +67,8 @@ noreturn void raise_error(const char *format, ...) {
  * The result must be freed by the caller.
  */
 char *concatenate_strings(const char *first, const char *second) {
+    assert(first);
+    assert(second);
     const size_t len1 = strlen(first);
     const size_t len2 = strlen(second);
     char *new = malloc(len1 + len2 + 1);
@@ -274,6 +278,7 @@ uint16_t str_to_uint16(const char *value) {
  * pastes it by the result pointer.
  */
 void replace_from_env(const char *env_name, char **result) {
+    assert(env_name);
     char *env_val = getenv(env_name);
     if (env_val && *env_val) {
         *result = env_val;
@@ -285,6 +290,7 @@ void replace_from_env(const char *env_name, char **result) {
  * pastes it by the result pointer.
  */
 void replace_from_env_uint(const char *env_name, unsigned int *result) {
+    assert(env_name);
     const char *env_val = getenv(env_name);
     if (env_val && *env_val) {
         *result = str_to_uint(env_val);
@@ -296,6 +302,7 @@ void replace_from_env_uint(const char *env_name, unsigned int *result) {
  * pastes it by the result pointer.
  */
 void replace_from_env_ull(const char *env_name, unsigned long long *result) {
+    assert(env_name);
     const char *env_val = getenv(env_name);
     if (env_val && *env_val) {
         *result = str_to_ull(env_val);
@@ -308,6 +315,7 @@ void replace_from_env_ull(const char *env_name, unsigned long long *result) {
  * The string must be freed by the caller.
  */
 void replace_from_env_copy(const char *env_name, char **result) {
+    assert(env_name);
     const char *env_val = getenv(env_name);
     if (env_val != nullptr && *env_val) {
         char *env_val_copy = copy_string(env_val);
@@ -340,7 +348,10 @@ cJSON *json_object(void) {
 /**
  * Adds a new key and string value to json
  */
-void add_str_to_json_object(cJSON * obj, const char *key, const char *val) {
+void add_str_to_json_object(cJSON *obj, const char *key, const char *val) {
+    assert(obj);
+    assert(key);
+    assert(val);
     if (!cJSON_AddStringToObject(obj, key, val)) {
         raise_error("Can't add str to object");
     }
@@ -349,7 +360,9 @@ void add_str_to_json_object(cJSON * obj, const char *key, const char *val) {
 /**
  * Adds a new key with value null to json
  */
-void add_null_to_json_object(cJSON * obj, const char *key) {
+void add_null_to_json_object(cJSON *obj, const char *key) {
+    assert(obj);
+    assert(key);
     if (!cJSON_AddNullToObject(obj, key)) {
         raise_error("Can't add null to object");
     }
@@ -358,7 +371,9 @@ void add_null_to_json_object(cJSON * obj, const char *key) {
 /**
  * Adds a new key and bool value to json
  */
-void add_bool_to_json_object(cJSON * obj, const char *key, const bool val) {
+void add_bool_to_json_object(cJSON *obj, const char *key, const bool val) {
+    assert(obj);
+    assert(key);
     if (!cJSON_AddBoolToObject(obj, key, val)) {
         raise_error("Can't add bool to object");
     }
@@ -369,6 +384,7 @@ void add_bool_to_json_object(cJSON * obj, const char *key, const bool val) {
  * The string must be freed by the caller.
  */
 char *json_to_str(cJSON *json) {
+    assert(json);
     char *result = cJSON_PrintUnformatted(json);
     cJSON_Delete(json);
     if (!result) {
