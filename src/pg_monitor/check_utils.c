@@ -70,19 +70,10 @@ static PGresult *execute_sql(PGconn *conn, const char *query) {
 /**
  * sql query to get host status
  */
-static const char *streaming_replication_query =
-    "with is_in_recovery as (\n"
-    "  select pg_is_in_recovery() is_replica\n"
-    ")\n"
-    "SELECT\n"
-    "    is_replica\n"
-    "  , case when not is_replica then pg_current_wal_lsn() end master_lsn\n"
-    "  , case when is_replica then pg_last_wal_receive_lsn() end replica_received_lsn\n"
-    "  , case when is_replica then pg_last_wal_replay_lsn() end replica_lsn\n"
-    "  , case when is_replica\n"
-    "      then coalesce((extract(epoch from now() - pg_last_xact_replay_timestamp()) * 1000)::bigint, 0)\n"
-    "      else 0 end replica_delay_ms\n"
-    "from is_in_recovery;\n";
+static const char streaming_replication_query[] = {
+    #embed "streaming_replication_query.sql"
+    , '\0'
+};
 
 
 /**
