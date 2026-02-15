@@ -68,6 +68,9 @@ scan-build:
 clean:
 	 cmake --build cmake-build-debug --verbose --target clean
 
+clean_release:
+	 cmake --build cmake-build-release --verbose --target clean
+
 build_valgrind:
 	docker build -f test/valgrind/Dockerfile -t pg-status-valgrind .
 

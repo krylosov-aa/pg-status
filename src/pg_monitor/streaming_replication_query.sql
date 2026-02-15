@@ -1,7 +1,7 @@
 with is_in_recovery as (
   select pg_is_in_recovery() is_replica
 )
-SELECT
+select
     is_replica
   , case when not is_replica then pg_current_wal_lsn() end master_lsn
   , case when is_replica then pg_last_wal_receive_lsn() end replica_received_lsn
