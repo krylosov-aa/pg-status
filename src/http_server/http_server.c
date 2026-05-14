@@ -124,43 +124,6 @@ static MHD_Result queue_response(
 }
 
 /**
- * Handler at the end of request processing
- */
-static void request_completed(
-    void *cls,
-    MHD_Connection *connection,
-    void **req_cls,
-    const MHD_RequestTerminationCode toe
-) {
-    switch (toe) {
-        case MHD_REQUEST_TERMINATED_COMPLETED_OK:
-            // printf("request completed\n");
-            break;
-        case MHD_REQUEST_TERMINATED_WITH_ERROR:
-            printf_error("request completed with error\n");
-            break;
-        case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
-            printf_error("request completed with timeout\n");
-            break;
-        case MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
-            printf_error("request completed with MHD shutdown\n");
-            break;
-        case MHD_REQUEST_TERMINATED_READ_ERROR:
-            printf_error(
-                "request completed with terminated read error\n"
-            );
-            break;
-        case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
-            printf_error("request completed with client abort\n");
-            break;
-    }
-    if (*req_cls) {
-        HTTPResponse *response = *req_cls;
-        free(response);
-    }
-}
-
-/**
  * Searches for a suitable route among registered routes
  */
 static request_handler_t find_handler(const char *method, const char *path) {
@@ -203,22 +166,6 @@ static MHD_Result process_handler(
 }
 
 /**
- * Prepares a structure with default parameters to store the response
- */
-static HTTPResponse *allocate_response(void) {
-    HTTPResponse *response = malloc(sizeof(HTTPResponse));
-    if (response != nullptr) {
-        response -> mhd_response = nullptr;
-        response -> response = nullptr;
-        response -> const_response = nullptr;
-        response -> memory_mode = MHD_RESPMEM_MUST_COPY;
-        response -> content_type = nullptr;
-        response -> status_code = MHD_HTTP_OK;
-    }
-    return response;
-}
-
-/**
  * Processing a get request
  */
 static MHD_Result process_get(
@@ -230,10 +177,16 @@ static MHD_Result process_get(
   const char *upload_data,
   void **req_cls
 ) {
-    HTTPResponse *response = allocate_response();
-    *req_cls = (void *) response;
+    HTTPResponse response = {
+        .mhd_response = nullptr,
+        .response = nullptr,
+        .const_response = nullptr,
+        .memory_mode = MHD_RESPMEM_MUST_COPY,
+        .content_type = nullptr,
+        .status_code = MHD_HTTP_OK,
+    };
 
-    return process_handler(path, method, response, connection);
+    return process_handler(path, method, &response, connection);
 }
 
 /**
@@ -279,7 +232,6 @@ MHD_Daemon *start_http_server(
         MHD_USE_ERROR_LOG,
         port, nullptr, nullptr,
         answer_to_connection, nullptr,
-        MHD_OPTION_NOTIFY_COMPLETED, request_completed, nullptr,
         // MHD_OPTION_NOTIFY_CONNECTION, notify_connection_callback, nullptr,
         MHD_OPTION_LISTEN_BACKLOG_SIZE, 512,
         MHD_OPTION_CONNECTION_LIMIT, 1000,
