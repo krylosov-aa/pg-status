@@ -11,17 +11,10 @@
 #include <string.h>
 
 /**
- * list of routes
- */
-typedef struct {
-    Route *routes;
-    unsigned int cnt;
-} Routes;
-
-/**
  * list of routes registered for processing
  */
-static Routes *routes_list = nullptr;
+static Route *routes_list = nullptr;
+static unsigned int routes_count = 0;
 
 
 /**
@@ -164,14 +157,12 @@ static void request_completed(
  * Searches for a suitable route among registered routes
  */
 static request_handler_t find_handler(const char *method, const char *path) {
-    for (unsigned int i = 0; i < routes_list -> cnt; i++) {
-        Route *routes = routes_list -> routes;
-
+    for (unsigned int i = 0; i < routes_count; i++) {
         if (
-            strcmp(routes[i].method, method) == 0 &&
-            strcmp(routes[i].path, path) == 0
+            strcmp(routes_list[i].method, method) == 0 &&
+            strcmp(routes_list[i].path, path) == 0
         ) {
-            return routes[i].handler;
+            return routes_list[i].handler;
         }
     }
     return not_found;
@@ -269,10 +260,8 @@ MHD_Daemon *start_http_server(
     Route *routes,
     const unsigned int cnt_routes
 ) {
-
-    routes_list = malloc(sizeof(Routes));
-    routes_list -> routes = routes;
-    routes_list -> cnt = cnt_routes;
+    routes_list = routes;
+    routes_count = cnt_routes;
 
     MHD_Daemon *daemon = MHD_start_daemon(
         MHD_USE_AUTO_INTERNAL_THREAD |
