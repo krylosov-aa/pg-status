@@ -70,7 +70,7 @@ static void return_single_host(HTTPResponse *response, const char *host) {
 static void get_random_replica(
   MHD_Connection *connection, HTTPResponse *response
 ) {
-  const char *host = find_replica_round_robin(is_alive_replica, true);
+  const char *host = find_replica_round_robin(is_alive_replica, "/replica");
   return_single_host(response, host);
 }
 
@@ -82,14 +82,18 @@ static void get_master(MHD_Connection *connection, HTTPResponse *response) {
 static void get_sync_host_by_time(
   MHD_Connection *connection, HTTPResponse *response
 ) {
-  const char *host = find_replica_round_robin(is_sync_replica_by_time, true);
+  const char *host = find_replica_round_robin(
+    is_sync_replica_by_time, "/sync_by_time"
+  );
   return_single_host(response, host);
 }
 
 static void get_sync_host_by_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
-  const char *host = find_replica_round_robin(is_sync_replica_by_bytes, true);
+  const char *host = find_replica_round_robin(
+    is_sync_replica_by_bytes, "/sync_by_bytes"
+  );
   return_single_host(response, host);
 }
 
@@ -97,7 +101,7 @@ static void get_sync_host_by_time_or_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
   const char *host = find_replica_round_robin(
-    is_sync_replica_by_time_or_bytes, true
+    is_sync_replica_by_time_or_bytes, "/sync_by_time_or_bytes"
   );
   return_single_host(response, host);
 }
@@ -106,7 +110,7 @@ static void get_sync_host_by_time_and_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
   const char *host = find_replica_round_robin(
-    is_sync_replica_by_time_and_bytes, true
+    is_sync_replica_by_time_and_bytes, "/sync_by_time_and_bytes"
   );
   return_single_host(response, host);
 }

@@ -161,12 +161,11 @@ typedef bool (*condition_handler)(MonitorStatus);
  * round-robin algorithm.
  * @param handler A function that determines whether the specified host has been
  * found
- * @param master_if_not_found Determines whether to return the master if the
- * desired host is not found by handler
+ * @param log_context The context that will be visible in the logs
  * @return Host name corresponding to conditions
  */
 const char *find_replica_round_robin(
-  condition_handler handler, bool master_if_not_found
+  condition_handler handler, const char *log_context
 );
 
 /**

@@ -7,6 +7,7 @@
 
 #include <stdatomic.h>
 #include <assert.h>
+#include <stdio.h>
 
 /**
  * Atomically returns MonitorStatus
@@ -111,7 +112,7 @@ static atomic_size_t round_robin_cursor = 0;
  * which to start the crawl. Special logic to skip the master host so it
  * doesn't interfere with fair load balancing across the replicas.
  */
-static unsigned int next_cursor_round_robin(void) {
+static unsigned int next_replica_round_robin(void) {
   size_t cursor;
   unsigned int new_cursor;
   do {
@@ -133,14 +134,13 @@ static unsigned int next_cursor_round_robin(void) {
  * conditions using the round-robin algorithm.
  * @param handler A function that determines whether the specified host
  * has been found
- * @param master_if_not_found Determines whether to return the master if
- * the desired host is not found by handler
+ * @param log_context The context that will be visible in the logs
  * @return Host name corresponding to conditions
  */
 const char *find_replica_round_robin(
-  const condition_handler handler, const bool master_if_not_found
+  const condition_handler handler, const char *log_context
 ) {
-  unsigned int cursor = next_cursor_round_robin();
+  unsigned int cursor = next_replica_round_robin();
   const unsigned int start_cursor = cursor;
   const MonitorHost *possible_mon_host = nullptr;
 
@@ -164,9 +164,6 @@ const char *find_replica_round_robin(
     return possible_mon_host->host;
   }
 
-  if (master_if_not_found) {
-    return get_master_host();
-  }
-
-  return nullptr;
+  printf("Master was returned instead of replica. Context: %s \n", log_context);
+  return get_master_host();
 }
