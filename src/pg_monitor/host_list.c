@@ -91,23 +91,24 @@ static char *get_connection_string(char *host, char *port) {
 /**
  * Initializes MonitorHost to its initial value.
  */
-static MonitorHost init_monitor_host(char *host, char *port) {
-    MonitorHost monitor_host;
-    monitor_host.host = copy_string(host);
-    monitor_host.connection_str = get_connection_string(host, port);
-    monitor_host.failed_connections = 0;
+static void init_monitor_host(
+      MonitorHost *monitor_host, char *host, char *port
+) {
+    monitor_host -> host = copy_string(host);
+    monitor_host -> connection_str = get_connection_string(host, port);
+    monitor_host -> failed_connections = 0;
 
     atomic_store_explicit(
-        &monitor_host.status,
+        &monitor_host -> status,
         (MonitorStatus) {
             .alive = false,
             .master = false,
             .sync_by_time = false,
-            .sync_by_bytes = false
+            .sync_by_bytes = false,
+            .possible_dead = false
         },
         memory_order_relaxed
     );
-    return monitor_host;
 }
 
 /**
@@ -124,7 +125,7 @@ void init_monitor_host_list(void) {
         if (host_count == MAX_HOSTS) {
             raise_error("Too many hosts. Maximum value = %d", MAX_HOSTS);
         }
-        monitor_host_list[host_count] = init_monitor_host(host, port);
+        init_monitor_host(&monitor_host_list[host_count], host, port);
 
         host = next_host(hosts);
         port = next_port(ports);

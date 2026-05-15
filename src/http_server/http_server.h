@@ -33,7 +33,6 @@ typedef struct HTTPResponse {
     MHD_Response *mhd_response;
 
     // Response type. It can be set by the server or specified by handler.
-    // Must be allocated on the heap and will be freed by the server.
     const char *content_type;
 
     // What to do with the response after mhd gives the response to the client

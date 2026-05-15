@@ -197,7 +197,8 @@ static MonitorStatus dead_status(void) {
         .alive = false,
         .master = false,
         .sync_by_time = false,
-        .sync_by_bytes = false
+        .sync_by_bytes = false,
+        .possible_dead = true
     };
 }
 
@@ -206,7 +207,8 @@ static MonitorStatus master_status(void) {
         .alive = true,
         .master = true,
         .sync_by_time = true,
-        .sync_by_bytes = true
+        .sync_by_bytes = true,
+        .possible_dead = false
     };
 }
 
@@ -218,7 +220,8 @@ static MonitorStatus replica_status(
         .alive = true,
         .master = false,
         .sync_by_time = delay_ms <= parameters.sync_max_lag_ms,
-        .sync_by_bytes = delay_bytes <= parameters.sync_max_lag_bytes
+        .sync_by_bytes = delay_bytes <= parameters.sync_max_lag_bytes,
+        .possible_dead = false
     };
 }
 

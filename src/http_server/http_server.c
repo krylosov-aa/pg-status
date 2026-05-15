@@ -207,14 +207,16 @@ static MHD_Result process_handler(
  */
 static HTTPResponse *allocate_response(void) {
     HTTPResponse *response = malloc(sizeof(HTTPResponse));
-    if (response != nullptr) {
-        response -> mhd_response = nullptr;
-        response -> response = nullptr;
-        response -> const_response = nullptr;
-        response -> memory_mode = MHD_RESPMEM_MUST_COPY;
-        response -> content_type = nullptr;
-        response -> status_code = MHD_HTTP_OK;
+    if (!response) {
+        raise_error("Can't allocate memory for response");
     }
+
+    response -> mhd_response = nullptr;
+    response -> response = nullptr;
+    response -> const_response = nullptr;
+    response -> memory_mode = MHD_RESPMEM_MUST_COPY;
+    response -> content_type = nullptr;
+    response -> status_code = MHD_HTTP_OK;
     return response;
 }
 
@@ -289,7 +291,7 @@ MHD_Daemon *start_http_server(
     if (!daemon) {
         raise_error("Failed to start mhd daemon");
     }
-    printf("http server started at 127.0.0.1:%d\n", port);
+    printf("http server started on the %d port\n", port);
     return daemon;
 
 }
