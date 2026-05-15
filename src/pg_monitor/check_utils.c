@@ -198,12 +198,12 @@ static MonitorStatus master_status(void) {
 }
 
 static MonitorStatus replica_status(
-  const unsigned long long delay_ms, const unsigned long long delay_bytes
+  const unsigned long long lag_ms, const unsigned long long lag_bytes
 ) {
   return (MonitorStatus){.alive = true,
                          .master = false,
-                         .sync_by_time = delay_ms <= parameters.sync_max_lag_ms,
-                         .sync_by_bytes = delay_bytes <=
+                         .sync_by_time = lag_ms <= parameters.sync_max_lag_ms,
+                         .sync_by_bytes = lag_bytes <=
                                           parameters.sync_max_lag_bytes,
                          .possible_dead = false};
 }
@@ -239,6 +239,9 @@ void check_host_streaming_replication(
     q_res = execute_sql(conn, streaming_replication_query);
   }
 
+  unsigned long long new_lag_ms = 0;
+  unsigned long long new_lag_bytes = 0;
+
   if (!q_res) {
     host->failed_connections++;
     new_status.possible_dead = true;
@@ -251,21 +254,22 @@ void check_host_streaming_replication(
 
     const bool is_replica = is_t(PQgetvalue(q_res, 0, 0));
     if (is_replica) {
-      const unsigned long long delay_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
+      new_lag_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
 
       const unsigned long long replica_received_lsn = parse_lsn(
         PQgetvalue(q_res, 0, 2)
       );
       const unsigned long long replica_lsn = parse_lsn(PQgetvalue(q_res, 0, 3));
-      const unsigned long long delay_bytes =
-        max_lsn(master_lsn, replica_received_lsn) - replica_lsn;
-      new_status = replica_status(delay_ms, delay_bytes);
+      new_lag_bytes = max_lsn(master_lsn, replica_received_lsn) - replica_lsn;
+      new_status = replica_status(new_lag_ms, new_lag_bytes);
     } else {
       new_status = master_status();
       master_lsn = parse_lsn(PQgetvalue(q_res, 0, 1));
     }
   }
 
+  atomic_store_explicit(&host->lag_ms, new_lag_ms, memory_order_relaxed);
+  atomic_store_explicit(&host->lag_bytes, new_lag_bytes, memory_order_relaxed);
   atomic_store_explicit(&host->status, new_status, memory_order_relaxed);
   log_changes(host, new_status, status);
 

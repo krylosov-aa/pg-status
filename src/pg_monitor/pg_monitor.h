@@ -110,6 +110,8 @@ typedef struct {
   char *connection_str;
   unsigned int failed_connections;
   _Atomic MonitorStatus status;
+  _Atomic uint64_t lag_ms;
+  _Atomic uint64_t lag_bytes;
 } MonitorHost;
 
 /**
@@ -138,6 +140,16 @@ const char *get_master_host(void);
  * Atomically returns a pointer to the host status
  */
 MonitorStatus atomic_get_status(const MonitorHost *host);
+
+/**
+ * Atomically returns the host's replication lag in milliseconds
+ */
+uint64_t atomic_get_lag_ms(const MonitorHost *host);
+
+/**
+ * Atomically returns the host's replication lag in bytes
+ */
+uint64_t atomic_get_lag_bytes(const MonitorHost *host);
 
 /**
  * Describes the interface of the function for searching hosts

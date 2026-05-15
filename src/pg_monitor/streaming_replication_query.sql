@@ -8,5 +8,5 @@ select
   , case when is_replica then pg_last_wal_replay_lsn() end replica_lsn
   , case when is_replica
       then coalesce((extract(epoch from now() - pg_last_xact_replay_timestamp()) * 1000)::bigint, 0)
-      else 0 end replica_delay_ms
+      else 0 end replica_lag_ms
 from is_in_recovery;

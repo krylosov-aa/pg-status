@@ -16,6 +16,20 @@ MonitorStatus atomic_get_status(const MonitorHost *host) {
 }
 
 /**
+ * Atomically returns the host's replication lag in milliseconds
+ */
+uint64_t atomic_get_lag_ms(const MonitorHost *host) {
+  return atomic_load_explicit(&host->lag_ms, memory_order_relaxed);
+}
+
+/**
+ * Atomically returns the host's replication lag in bytes
+ */
+uint64_t atomic_get_lag_bytes(const MonitorHost *host) {
+  return atomic_load_explicit(&host->lag_bytes, memory_order_relaxed);
+}
+
+/**
  * Atomic acquisition of the current master
  */
 const char *get_master_host(void) {

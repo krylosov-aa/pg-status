@@ -158,6 +158,11 @@ void add_null_to_json_object(cJSON *obj, const char *key);
 void add_bool_to_json_object(cJSON *obj, const char *key, bool val);
 
 /**
+ * Adds a new key and uint64 value to json as a JSON number.
+ */
+void add_uint64_to_json_object(cJSON *obj, const char *key, uint64_t val);
+
+/**
  * Converts json to string.
  * The string must be freed by the caller.
  */

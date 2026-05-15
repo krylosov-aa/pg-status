@@ -79,17 +79,29 @@ For example:
   {
     "host": "host-1",
     "master": true,
-    "alive": true
+    "alive": true,
+    "sync_by_time": true,
+    "sync_by_bytes": true,
+    "lag_ms": 0,
+    "lag_bytes": 0
   },
   {
     "host": "host-2",
     "master": false,
-    "alive": true
+    "alive": true,
+    "sync_by_time": false,
+    "sync_by_bytes": true,
+    "lag_ms": 6193,
+    "lag_bytes": 456
   },
   {
     "host": "host-3",
     "master": false,
-    "alive": false
+    "alive": false,
+    "sync_by_time": false,
+    "sync_by_bytes": false,
+    "lag_ms": null,
+    "lag_bytes": null
   }
 ]
 ```
@@ -106,7 +118,9 @@ For example: `http://127.0.0.1:8000/status?host=host-1`
   "master": false,
   "alive": true,
   "sync_by_time": true,
-  "sync_by_bytes": true
+  "sync_by_bytes": true,
+  "lag_ms": 0,
+  "lag_bytes": 0
 }
 ```
 

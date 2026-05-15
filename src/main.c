@@ -16,6 +16,20 @@ static void add_host_to_json(cJSON *json_obj, const char *host) {
   }
 }
 
+static void add_lags_to_json(
+  cJSON *json_obj, const MonitorHost *mon_host, const MonitorStatus status
+) {
+  if (status.alive) {
+    add_uint64_to_json_object(json_obj, "lag_ms", atomic_get_lag_ms(mon_host));
+    add_uint64_to_json_object(
+      json_obj, "lag_bytes", atomic_get_lag_bytes(mon_host)
+    );
+  } else {
+    add_null_to_json_object(json_obj, "lag_ms");
+    add_null_to_json_object(json_obj, "lag_bytes");
+  }
+}
+
 void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
   cJSON *arr = json_array();
   for (unsigned int i = 0; i < host_count; i++) {
@@ -26,6 +40,9 @@ void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
     const MonitorStatus status = atomic_get_status(mon_host);
     add_bool_to_json_object(json_obj, "master", status.master);
     add_bool_to_json_object(json_obj, "alive", status.alive);
+    add_bool_to_json_object(json_obj, "sync_by_time", status.sync_by_time);
+    add_bool_to_json_object(json_obj, "sync_by_bytes", status.sync_by_bytes);
+    add_lags_to_json(json_obj, mon_host, status);
 
     cJSON_AddItemToArray(arr, json_obj);
   }
@@ -118,6 +135,7 @@ static void get_host_status(
   add_bool_to_json_object(json_obj, "alive", status.alive);
   add_bool_to_json_object(json_obj, "sync_by_time", status.sync_by_time);
   add_bool_to_json_object(json_obj, "sync_by_bytes", status.sync_by_bytes);
+  add_lags_to_json(json_obj, mon_host, status);
 
   response->response = json_to_str(json_obj);
   response->memory_mode = MHD_RESPMEM_MUST_FREE;
