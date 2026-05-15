@@ -43,8 +43,8 @@ typedef struct {
   // The lag in bytes below which a replica is considered synchronous
   unsigned long long sync_max_lag_bytes;
 
-  // Time between checks
-  unsigned int sleep;
+  // Time between checks in ms
+  int sleep_ms;
 
   // After this number of falls, the host is considered dead.
   unsigned int max_fails;

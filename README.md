@@ -126,10 +126,14 @@ You can configure various parameters using environment variables:
 - `pg_status__pg_port` — The connection port. You can specify separate ports for individual hosts using the same delimiter. Default: `5432`
 - `pg_status__connect_timeout` — The time limit (in seconds) for establishing a connection to PostgreSQL. Default: `2`
 - `pg_status__max_fails` — The number of consecutive errors allowed when checking a host’s status before it is considered dead. Default: `3`
-- `pg_status__sleep` — The delay (in seconds) between consecutive host status checks. Default: `5`
+- `pg_status__sleep_ms` — The delay (in milliseconds) between consecutive host status checks. Default: `5000`
 - `pg_status__sync_max_lag_ms` — The maximum acceptable replication lag (in milliseconds) for a replica to still be considered time-synchronous. Default: `1000`
 - `pg_status__sync_max_lag_bytes` — The maximum acceptable lag (in bytes) for a replica to still be considered byte-synchronous. Default: `1000000` (1 MB)
 - `pg_status__http_port` — the port on which the http server will listen. Default: `8000`
+
+#### Deprecated
+- `pg_status__sleep` — Use `pg_status__sleep_ms` instead. The delay (in seconds) between consecutive host status checks.
+If both `pg_status__sleep` and `pg_status__sleep_ms` are set, `pg_status__sleep_ms` takes precedence.
 
 
 # Installation
@@ -163,8 +167,8 @@ Depending on the API being called and the format selected
 There is one writer and many readers in the program. To ensure the fastest possible response for readers and to allow
 the writer to record new host statuses without delay, a lock-free approach was chosen.
 
-The writer goes through all the hosts listed in `pg_status__hosts` every `pg_status__sleep` seconds, attempting to
-connect to each host and read its status. Upon successfully receiving a response from a host, its status is updated
+The writer goes through all the hosts listed in `pg_status__hosts` every `pg_status__sleep_ms` milliseconds, attempting
+to connect to each host and read its status. Upon successfully receiving a response from a host, its status is updated
 immediately. This means if the writer has started traversing the hosts but hasn't finished yet, there will be
 inconsistency in the data: some hosts will have new data, while others will not. Thanks to the lock-free design,
 the writer cannot be blocked for long, so the window of inconsistency is quite small; however, it can grow depending

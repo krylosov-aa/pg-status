@@ -6,8 +6,10 @@
 #include "utils.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <pthread.h>
-#include <stdatomic.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -22,21 +24,9 @@ static pthread_cond_t start_cond = PTHREAD_COND_INITIALIZER;
 static bool pg_monitor_ready = false;
 
 /**
- * Parameters for stop a thread
+ * Stop signaling via a pipe.
  */
-static pthread_mutex_t stop_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t stop_cond = PTHREAD_COND_INITIALIZER;
-static atomic_bool monitor_running = true;
-
-/**
- * Gets a flag indicating whether the monitor thread should keep running.
- * This is intentionally implemented using an atomic bool so that
- * even with sleep=0, the thread stops correctly, even if stop_pg_monitor
- * is starving while trying to acquire the lock
- */
-static bool is_running(void) {
-  return atomic_load_explicit(&monitor_running, memory_order_relaxed);
-}
+static int stop_pipe[2] = {-1, -1};
 
 /**
  * One iteration of host checking
@@ -86,20 +76,30 @@ static void *pg_monitor_thread(void *arg) {
   pthread_cond_broadcast(&start_cond);
   pthread_mutex_unlock(&start_mutex);
 
-  struct timespec ts;
-  pthread_mutex_lock(&stop_mutex);
-  while (is_running()) {
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += parameters.sleep;
+  struct pollfd pfd = {
+    .fd = stop_pipe[0],
+    .events = POLLIN,
+    .revents = 0,
+  };
 
-    pthread_cond_timedwait(&stop_cond, &stop_mutex, &ts);
-    if (!is_running()) {
+  for (;;) {
+    const int rc = poll(&pfd, 1, parameters.sleep_ms);
+
+    if (rc < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      printf_error("poll failed");
       break;
-    };
+    }
+
+    if (rc > 0) {
+      break;
+    }
 
     check_hosts();
   }
-  pthread_mutex_unlock(&stop_mutex);
+
   return nullptr;
 }
 
@@ -107,6 +107,14 @@ static void *pg_monitor_thread(void *arg) {
  * Starts a host monitoring thread
  */
 pthread_t start_pg_monitor() {
+  if (pipe(stop_pipe) != 0) {
+    raise_error("Failed to create stop pipe");
+  }
+  if (fcntl(stop_pipe[0], F_SETFD, FD_CLOEXEC) != 0 ||
+      fcntl(stop_pipe[1], F_SETFD, FD_CLOEXEC) != 0) {
+    raise_error("Failed to set FD_CLOEXEC on stop pipe");
+  }
+
   pthread_mutex_lock(&start_mutex);
   const int started = pthread_create(
     &monitor_tid, nullptr, pg_monitor_thread, nullptr
@@ -129,17 +137,18 @@ pthread_t start_pg_monitor() {
  * Stops a host monitoring thread
  */
 void stop_pg_monitor(void) {
-  /*
-   * This is intentionally implemented using an atomic bool so that
-   * even with sleep=0, the thread stops correctly, even if stop_pg_monitor
-   * is starving while trying to acquire the lock
-   */
-  atomic_store_explicit(&monitor_running, false, memory_order_relaxed);
-
-  pthread_mutex_lock(&stop_mutex);
-  pthread_cond_broadcast(&stop_cond);
-  pthread_mutex_unlock(&stop_mutex);
+  constexpr char b = 1;
+  ssize_t w;
+  do {
+    w = write(stop_pipe[1], &b, 1);
+  } while (w < 0 && errno == EINTR);
 
   pthread_join(monitor_tid, nullptr);
+
+  close(stop_pipe[0]);
+  close(stop_pipe[1]);
+  stop_pipe[0] = -1;
+  stop_pipe[1] = -1;
+
   printf("pg_monitor stopped\n");
 }

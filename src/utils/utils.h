@@ -89,6 +89,11 @@ unsigned long long str_to_ull(const char *value);
 int str_to_int(const char *value);
 
 /**
+ * Converts string to int greater than or equal to zero
+ */
+int str_to_int_greater_or_equal_zero(const char *value);
+
+/**
  * Converts string to unsigned int
  */
 unsigned int str_to_uint(const char *value);

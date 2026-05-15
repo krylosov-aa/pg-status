@@ -11,4 +11,4 @@ services:
       - pg_status__pg_password=${pg_status__pg_password}
       - pg_status__pg_user=${pg_status__pg_user}
       - pg_status__pg_port=${pg_status__pg_port}
-      - pg_status__sleep=${pg_status__sleep}
+      - pg_status__sleep_ms=${pg_status__sleep_ms}

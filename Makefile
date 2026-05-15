@@ -86,8 +86,5 @@ build_push_amd_64:
 	sudo docker push ${r}/pg-status:${v}
 	sudo docker push ${r}/pg-status:latest
 
-format:
-	cmake --build cmake-build-debug --target format
-
-format-check:
-	cmake --build cmake-build-debug --target format-check
+format-warn:
+	cmake --build cmake-build-debug --target format-warn

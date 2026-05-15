@@ -224,6 +224,17 @@ int str_to_int(const char *value) {
 }
 
 /**
+ * Converts string to int greater than or equal to zero
+ */
+int str_to_int_greater_or_equal_zero(const char *value) {
+  const int result = str_to_int(value);
+  if (result < 0) {
+    raise_error("Failed to convert '%s' to int greater or equal zero", value);
+  }
+  return result;
+}
+
+/**
  * Converts string to unsigned int
  */
 unsigned int str_to_uint(const char *value) {

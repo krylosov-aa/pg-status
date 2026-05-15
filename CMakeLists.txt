@@ -56,13 +56,14 @@ if(CLANG_FORMAT_EXE)
             COMMENT "clang-format: strict dry-run (fails on diff)"
     )
 
+    add_custom_target(format-warn
+            COMMAND ${CLANG_FORMAT_EXE} --dry-run ${FORMAT_SOURCES}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "clang-format: dry-run (warnings only)"
+    )
+
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_custom_target(format-warn
-                COMMAND ${CLANG_FORMAT_EXE} --dry-run ${FORMAT_SOURCES}
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                COMMENT "clang-format: dry-run (warnings only)"
-        )
-        add_dependencies(pg-status format-warn)
+        add_dependencies(pg-status format)
     elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_dependencies(pg-status format-check)
     endif()
