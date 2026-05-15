@@ -2,10 +2,10 @@
  * Utilities for checking the status of a host
  */
 
+#include <errno.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #include "pg_monitor.h"
 #include "utils.h"

@@ -2,8 +2,6 @@
 BasedOnStyle: Google
 Standard: Latest
 PointerAlignment: Right  # char *foo
-IncludeBlocks: Preserve
-SortIncludes: Never
 AlignAfterOpenBracket: BlockIndent
 ContinuationIndentWidth: 2
 PenaltyBreakAssignment: 100  # Prefer wrapping inside call parens over breaking after `=`

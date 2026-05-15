@@ -2,12 +2,12 @@
  * Utilities for initializing and writing an array of monitoring hosts
  */
 
-#include "pg_monitor.h"
-#include "utils.h"
-
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "pg_monitor.h"
+#include "utils.h"
 
 /**
  * The actual number of hosts

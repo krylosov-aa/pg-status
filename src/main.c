@@ -1,12 +1,12 @@
+#include <cjson/cJSON.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "http_server.h"
 #include "pg_monitor.h"
 #include "utils.h"
-
-#include <pthread.h>
-#include <stdio.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <cjson/cJSON.h>
 
 static void add_host_to_json(cJSON *json_obj, const char *host) {
   if (!host) {

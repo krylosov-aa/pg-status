@@ -5,8 +5,8 @@
 #ifndef PG_STATUS_UTILS_H
 #define PG_STATUS_UTILS_H
 
-#include <stdint.h>
 #include <cjson/cJSON.h>
+#include <stdint.h>
 
 // ------------------------ Errors ------------------------
 

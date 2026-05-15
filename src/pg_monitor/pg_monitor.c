@@ -3,7 +3,6 @@
  */
 
 #include "pg_monitor.h"
-#include "utils.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -11,8 +10,10 @@
 #include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <sys/types.h>
+#include <unistd.h>
+
+#include "utils.h"
 
 static pthread_t monitor_tid;
 

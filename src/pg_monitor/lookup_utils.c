@@ -2,12 +2,12 @@
  * Various utilities for finding the right host for different conditions
  */
 
+#include <assert.h>
+#include <stdatomic.h>
+#include <stdio.h>
+
 #include "pg_monitor.h"
 #include "utils.h"
-
-#include <stdatomic.h>
-#include <assert.h>
-#include <stdio.h>
 
 /**
  * Atomically returns MonitorStatus
