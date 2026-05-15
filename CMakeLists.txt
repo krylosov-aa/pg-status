@@ -35,3 +35,35 @@ target_link_options(common_warnings INTERFACE
 
 find_package(PkgConfig REQUIRED)
 add_subdirectory(src)
+
+find_program(CLANG_FORMAT_EXE NAMES clang-format)
+
+if(CLANG_FORMAT_EXE)
+    file(GLOB_RECURSE FORMAT_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/*.c"
+            "${CMAKE_SOURCE_DIR}/src/*.h"
+    )
+
+    add_custom_target(format
+            COMMAND ${CLANG_FORMAT_EXE} -i ${FORMAT_SOURCES}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "clang-format: rewriting in place"
+    )
+
+    add_custom_target(format-check
+            COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${FORMAT_SOURCES}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "clang-format: strict dry-run (fails on diff)"
+    )
+
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_custom_target(format-warn
+                COMMAND ${CLANG_FORMAT_EXE} --dry-run ${FORMAT_SOURCES}
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                COMMENT "clang-format: dry-run (warnings only)"
+        )
+        add_dependencies(pg-status format-warn)
+    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_dependencies(pg-status format-check)
+    endif()
+endif()

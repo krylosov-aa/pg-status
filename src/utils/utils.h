@@ -5,7 +5,6 @@
 #ifndef PG_STATUS_UTILS_H
 #define PG_STATUS_UTILS_H
 
-
 #include <stdint.h>
 #include <cjson/cJSON.h>
 
@@ -23,7 +22,6 @@ void printf_error(const char *format, ...);
  */
 [[noreturn, gnu::format(printf, 1, 2)]]
 void raise_error(const char *format, ...);
-
 
 // ------------------------ Strings ------------------------
 
@@ -106,7 +104,6 @@ uint16_t str_to_uint16(const char *value);
  */
 void replace_from_env(const char *env_name, char **result);
 
-
 // ------------------------ Environment variables ------------------------
 
 /**
@@ -128,7 +125,6 @@ void replace_from_env_ull(const char *env_name, unsigned long long *result);
  */
 void replace_from_env_copy(const char *env_name, char **result);
 
-
 // ------------------------ JSON ------------------------
 
 /**
@@ -144,17 +140,17 @@ cJSON *json_object(void);
 /**
  * Adds a new key and value to json
  */
-void add_str_to_json_object(cJSON * obj, const char *key, const char *val);
+void add_str_to_json_object(cJSON *obj, const char *key, const char *val);
 
 /**
  * Adds a new key with value null to json
  */
-void add_null_to_json_object(cJSON * obj, const char *key);
+void add_null_to_json_object(cJSON *obj, const char *key);
 
 /**
  * Adds a new key and bool value to json
  */
-void add_bool_to_json_object(cJSON * obj, const char *key, bool val);
+void add_bool_to_json_object(cJSON *obj, const char *key, bool val);
 
 /**
  * Converts json to string.
@@ -162,4 +158,4 @@ void add_bool_to_json_object(cJSON * obj, const char *key, bool val);
  */
 char *json_to_str(cJSON *json);
 
-#endif //PG_STATUS_UTILS_H
+#endif  // PG_STATUS_UTILS_H
