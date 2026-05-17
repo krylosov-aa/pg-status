@@ -29,6 +29,13 @@ static void set_sleep(void) {
   if (env_val && *env_val) {
     parameters.sleep_ms = str_to_int_greater_or_equal_zero(env_val);
   }
+
+  env_val = getenv("pg_status__sleep");
+  if (env_val && *env_val) {
+    raise_error(
+      "pg_status__sleep is deprecated! Use pg_status__sleep_ms instead!"
+    );
+  }
 }
 
 static void set_hosts(void) {
