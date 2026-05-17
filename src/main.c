@@ -185,6 +185,21 @@ static void get_sync_host_by_time_and_bytes(
   return_single_host(response, host);
 }
 
+static void get_most_sync_host_by_bytes(
+  MHD_Connection *connection, HTTPResponse *response
+) {
+  LagThresholds thresholds = lag_thresholds_by_parameters();
+  const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
+  if (!parsed) {
+    return;
+  }
+
+  const char *host = find_most_sync_replica_by_bytes(
+    &thresholds, "/most_sync_by_bytes"
+  );
+  return_single_host(response, host);
+}
+
 static void get_host_status(
   MHD_Connection *connection, HTTPResponse *response
 ) {
@@ -260,6 +275,7 @@ static Route routes[] = {
   {"GET", "/sync_by_bytes", get_sync_host_by_bytes},
   {"GET", "/sync_by_time_or_bytes", get_sync_host_by_time_or_bytes},
   {"GET", "/sync_by_time_and_bytes", get_sync_host_by_time_and_bytes},
+  {"GET", "/most_sync_by_bytes", get_most_sync_host_by_bytes},
   {"GET", "/version", get_version},
 };
 

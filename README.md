@@ -42,18 +42,20 @@ In this case, the response body will be empty for plain text mode, and `{"host":
 
 ### Lag query parameters
 
-The `/replica` and `/sync_by_*` endpoints accept optional query parameters
-`lag_ms` and `lag_bytes` that override the lag thresholds for a single
-request. Values must be non-negative integers; otherwise the endpoint
-responds with HTTP 400 and a body like `{"error_text": "Invalid lag_ms"}`.
+The `/replica`, `/sync_by_*`, and `/most_sync_by_bytes` endpoints accept
+optional query parameters `lag_ms` and `lag_bytes` that override the lag
+thresholds for a single request. Values must be non-negative integers;
+otherwise the endpoint responds with HTTP 400 and a body like
+`{"error_text": "Invalid lag_ms"}`.
 
 How a missing parameter is interpreted depends on the route:
 
 - `/replica` — a missing parameter means **no constraint on that
   dimension**. The global `pg_status__sync_max_lag_*` defaults are not
   applied here.
-- `/sync_by_*` — a missing parameter falls back to the global
-  `pg_status__sync_max_lag_ms` / `pg_status__sync_max_lag_bytes`.
+- `/sync_by_*` and `/most_sync_by_bytes` — a missing parameter falls back
+  to the global `pg_status__sync_max_lag_ms` /
+  `pg_status__sync_max_lag_bytes`.
 
 A `/sync_by_time` request only consults the time threshold and a
 `/sync_by_bytes` request only consults the byte threshold; passing the
@@ -98,6 +100,12 @@ If no such replica exists, the master’s host is returned.
 Returns the host of a replica (selected using the round-robin algorithm) that is considered synchronous by both time and bytes.
 Per-request `lag_ms` / `lag_bytes` query parameters override the corresponding global thresholds for this request only.
 If no such replica exists, the master’s host is returned.
+
+### `GET /most_sync_by_bytes`
+
+Returns the host of the most byte-synchronous replica — the one with the smallest `lag_bytes` among replicas that still satisfy the time threshold. Unlike the `/sync_by_*` endpoints, this endpoint does not use round-robin: selection is deterministic (ties are broken by host order).
+Per-request `lag_bytes` query parameter overrides the global threshold for this request only.
+If no replica satisfies threshold, the master’s host is returned.
 
 ### `GET /hosts`
 

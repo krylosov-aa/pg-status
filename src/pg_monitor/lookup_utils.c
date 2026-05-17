@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <stdatomic.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "pg_monitor.h"
@@ -225,6 +226,62 @@ const char *find_replica_round_robin(
 
   if (possible_mon_host) {
     return possible_mon_host->host;
+  }
+
+  const char *master = get_master_host();
+  if (master) {
+    printf(
+      "Master was returned instead of replica. Context: %s \n", log_context
+    );
+  }
+  return master;
+}
+
+/**
+ * Searches for the most byte-synchronous replica whose lag still satisfies
+ * the byte threshold. Ties are broken by host order. Prefers a
+ * fully alive match; falls back to a `possible_dead` match only if no
+ * alive replica satisfies the thresholds. If no replica matches, returns
+ * the current master, or nullptr if there is no master.
+ * @param thresholds Lag thresholds the replica must satisfy
+ * @param log_context The context that will be visible in the logs
+ * @return Host name of the most byte-synchronous replica, or the master
+ * as a fallback, or nullptr if no host is available
+ */
+const char *find_most_sync_replica_by_bytes(
+  const LagThresholds *thresholds, const char *log_context
+) {
+  const MonitorHost *best_alive = nullptr;
+  uint64_t best_alive_lag = UINT64_MAX;
+  const MonitorHost *best_possible = nullptr;
+  uint64_t best_possible_lag = UINT64_MAX;
+
+  for (unsigned int i = 0; i < host_count; i++) {
+    const MonitorHost *mon_host = &monitor_host_list[i];
+    const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
+
+    if (!is_sync_replica_by_bytes(snap, mon_host, thresholds)) {
+      continue;
+    }
+
+    if (snap.status.possible_dead) {
+      if (snap.lag_bytes < best_possible_lag) {
+        best_possible_lag = snap.lag_bytes;
+        best_possible = mon_host;
+      }
+    } else {
+      if (snap.lag_bytes < best_alive_lag) {
+        best_alive_lag = snap.lag_bytes;
+        best_alive = mon_host;
+      }
+    }
+  }
+
+  if (best_alive) {
+    return best_alive->host;
+  }
+  if (best_possible) {
+    return best_possible->host;
   }
 
   const char *master = get_master_host();

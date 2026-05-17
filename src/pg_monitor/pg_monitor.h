@@ -254,6 +254,21 @@ typedef struct {
   uint64_t max_lag_bytes;
 } LagThresholds;
 
+/**
+ * Searches for the most byte-synchronous replica whose lag still satisfies
+ * the byte threshold. Ties are broken by host order. Prefers a
+ * fully alive match; falls back to a `possible_dead` match only if no
+ * alive replica satisfies the thresholds. If no replica matches, returns
+ * the current master, or nullptr if there is no master.
+ * @param thresholds Lag thresholds the replica must satisfy
+ * @param log_context The context that will be visible in the logs
+ * @return Host name of the most byte-synchronous replica, or the master
+ * as a fallback, or nullptr if no host is available
+ */
+const char *find_most_sync_replica_by_bytes(
+  const LagThresholds *thresholds, const char *log_context
+);
+
 // ------------------------ Host checking utils ------------------------
 
 /**
