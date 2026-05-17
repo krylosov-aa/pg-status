@@ -1,6 +1,7 @@
 #include <cjson/cJSON.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -20,9 +21,16 @@ static void add_lags_to_json(
   cJSON *json_obj, const MonitorHost *mon_host, const MonitorStatus status
 ) {
   if (status.alive) {
-    add_uint64_to_json_object(json_obj, "lag_ms", atomic_get_lag_ms(mon_host));
-    add_uint64_to_json_object(
-      json_obj, "lag_bytes", atomic_get_lag_bytes(mon_host)
+    const uint64_t lag_ms = atomic_get_lag_ms(mon_host);
+    add_uint64_to_json_object(json_obj, "lag_ms", lag_ms);
+    add_bool_to_json_object(
+      json_obj, "sync_by_time", lag_ms <= parameters.sync_max_lag_ms
+    );
+
+    const uint64_t lag_bytes = atomic_get_lag_bytes(mon_host);
+    add_uint64_to_json_object(json_obj, "lag_bytes", lag_bytes);
+    add_bool_to_json_object(
+      json_obj, "sync_by_bytes", lag_bytes <= parameters.sync_max_lag_bytes
     );
   } else {
     add_null_to_json_object(json_obj, "lag_ms");
@@ -40,8 +48,6 @@ void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
     const MonitorStatus status = atomic_get_status(mon_host);
     add_bool_to_json_object(json_obj, "master", status.master);
     add_bool_to_json_object(json_obj, "alive", status.alive);
-    add_bool_to_json_object(json_obj, "sync_by_time", status.sync_by_time);
-    add_bool_to_json_object(json_obj, "sync_by_bytes", status.sync_by_bytes);
     add_lags_to_json(json_obj, mon_host, status);
 
     cJSON_AddItemToArray(arr, json_obj);
@@ -67,10 +73,37 @@ static void return_single_host(HTTPResponse *response, const char *host) {
   }
 }
 
+static bool parse_lag_thresholds(
+  LagThresholds *thresholds, MHD_Connection *connection, HTTPResponse *response
+) {
+  thresholds->max_lag_ms = parameters.sync_max_lag_ms;
+  thresholds->max_lag_bytes = parameters.sync_max_lag_bytes;
+
+  bool parsed = parse_get_param_uint(
+    connection, "lag_ms", &thresholds->max_lag_ms
+  );
+  if (!parsed) {
+    bad_request(response, "{\"error_text\": \"Invalid lag_ms\"}");
+    return false;
+  }
+
+  parsed = parse_get_param_uint(
+    connection, "lag_bytes", &thresholds->max_lag_bytes
+  );
+  if (!parsed) {
+    bad_request(response, "{\"error_text\": \"Invalid lag_bytes\"}");
+    return false;
+  }
+
+  return true;
+}
+
 static void get_random_replica(
   MHD_Connection *connection, HTTPResponse *response
 ) {
-  const char *host = find_replica_round_robin(is_alive_replica, "/replica");
+  const char *host = find_replica_round_robin(
+    is_alive_replica, nullptr, "/replica"
+  );
   return_single_host(response, host);
 }
 
@@ -82,8 +115,14 @@ static void get_master(MHD_Connection *connection, HTTPResponse *response) {
 static void get_sync_host_by_time(
   MHD_Connection *connection, HTTPResponse *response
 ) {
+  LagThresholds thresholds;
+  const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
+  if (!parsed) {
+    return;
+  }
+
   const char *host = find_replica_round_robin(
-    is_sync_replica_by_time, "/sync_by_time"
+    is_sync_replica_by_time, &thresholds, "/sync_by_time"
   );
   return_single_host(response, host);
 }
@@ -91,8 +130,14 @@ static void get_sync_host_by_time(
 static void get_sync_host_by_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
+  LagThresholds thresholds;
+  const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
+  if (!parsed) {
+    return;
+  }
+
   const char *host = find_replica_round_robin(
-    is_sync_replica_by_bytes, "/sync_by_bytes"
+    is_sync_replica_by_bytes, &thresholds, "/sync_by_bytes"
   );
   return_single_host(response, host);
 }
@@ -100,8 +145,14 @@ static void get_sync_host_by_bytes(
 static void get_sync_host_by_time_or_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
+  LagThresholds thresholds;
+  const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
+  if (!parsed) {
+    return;
+  }
+
   const char *host = find_replica_round_robin(
-    is_sync_replica_by_time_or_bytes, "/sync_by_time_or_bytes"
+    is_sync_replica_by_time_or_bytes, &thresholds, "/sync_by_time_or_bytes"
   );
   return_single_host(response, host);
 }
@@ -109,8 +160,14 @@ static void get_sync_host_by_time_or_bytes(
 static void get_sync_host_by_time_and_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
+  LagThresholds thresholds;
+  const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
+  if (!parsed) {
+    return;
+  }
+
   const char *host = find_replica_round_robin(
-    is_sync_replica_by_time_and_bytes, "/sync_by_time_and_bytes"
+    is_sync_replica_by_time_and_bytes, &thresholds, "/sync_by_time_and_bytes"
   );
   return_single_host(response, host);
 }
@@ -122,9 +179,9 @@ static void get_host_status(
     connection, MHD_GET_ARGUMENT_KIND, "host"
   );
   if (!host) {
-    response->status_code = 400;
-    response->const_response =
-      "{\"error_text\": \"Get parameter 'host' wasn't passed\"}";
+    bad_request(
+      response, "{\"error_text\": \"Get parameter 'host' wasn't passed\"}"
+    );
     return;
   }
   const MonitorHost *mon_host = find_host_by_name(host);
@@ -137,8 +194,6 @@ static void get_host_status(
   cJSON *json_obj = json_object();
   add_bool_to_json_object(json_obj, "master", status.master);
   add_bool_to_json_object(json_obj, "alive", status.alive);
-  add_bool_to_json_object(json_obj, "sync_by_time", status.sync_by_time);
-  add_bool_to_json_object(json_obj, "sync_by_bytes", status.sync_by_bytes);
   add_lags_to_json(json_obj, mon_host, status);
 
   response->response = json_to_str(json_obj);
@@ -180,7 +235,7 @@ static void wait_for_termination_signal(const sigset_t *sigset) {
 static uint16_t get_port() {
   const char *env_val = getenv("pg_status__http_port");
   if (env_val && *env_val) {
-    return str_to_uint16(getenv("pg_status__http_port"));
+    return str_to_uint16(env_val);
   }
   return 8000;
 }

@@ -38,10 +38,10 @@ typedef struct {
   char *connect_timeout;
 
   // The lag in ms below which a replica is considered synchronous
-  unsigned long long sync_max_lag_ms;
+  uint64_t sync_max_lag_ms;
 
   // The lag in bytes below which a replica is considered synchronous
-  unsigned long long sync_max_lag_bytes;
+  uint64_t sync_max_lag_bytes;
 
   // Time between checks in ms
   int sleep_ms;
@@ -95,8 +95,6 @@ int get_master_index(void);
  * them, some hosts may have the new data while others still have the old data.
  */
 typedef struct {
-  bool sync_by_time : 1;
-  bool sync_by_bytes : 1;
   bool master : 1;
   bool alive : 1;
   bool possible_dead : 1;
@@ -152,20 +150,26 @@ uint64_t atomic_get_lag_ms(const MonitorHost *host);
 uint64_t atomic_get_lag_bytes(const MonitorHost *host);
 
 /**
- * Describes the interface of the function for searching hosts
+ * Describes the interface of the function for searching hosts.
+ * The handler receives a snapshot of the host status, the host itself
+ * (so it can read raw atomics like lag_ms/lag_bytes), and an opaque
+ * caller-supplied context pointer.
  */
-typedef bool (*condition_handler)(MonitorStatus);
+typedef bool (*condition_handler)(
+  MonitorStatus status, const MonitorHost *host, const void *ctx
+);
 
 /**
  * A function for searching for a host that matches certain conditions using the
  * round-robin algorithm.
  * @param handler A function that determines whether the specified host has been
  * found
+ * @param ctx Opaque context forwarded to the handler
  * @param log_context The context that will be visible in the logs
  * @return Host name corresponding to conditions
  */
 const char *find_replica_round_robin(
-  condition_handler handler, const char *log_context
+  condition_handler handler, const void *ctx, const char *log_context
 );
 
 /**
@@ -176,31 +180,58 @@ const MonitorHost *find_host_by_name(const char *host);
 /**
  * condition_handler that searches for a live replica
  */
-bool is_alive_replica(MonitorStatus status);
+bool is_alive_replica(
+  MonitorStatus status, const MonitorHost *host, const void *ctx
+);
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous
  */
-bool is_sync_replica_by_time(MonitorStatus status);
+bool is_sync_replica_by_time(
+  MonitorStatus status, const MonitorHost *host, const void *ctx
+);
 
 /**
  * condition_handler that searches for a live replica that is considered
  * byte-synchronous
  */
-bool is_sync_replica_by_bytes(MonitorStatus status);
+bool is_sync_replica_by_bytes(
+  MonitorStatus status, const MonitorHost *host, const void *ctx
+);
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous or byte-synchronous
  */
-bool is_sync_replica_by_time_or_bytes(MonitorStatus status);
+bool is_sync_replica_by_time_or_bytes(
+  MonitorStatus status, const MonitorHost *host, const void *ctx
+);
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous and byte-synchronous
  */
-bool is_sync_replica_by_time_and_bytes(MonitorStatus status);
+bool is_sync_replica_by_time_and_bytes(
+  MonitorStatus status, const MonitorHost *host, const void *ctx
+);
+
+/**
+ * Per-request lag thresholds.
+ */
+typedef struct {
+  uint64_t max_lag_ms;
+  uint64_t max_lag_bytes;
+} LagThresholds;
+
+/**
+ * condition_handler that searches for a live replica whose current lag
+ * (read via atomic_get_lag_ms / atomic_get_lag_bytes) is within both
+ * thresholds carried in ctx (LagThresholds*).
+ */
+bool is_replica_within_lag(
+  MonitorStatus status, const MonitorHost *host, const void *ctx
+);
 
 // ------------------------ Host checking utils ------------------------
 

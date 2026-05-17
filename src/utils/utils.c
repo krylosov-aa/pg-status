@@ -184,6 +184,10 @@ long str_to_long(const char *value) {
  * Converts string to unsigned long
  */
 unsigned long str_to_ulong(const char *value) {
+  if (!value || *value == '\0' || *value == '-') {
+    raise_error("Failed to convert '%s' to ulong", value);
+  }
+
   char *end_ptr = nullptr;
   errno = 0;
 
@@ -197,19 +201,47 @@ unsigned long str_to_ulong(const char *value) {
 }
 
 /**
- * Converts string to unsigned long long
+ * Converts string to uint64_t
  */
-unsigned long long str_to_ull(const char *value) {
+uint64_t str_to_ull(const char *value) {
+  if (!value || *value == '\0' || *value == '-') {
+    raise_error("Failed to convert '%s' to ull", value);
+  }
+
   char *end_ptr = nullptr;
   errno = 0;
 
-  const unsigned long long result = strtoull(value, &end_ptr, 10);
+  const uint64_t result = strtoull(value, &end_ptr, 10);
 
   if (end_ptr == value || *end_ptr != '\0' || errno == ERANGE) {
     raise_error("Failed to convert '%s' to ull", value);
   }
 
   return result;
+}
+
+/**
+ * Converts string to uint64_t without aborting on failure.
+ * Returns true on success and writes the parsed value to *out.
+ * Returns false on any malformed input: NULL/empty, leading '-',
+ * non-numeric content, or overflow.
+ */
+bool try_str_to_ull(const char *value, uint64_t *out) {
+  if (!value || *value == '\0' || *value == '-') {
+    return false;
+  }
+
+  char *end_ptr = nullptr;
+  errno = 0;
+
+  const uint64_t result = strtoull(value, &end_ptr, 10);
+
+  if (end_ptr == value || *end_ptr != '\0' || errno == ERANGE) {
+    return false;
+  }
+
+  *out = result;
+  return true;
 }
 
 /**
@@ -284,7 +316,7 @@ void replace_from_env_uint(const char *env_name, unsigned int *result) {
  * Takes a value from the environment variables if it is set,
  * pastes it by the result pointer.
  */
-void replace_from_env_ull(const char *env_name, unsigned long long *result) {
+void replace_from_env_ull(const char *env_name, uint64_t *result) {
   assert(env_name);
   const char *env_val = getenv(env_name);
   if (env_val && *env_val) {

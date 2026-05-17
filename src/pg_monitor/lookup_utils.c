@@ -57,7 +57,9 @@ const MonitorHost *find_host_by_name(const char *host) {
 /**
  * condition_handler that searches for a live replica
  */
-bool is_alive_replica(const MonitorStatus status) {
+bool is_alive_replica(
+  const MonitorStatus status, const MonitorHost *host, const void *ctx
+) {
   return status.alive && !status.master;
 }
 
@@ -65,32 +67,58 @@ bool is_alive_replica(const MonitorStatus status) {
  * condition_handler that searches for a live replica that is considered
  * time-synchronous
  */
-bool is_sync_replica_by_time(const MonitorStatus status) {
-  return is_alive_replica(status) && status.sync_by_time;
+bool is_sync_replica_by_time(
+  const MonitorStatus status, const MonitorHost *host, const void *ctx
+) {
+  if (!is_alive_replica(status, host, ctx)) {
+    return false;
+  }
+  const LagThresholds *thresholds = ctx;
+  return atomic_get_lag_ms(host) <= thresholds->max_lag_ms;
 }
 
 /**
  * condition_handler that searches for a live replica that is considered
  * byte-synchronous
  */
-bool is_sync_replica_by_bytes(const MonitorStatus status) {
-  return is_alive_replica(status) && status.sync_by_bytes;
+bool is_sync_replica_by_bytes(
+  const MonitorStatus status, const MonitorHost *host, const void *ctx
+) {
+  if (!is_alive_replica(status, host, ctx)) {
+    return false;
+  }
+  const LagThresholds *thresholds = ctx;
+  return atomic_get_lag_bytes(host) <= thresholds->max_lag_bytes;
 }
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous or byte-synchronous
  */
-bool is_sync_replica_by_time_or_bytes(const MonitorStatus status) {
-  return is_sync_replica_by_time(status) || is_sync_replica_by_bytes(status);
+bool is_sync_replica_by_time_or_bytes(
+  const MonitorStatus status, const MonitorHost *host, const void *ctx
+) {
+  if (!is_alive_replica(status, host, ctx)) {
+    return false;
+  }
+  const LagThresholds *thresholds = ctx;
+  return atomic_get_lag_ms(host) <= thresholds->max_lag_ms ||
+         atomic_get_lag_bytes(host) <= thresholds->max_lag_bytes;
 }
 
 /**
  * condition_handler that searches for a live replica that is considered
  * time-synchronous and byte-synchronous
  */
-bool is_sync_replica_by_time_and_bytes(const MonitorStatus status) {
-  return is_sync_replica_by_time(status) && is_sync_replica_by_bytes(status);
+bool is_sync_replica_by_time_and_bytes(
+  const MonitorStatus status, const MonitorHost *host, const void *ctx
+) {
+  if (!is_alive_replica(status, host, ctx)) {
+    return false;
+  }
+  const LagThresholds *thresholds = ctx;
+  return atomic_get_lag_ms(host) <= thresholds->max_lag_ms &&
+         atomic_get_lag_bytes(host) <= thresholds->max_lag_bytes;
 }
 
 /**
@@ -134,11 +162,12 @@ static unsigned int next_replica_round_robin(void) {
  * conditions using the round-robin algorithm.
  * @param handler A function that determines whether the specified host
  * has been found
+ * @param ctx Opaque context forwarded to the handler
  * @param log_context The context that will be visible in the logs
  * @return Host name corresponding to conditions
  */
 const char *find_replica_round_robin(
-  const condition_handler handler, const char *log_context
+  const condition_handler handler, const void *ctx, const char *log_context
 ) {
   unsigned int cursor = next_replica_round_robin();
   const unsigned int start_cursor = cursor;
@@ -148,7 +177,7 @@ const char *find_replica_round_robin(
     const MonitorHost *mon_host = &monitor_host_list[cursor];
     const MonitorStatus status = atomic_get_status(mon_host);
 
-    if (handler(status)) {
+    if (handler(status, mon_host, ctx)) {
       if (!status.possible_dead) {
         return mon_host->host;
       }

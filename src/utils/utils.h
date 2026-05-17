@@ -79,9 +79,17 @@ long str_to_long(const char *value);
 unsigned long str_to_ulong(const char *value);
 
 /**
- * Converts string to unsigned long long
+ * Converts string to uint64_t
  */
-unsigned long long str_to_ull(const char *value);
+uint64_t str_to_ull(const char *value);
+
+/**
+ * Converts string to uint64_t without aborting on failure.
+ * Returns true on success and writes the parsed value to *out.
+ * Returns false on any malformed input: NULL/empty, leading '-',
+ * non-numeric content, or overflow.
+ */
+bool try_str_to_ull(const char *value, uint64_t *out);
 
 /**
  * Converts string to int
@@ -121,7 +129,7 @@ void replace_from_env_uint(const char *env_name, unsigned int *result);
  * Takes a value from the environment variables if it is set,
  * pastes it by the result pointer.
  */
-void replace_from_env_ull(const char *env_name, unsigned long long *result);
+void replace_from_env_ull(const char *env_name, uint64_t *result);
 
 /**
  * Takes a value from the environment variables if it is set,

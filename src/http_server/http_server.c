@@ -268,3 +268,25 @@ bool need_json_response(const HTTPResponse *response) {
   return response->content_type &&
          is_equal_strings(response->content_type, "application/json");
 }
+
+bool parse_get_param_uint(
+  MHD_Connection *connection, const char *name, uint64_t *out
+) {
+  const char *raw = MHD_lookup_connection_value(
+    connection, MHD_GET_ARGUMENT_KIND, name
+  );
+  if (!raw) {
+    return true;
+  }
+  uint64_t parsed;
+  if (!try_str_to_ull(raw, &parsed)) {
+    return false;
+  }
+  *out = parsed;
+  return true;
+}
+
+void bad_request(HTTPResponse *response, const char *const_response) {
+  response->status_code = 400;
+  response->const_response = const_response;
+}

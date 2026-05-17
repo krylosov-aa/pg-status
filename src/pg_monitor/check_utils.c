@@ -74,7 +74,7 @@ static const char streaming_replication_query[] = {
 /**
  * Converts pg lsn to bytes
  */
-static unsigned long long parse_lsn(const char *lsn) {
+static uint64_t parse_lsn(const char *lsn) {
   if (!lsn) {
     return 0;
   }
@@ -96,15 +96,13 @@ static unsigned long long parse_lsn(const char *lsn) {
     return 0;
   }
 
-  return (unsigned long long)hi << 32 | lo;
+  return (uint64_t)hi << 32 | lo;
 }
 
 /**
  * Selects the maximum lsn
  */
-static unsigned long long max_lsn(
-  const unsigned long long a, const unsigned long long b
-) {
+static uint64_t max_lsn(const uint64_t a, const uint64_t b) {
   return a > b ? a : b;
 }
 
@@ -112,15 +110,15 @@ static unsigned long long max_lsn(
  * Logs changes to stdout if there have been changes in the lag in time
  */
 static void log_time_lag_changes(
-  const MonitorHost *host, const MonitorStatus new_status,
-  const MonitorStatus status
+  const MonitorHost *host, const uint64_t new_lag_ms, const uint64_t lag_ms
 ) {
-  const bool is_sync = is_sync_replica_by_time(new_status);
-  if (is_sync != is_sync_replica_by_time(status)) {
-    if (is_sync) {
-      printf("%s: synchronous in time\n", host->host);
-    } else {
+  if (new_lag_ms > parameters.sync_max_lag_ms) {
+    if (lag_ms <= parameters.sync_max_lag_ms) {
       printf("%s: out of sync in time\n", host->host);
+    }
+  } else {
+    if (lag_ms > parameters.sync_max_lag_ms) {
+      printf("%s: synchronous in time\n", host->host);
     }
   }
 }
@@ -129,15 +127,16 @@ static void log_time_lag_changes(
  * Logs changes to stdout if there have been changes in the lag in bytes
  */
 static void log_bytes_lag_changes(
-  const MonitorHost *host, const MonitorStatus new_status,
-  const MonitorStatus status
+  const MonitorHost *host, const uint64_t new_lag_bytes,
+  const uint64_t lag_bytes
 ) {
-  const bool is_sync = is_sync_replica_by_bytes(new_status);
-  if (is_sync != is_sync_replica_by_bytes(status)) {
-    if (is_sync) {
-      printf("%s: synchronous in bytes\n", host->host);
-    } else {
+  if (new_lag_bytes > parameters.sync_max_lag_bytes) {
+    if (lag_bytes <= parameters.sync_max_lag_bytes) {
       printf("%s: out of sync in bytes\n", host->host);
+    }
+  } else {
+    if (lag_bytes > parameters.sync_max_lag_bytes) {
+      printf("%s: synchronous in bytes\n", host->host);
     }
   }
 }
@@ -147,7 +146,8 @@ static void log_bytes_lag_changes(
  */
 static void log_changes(
   const MonitorHost *host, const MonitorStatus new_status,
-  const MonitorStatus status
+  const MonitorStatus status, const uint64_t new_lag_ms, const uint64_t lag_ms,
+  const uint64_t new_lag_bytes, const uint64_t lag_bytes
 ) {
   if (new_status.possible_dead != status.possible_dead &&
       new_status.possible_dead) {
@@ -165,8 +165,8 @@ static void log_changes(
       return;
     }
     printf("%s: replica\n", host->host);
-    log_time_lag_changes(host, new_status, status);
-    log_bytes_lag_changes(host, new_status, status);
+    log_time_lag_changes(host, new_lag_ms, lag_ms);
+    log_bytes_lag_changes(host, new_lag_bytes, lag_bytes);
     return;
   }
 
@@ -176,36 +176,25 @@ static void log_changes(
       return;
     }
     printf("%s: replica\n", host->host);
-    log_time_lag_changes(host, new_status, status);
-    log_bytes_lag_changes(host, new_status, status);
+    log_time_lag_changes(host, new_lag_ms, lag_ms);
+    log_bytes_lag_changes(host, new_lag_bytes, lag_bytes);
   }
 }
 
 static MonitorStatus dead_status(void) {
-  return (MonitorStatus){.alive = false,
-                         .master = false,
-                         .sync_by_time = false,
-                         .sync_by_bytes = false,
-                         .possible_dead = true};
+  return (MonitorStatus){
+    .alive = false, .master = false, .possible_dead = true
+  };
 }
 
 static MonitorStatus master_status(void) {
-  return (MonitorStatus){.alive = true,
-                         .master = true,
-                         .sync_by_time = true,
-                         .sync_by_bytes = true,
-                         .possible_dead = false};
+  return (MonitorStatus){.alive = true, .master = true, .possible_dead = false};
 }
 
-static MonitorStatus replica_status(
-  const unsigned long long lag_ms, const unsigned long long lag_bytes
-) {
-  return (MonitorStatus){.alive = true,
-                         .master = false,
-                         .sync_by_time = lag_ms <= parameters.sync_max_lag_ms,
-                         .sync_by_bytes = lag_bytes <=
-                                          parameters.sync_max_lag_bytes,
-                         .possible_dead = false};
+static MonitorStatus replica_status() {
+  return (MonitorStatus){
+    .alive = true, .master = false, .possible_dead = false
+  };
 }
 
 /**
@@ -226,7 +215,9 @@ static MonitorStatus replica_status(
 void check_host_streaming_replication(
   MonitorHost *host, const unsigned int max_fails
 ) {
-  static unsigned long long master_lsn = 0;
+  static uint64_t master_lsn = 0;
+  const uint64_t lag_ms = atomic_get_lag_ms(host);
+  const uint64_t lag_bytes = atomic_get_lag_bytes(host);
   const MonitorStatus status = atomic_load_explicit(
     &host->status, memory_order_relaxed
   );
@@ -239,8 +230,8 @@ void check_host_streaming_replication(
     q_res = execute_sql(conn, streaming_replication_query);
   }
 
-  unsigned long long new_lag_ms = 0;
-  unsigned long long new_lag_bytes = 0;
+  uint64_t new_lag_ms = 0;
+  uint64_t new_lag_bytes = 0;
 
   if (!q_res) {
     host->failed_connections++;
@@ -256,12 +247,10 @@ void check_host_streaming_replication(
     if (is_replica) {
       new_lag_ms = str_to_ull(PQgetvalue(q_res, 0, 4));
 
-      const unsigned long long replica_received_lsn = parse_lsn(
-        PQgetvalue(q_res, 0, 2)
-      );
-      const unsigned long long replica_lsn = parse_lsn(PQgetvalue(q_res, 0, 3));
+      const uint64_t replica_received_lsn = parse_lsn(PQgetvalue(q_res, 0, 2));
+      const uint64_t replica_lsn = parse_lsn(PQgetvalue(q_res, 0, 3));
       new_lag_bytes = max_lsn(master_lsn, replica_received_lsn) - replica_lsn;
-      new_status = replica_status(new_lag_ms, new_lag_bytes);
+      new_status = replica_status();
     } else {
       new_status = master_status();
       master_lsn = parse_lsn(PQgetvalue(q_res, 0, 1));
@@ -271,7 +260,9 @@ void check_host_streaming_replication(
   atomic_store_explicit(&host->lag_ms, new_lag_ms, memory_order_relaxed);
   atomic_store_explicit(&host->lag_bytes, new_lag_bytes, memory_order_relaxed);
   atomic_store_explicit(&host->status, new_status, memory_order_relaxed);
-  log_changes(host, new_status, status);
+  log_changes(
+    host, new_status, status, new_lag_ms, lag_ms, new_lag_bytes, lag_bytes
+  );
 
   if (q_res) {
     PQclear(q_res);
