@@ -91,6 +91,7 @@ static void init_monitor_host(
   monitor_host->connection_str = get_connection_string(host, port);
   monitor_host->failed_connections = 0;
 
+  atomic_store_explicit(&monitor_host->seq, 0, memory_order_relaxed);
   atomic_store_explicit(
     &monitor_host->status,
     (MonitorStatus){.alive = false, .master = false, .possible_dead = false},

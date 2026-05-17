@@ -17,20 +17,20 @@ static void add_host_to_json(cJSON *json_obj, const char *host) {
   }
 }
 
-static void add_lags_to_json(
-  cJSON *json_obj, const MonitorHost *mon_host, const MonitorStatus status
+static void add_host_status_to_json(
+  cJSON *json_obj, const MonitorSnapshot snap
 ) {
-  if (status.alive) {
-    const uint64_t lag_ms = atomic_get_lag_ms(mon_host);
-    add_uint64_to_json_object(json_obj, "lag_ms", lag_ms);
+  add_bool_to_json_object(json_obj, "master", snap.status.master);
+  add_bool_to_json_object(json_obj, "alive", snap.status.alive);
+  if (snap.status.alive) {
+    add_uint64_to_json_object(json_obj, "lag_ms", snap.lag_ms);
     add_bool_to_json_object(
-      json_obj, "sync_by_time", lag_ms <= parameters.sync_max_lag_ms
+      json_obj, "sync_by_time", snap.lag_ms <= parameters.sync_max_lag_ms
     );
 
-    const uint64_t lag_bytes = atomic_get_lag_bytes(mon_host);
-    add_uint64_to_json_object(json_obj, "lag_bytes", lag_bytes);
+    add_uint64_to_json_object(json_obj, "lag_bytes", snap.lag_bytes);
     add_bool_to_json_object(
-      json_obj, "sync_by_bytes", lag_bytes <= parameters.sync_max_lag_bytes
+      json_obj, "sync_by_bytes", snap.lag_bytes <= parameters.sync_max_lag_bytes
     );
   } else {
     add_null_to_json_object(json_obj, "lag_ms");
@@ -45,10 +45,8 @@ void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
     cJSON *json_obj = json_object();
     add_host_to_json(json_obj, mon_host->host);
 
-    const MonitorStatus status = atomic_get_status(mon_host);
-    add_bool_to_json_object(json_obj, "master", status.master);
-    add_bool_to_json_object(json_obj, "alive", status.alive);
-    add_lags_to_json(json_obj, mon_host, status);
+    const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
+    add_host_status_to_json(json_obj, snap);
 
     cJSON_AddItemToArray(arr, json_obj);
   }
@@ -190,11 +188,9 @@ static void get_host_status(
     return;
   }
 
-  const MonitorStatus status = atomic_get_status(mon_host);
+  const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
   cJSON *json_obj = json_object();
-  add_bool_to_json_object(json_obj, "master", status.master);
-  add_bool_to_json_object(json_obj, "alive", status.alive);
-  add_lags_to_json(json_obj, mon_host, status);
+  add_host_status_to_json(json_obj, snap);
 
   response->response = json_to_str(json_obj);
   response->memory_mode = MHD_RESPMEM_MUST_FREE;

@@ -31,6 +31,36 @@ uint64_t atomic_get_lag_bytes(const MonitorHost *host) {
 }
 
 /**
+ * Reads {status, lag_ms, lag_bytes} as a consistent snapshot via the
+ * seqlock on host->seq. Spins until two reads of seq match and are even
+ * (writer not in progress), so the returned values all come from the
+ * same writer epoch.
+ */
+MonitorSnapshot atomic_get_snapshot(const MonitorHost *host) {
+  MonitorSnapshot snap;
+  for (;;) {
+    const uint64_t seq1 = atomic_load_explicit(
+      &host->seq, memory_order_acquire
+    );
+    if ((seq1 & 1U) != 0) {
+      continue;  // writer in progress
+    }
+    snap.status = atomic_load_explicit(&host->status, memory_order_relaxed);
+    snap.lag_ms = atomic_load_explicit(&host->lag_ms, memory_order_relaxed);
+    snap.lag_bytes = atomic_load_explicit(
+      &host->lag_bytes, memory_order_relaxed
+    );
+    const uint64_t seq2 = atomic_load_explicit(
+      &host->seq, memory_order_acquire
+    );
+    if (seq1 == seq2) {
+      return snap;
+    }
+    // writer advanced between the two seq reads; retry
+  }
+}
+
+/**
  * Atomic acquisition of the current master
  */
 const char *get_master_host(void) {
@@ -58,9 +88,9 @@ const MonitorHost *find_host_by_name(const char *host) {
  * condition_handler that searches for a live replica
  */
 bool is_alive_replica(
-  const MonitorStatus status, const MonitorHost *host, const void *ctx
+  const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
-  return status.alive && !status.master;
+  return snap.status.alive && !snap.status.master;
 }
 
 /**
@@ -68,13 +98,13 @@ bool is_alive_replica(
  * time-synchronous
  */
 bool is_sync_replica_by_time(
-  const MonitorStatus status, const MonitorHost *host, const void *ctx
+  const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
-  if (!is_alive_replica(status, host, ctx)) {
+  if (!is_alive_replica(snap, host, ctx)) {
     return false;
   }
   const LagThresholds *thresholds = ctx;
-  return atomic_get_lag_ms(host) <= thresholds->max_lag_ms;
+  return snap.lag_ms <= thresholds->max_lag_ms;
 }
 
 /**
@@ -82,13 +112,13 @@ bool is_sync_replica_by_time(
  * byte-synchronous
  */
 bool is_sync_replica_by_bytes(
-  const MonitorStatus status, const MonitorHost *host, const void *ctx
+  const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
-  if (!is_alive_replica(status, host, ctx)) {
+  if (!is_alive_replica(snap, host, ctx)) {
     return false;
   }
   const LagThresholds *thresholds = ctx;
-  return atomic_get_lag_bytes(host) <= thresholds->max_lag_bytes;
+  return snap.lag_bytes <= thresholds->max_lag_bytes;
 }
 
 /**
@@ -96,14 +126,14 @@ bool is_sync_replica_by_bytes(
  * time-synchronous or byte-synchronous
  */
 bool is_sync_replica_by_time_or_bytes(
-  const MonitorStatus status, const MonitorHost *host, const void *ctx
+  const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
-  if (!is_alive_replica(status, host, ctx)) {
+  if (!is_alive_replica(snap, host, ctx)) {
     return false;
   }
   const LagThresholds *thresholds = ctx;
-  return atomic_get_lag_ms(host) <= thresholds->max_lag_ms ||
-         atomic_get_lag_bytes(host) <= thresholds->max_lag_bytes;
+  return snap.lag_ms <= thresholds->max_lag_ms ||
+         snap.lag_bytes <= thresholds->max_lag_bytes;
 }
 
 /**
@@ -111,14 +141,14 @@ bool is_sync_replica_by_time_or_bytes(
  * time-synchronous and byte-synchronous
  */
 bool is_sync_replica_by_time_and_bytes(
-  const MonitorStatus status, const MonitorHost *host, const void *ctx
+  const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
-  if (!is_alive_replica(status, host, ctx)) {
+  if (!is_alive_replica(snap, host, ctx)) {
     return false;
   }
   const LagThresholds *thresholds = ctx;
-  return atomic_get_lag_ms(host) <= thresholds->max_lag_ms &&
-         atomic_get_lag_bytes(host) <= thresholds->max_lag_bytes;
+  return snap.lag_ms <= thresholds->max_lag_ms &&
+         snap.lag_bytes <= thresholds->max_lag_bytes;
 }
 
 /**
@@ -175,10 +205,10 @@ const char *find_replica_round_robin(
 
   do {
     const MonitorHost *mon_host = &monitor_host_list[cursor];
-    const MonitorStatus status = atomic_get_status(mon_host);
+    const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
 
-    if (handler(status, mon_host, ctx)) {
-      if (!status.possible_dead) {
+    if (handler(snap, mon_host, ctx)) {
+      if (!snap.status.possible_dead) {
         return mon_host->host;
       }
       if (!possible_mon_host) {

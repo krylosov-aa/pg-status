@@ -85,14 +85,7 @@ extern unsigned int host_count;
 int get_master_index(void);
 
 /**
- * Host status. Separated into a structure for atomic access.
- *
- * This way, concurrent threads can read the current status lock-free,
- * and the writer can perform lock-free writes.
- *
- * But the downside of this solution is the inconsistency: if the writer
- * has started updating the hosts but hasn't finished updating all of
- * them, some hosts may have the new data while others still have the old data.
+ * Host status flags. Small enough to be loaded atomically as a whole.
  */
 typedef struct {
   bool master : 1;
@@ -101,16 +94,41 @@ typedef struct {
 } MonitorStatus;
 
 /**
- *  Host parameters
+ *  Host parameters.
+ *
+ *  Concurrency model: one writer (the poll thread) and many readers
+ *  (HTTP handlers). The fields {status, lag_ms, lag_bytes} together
+ *  describe a host and must be read as a consistent snapshot — otherwise
+ *  routing endpoints could see, e.g., the old (alive) status with the
+ *  new (zeroed) lags and return a dead host as a "sync replica".
+ *
+ *  A seqlock protects the snapshot:
+ *  - Writer increments `seq` to odd, writes the three fields, then
+ *    increments `seq` to even. Each step is lock-free; the writer
+ *    never waits.
+ *  - Readers must call atomic_get_snapshot() — never read status / lag_ms
+ *    / lag_bytes directly during routing decisions. Direct atomic_get_*
+ *    accessors remain available for places that only need one field
+ *    (e.g. /hosts and /status JSON rendering).
  */
 typedef struct {
-  char *host;
-  char *connection_str;
-  unsigned int failed_connections;
-  _Atomic MonitorStatus status;
-  _Atomic uint64_t lag_ms;
-  _Atomic uint64_t lag_bytes;
+  char *host;                       // immutable after init
+  char *connection_str;             // immutable after init
+  _Atomic uint64_t seq;             // seqlock: odd = writing, even = stable
+  _Atomic uint64_t lag_ms;          // protected by seq
+  _Atomic uint64_t lag_bytes;       // protected by seq
+  unsigned int failed_connections;  // writer-private
+  _Atomic MonitorStatus status;     // protected by seq
 } MonitorHost;
+
+/**
+ * Consistent snapshot of a host's state
+ */
+typedef struct {
+  MonitorStatus status;
+  uint64_t lag_ms;
+  uint64_t lag_bytes;
+} MonitorSnapshot;
 
 /**
  * Array of monitoring hosts
@@ -135,7 +153,7 @@ void save_master_index(int i);
 const char *get_master_host(void);
 
 /**
- * Atomically returns a pointer to the host status
+ * Atomically returns MonitorStatus
  */
 MonitorStatus atomic_get_status(const MonitorHost *host);
 
@@ -150,13 +168,20 @@ uint64_t atomic_get_lag_ms(const MonitorHost *host);
 uint64_t atomic_get_lag_bytes(const MonitorHost *host);
 
 /**
+ * Returns a consistent snapshot of {status, lag_ms, lag_bytes} via the
+ * seqlock on host->seq. May spin briefly if the writer is mid-update,
+ * but never blocks the writer.
+ */
+MonitorSnapshot atomic_get_snapshot(const MonitorHost *host);
+
+/**
  * Describes the interface of the function for searching hosts.
- * The handler receives a snapshot of the host status, the host itself
- * (so it can read raw atomics like lag_ms/lag_bytes), and an opaque
+ * Receives a consistent MonitorSnapshot (status + lags from the same
+ * poll), the host itself (for host->host name access), and an opaque
  * caller-supplied context pointer.
  */
 typedef bool (*condition_handler)(
-  MonitorStatus status, const MonitorHost *host, const void *ctx
+  MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 );
 
 /**
@@ -181,7 +206,7 @@ const MonitorHost *find_host_by_name(const char *host);
  * condition_handler that searches for a live replica
  */
 bool is_alive_replica(
-  MonitorStatus status, const MonitorHost *host, const void *ctx
+  MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 );
 
 /**
@@ -189,7 +214,7 @@ bool is_alive_replica(
  * time-synchronous
  */
 bool is_sync_replica_by_time(
-  MonitorStatus status, const MonitorHost *host, const void *ctx
+  MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 );
 
 /**
@@ -197,7 +222,7 @@ bool is_sync_replica_by_time(
  * byte-synchronous
  */
 bool is_sync_replica_by_bytes(
-  MonitorStatus status, const MonitorHost *host, const void *ctx
+  MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 );
 
 /**
@@ -205,7 +230,7 @@ bool is_sync_replica_by_bytes(
  * time-synchronous or byte-synchronous
  */
 bool is_sync_replica_by_time_or_bytes(
-  MonitorStatus status, const MonitorHost *host, const void *ctx
+  MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 );
 
 /**
@@ -213,25 +238,17 @@ bool is_sync_replica_by_time_or_bytes(
  * time-synchronous and byte-synchronous
  */
 bool is_sync_replica_by_time_and_bytes(
-  MonitorStatus status, const MonitorHost *host, const void *ctx
+  MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 );
 
 /**
- * Per-request lag thresholds.
+ * Per-request lag thresholds. Passed as ctx to is_sync_replica_by_*
+ * handlers so each request can override the global sync thresholds.
  */
 typedef struct {
   uint64_t max_lag_ms;
   uint64_t max_lag_bytes;
 } LagThresholds;
-
-/**
- * condition_handler that searches for a live replica whose current lag
- * (read via atomic_get_lag_ms / atomic_get_lag_bytes) is within both
- * thresholds carried in ctx (LagThresholds*).
- */
-bool is_replica_within_lag(
-  MonitorStatus status, const MonitorHost *host, const void *ctx
-);
 
 // ------------------------ Host checking utils ------------------------
 

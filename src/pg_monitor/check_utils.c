@@ -198,14 +198,18 @@ static MonitorStatus replica_status() {
 }
 
 /**
- * Updates the host status
+ * Updates the host status, lag_ms and lag_bytes as a consistent snapshot
+ * via the seqlock on host->seq:
+ *  - Bump seq to odd (writer in progress).
+ *  - Store new lag_ms, lag_bytes, status.
+ *  - Bump seq back to even (stable).
+ * Readers (atomic_get_snapshot) loop until they see two equal, even seq
+ * values around their reads, so they never observe a torn snapshot.
+ * Writer never waits on readers; readers never block the writer.
  *
- * This way, concurrent threads can read the current status lock-free,
- * and the writer can perform lock-free writes.
- *
- * But the downside of this solution is the inconsistency: if the writer
- * has started updating the hosts but hasn't finished updating all of
- * them, some hosts may have the new data while others still have the old data.
+ * Inconsistency between hosts is still permitted by design: while the
+ * writer is partway through monitor_host_list[], some hosts have the
+ * new state and others still have the old one.
  *
  * A replica’s lsn lag is defined as the difference between its own lsn and
  * the greater of the lsn received by the replica or the lsn on the master.
@@ -257,9 +261,12 @@ void check_host_streaming_replication(
     }
   }
 
+  atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);
   atomic_store_explicit(&host->lag_ms, new_lag_ms, memory_order_relaxed);
   atomic_store_explicit(&host->lag_bytes, new_lag_bytes, memory_order_relaxed);
   atomic_store_explicit(&host->status, new_status, memory_order_relaxed);
+  atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);
+
   log_changes(
     host, new_status, status, new_lag_ms, lag_ms, new_lag_bytes, lag_bytes
   );
