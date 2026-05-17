@@ -92,6 +92,21 @@ uint64_t str_to_ull(const char *value);
 bool try_str_to_ull(const char *value, uint64_t *out);
 
 /**
+ * Parses a PostgreSQL LSN in canonical "HEX/HEX" form into a 64-bit
+ * integer (high 32 bits | low 32 bits). Returns true on success and
+ * writes the result to *out. Returns false on any malformed input:
+ * NULL/empty, missing or leading '/', non-hex content, overflow of
+ * either half above 0xFFFFFFFF, or trailing garbage.
+ */
+bool try_parse_lsn(const char *value, uint64_t *out);
+
+/**
+ * Formats a 64-bit LSN value back to canonical "HEX/HEX" form
+ * (uppercase, no leading zeros). The result must be freed by the caller.
+ */
+char *format_lsn(uint64_t lsn);
+
+/**
  * Converts string to int
  */
 int str_to_int(const char *value);

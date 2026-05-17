@@ -32,11 +32,16 @@ static void add_host_status_to_json(
     add_bool_to_json_object(
       json_obj, "sync_by_bytes", snap.lag_bytes <= parameters.sync_max_lag_bytes
     );
+
+    char *lsn_str = format_lsn(snap.lsn);
+    add_str_to_json_object(json_obj, "lsn", lsn_str);
+    free(lsn_str);
   } else {
     add_null_to_json_object(json_obj, "lag_ms");
     add_bool_to_json_object(json_obj, "sync_by_time", false);
     add_null_to_json_object(json_obj, "lag_bytes");
     add_bool_to_json_object(json_obj, "sync_by_bytes", false);
+    add_null_to_json_object(json_obj, "lsn");
   }
 }
 
@@ -77,6 +82,7 @@ static LagThresholds lag_thresholds_by_parameters(void) {
   return (LagThresholds){
     .max_lag_ms = parameters.sync_max_lag_ms,
     .max_lag_bytes = parameters.sync_max_lag_bytes,
+    .min_lsn = 0,
   };
 }
 
@@ -99,6 +105,12 @@ static bool parse_lag_thresholds(
     return false;
   }
 
+  parsed = parse_get_param_lsn(connection, "min_lsn", &thresholds->min_lsn);
+  if (!parsed) {
+    bad_request(response, "{\"error_text\": \"Invalid min_lsn\"}");
+    return false;
+  }
+
   return true;
 }
 
@@ -108,6 +120,7 @@ static void get_random_replica(
   LagThresholds thresholds = {
     .max_lag_ms = UINT64_MAX,
     .max_lag_bytes = UINT64_MAX,
+    .min_lsn = 0,
   };
   const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
   if (!parsed) {

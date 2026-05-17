@@ -77,6 +77,10 @@ bool parse_get_param_uint(
   MHD_Connection *connection, const char *name, uint64_t *out
 );
 
+bool parse_get_param_lsn(
+  MHD_Connection *connection, const char *name, uint64_t *out
+);
+
 void bad_request(HTTPResponse *response, const char *const_response);
 
 #endif  // PG_STATUS_HTTP_SERVER_H

@@ -97,19 +97,23 @@ typedef struct {
  *  Host parameters.
  *
  *  Concurrency model: one writer (the poll thread) and many readers
- *  (HTTP handlers). The fields {status, lag_ms, lag_bytes} together
- *  describe a host and must be read as a consistent snapshot — otherwise
- *  routing endpoints could see, e.g., the old (alive) status with the
- *  new (zeroed) lags and return a dead host as a "sync replica".
+ *  (HTTP handlers). The fields {status, lag_ms, lag_bytes, lsn}
+ *  together describe a host and must be read as a consistent snapshot —
+ *  otherwise routing endpoints could see, e.g., the old (alive) status
+ *  with the new (zeroed) lags and return a dead host as a "sync replica".
+ *
+ *  `lsn` is the latest WAL position known to this host as of the
+ *  last successful poll: `pg_last_wal_replay_lsn()` on a replica,
+ *  `pg_current_wal_lsn()` on a master.
  *
  *  A seqlock protects the snapshot:
- *  - Writer increments `seq` to odd, writes the three fields, then
+ *  - Writer increments `seq` to odd, writes the four fields, then
  *    increments `seq` to even. Each step is lock-free; the writer
  *    never waits.
  *  - Readers must call atomic_get_snapshot() — never read status / lag_ms
- *    / lag_bytes directly during routing decisions. Direct atomic_get_*
- *    accessors remain available for places that only need one field
- *    (e.g. /hosts and /status JSON rendering).
+ *    / lag_bytes / lsn directly during routing decisions. Direct
+ *    atomic_get_* accessors remain available for places that only need
+ *    one field (e.g. /hosts and /status JSON rendering).
  */
 typedef struct {
   char *host;                       // immutable after init
@@ -117,6 +121,7 @@ typedef struct {
   _Atomic uint64_t seq;             // seqlock: odd = writing, even = stable
   _Atomic uint64_t lag_ms;          // protected by seq
   _Atomic uint64_t lag_bytes;       // protected by seq
+  _Atomic uint64_t lsn;             // protected by seq
   unsigned int failed_connections;  // writer-private
   _Atomic MonitorStatus status;     // protected by seq
 } MonitorHost;
@@ -128,6 +133,7 @@ typedef struct {
   MonitorStatus status;
   uint64_t lag_ms;
   uint64_t lag_bytes;
+  uint64_t lsn;
 } MonitorSnapshot;
 
 /**
@@ -248,10 +254,17 @@ bool is_sync_replica_by_time_and_bytes(
 /**
  * Per-request lag thresholds. Passed as ctx to is_sync_replica_by_*
  * handlers so each request can override the global sync thresholds.
+ *
+ * `min_lsn` is an optional strict freshness filter: when non-zero, a
+ * candidate replica must have replayed at least up to this LSN to match.
+ * A value of 0 means no LSN constraint (the field is unused). This is
+ * the read-your-writes primitive — clients pass the master's LSN from
+ * just after their write.
  */
 typedef struct {
   uint64_t max_lag_ms;
   uint64_t max_lag_bytes;
+  uint64_t min_lsn;
 } LagThresholds;
 
 /**

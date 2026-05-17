@@ -61,6 +61,38 @@ A `/sync_by_time` request only consults the time threshold and a
 `/sync_by_bytes` request only consults the byte threshold; passing the
 other parameter to those endpoints is silently ignored.
 
+### LSN query parameter (read-your-writes)
+
+The `/replica`, `/sync_by_*`, and `/most_sync_by_bytes` endpoints also
+accept an optional `min_lsn` query parameter — a strict freshness
+filter that guarantees the chosen host has replayed at least up to a
+given WAL position. This is the primitive for read-your-writes
+consistency: instead of relying on `lag_ms` / `lag_bytes` heuristics,
+the caller supplies an exact LSN and pg-status only returns a replica
+that has caught up to it.
+
+The value must be a PostgreSQL LSN in canonical `HEX/HEX` form (for
+example, `0/3000060`). An invalid format produces HTTP 400 with
+`{"error_text": "Invalid min_lsn"}`. A missing parameter means no LSN
+constraint and stacks with the lag parameters described above.
+
+If no replica has replayed to `min_lsn`, the master is returned as a
+fallback.
+
+**Read-your-writes pattern.** After a write to the master, capture
+`pg_current_wal_lsn()` and pass it to the next read request:
+
+```
+INSERT INTO ...;
+SELECT pg_current_wal_lsn();   -- returns e.g. "0/3000060"
+
+# follow-up read is guaranteed to see the write:
+GET /replica?min_lsn=0/3000060
+```
+
+Either a replica that has already replayed at least to `0/3000060` is
+returned, or the master is returned.
+
 ### `GET /master`
 
 Returns the host of the current master, if one exists. If no master is available, it returns null.
@@ -68,12 +100,14 @@ Returns the host of the current master, if one exists. If no master is available
 ### `GET /replica`
 
 Returns the host of a replica, selected using the round-robin algorithm.
-Optional `lag_ms` and `lag_bytes` query parameters constrain the result:
+Optional `lag_ms`, `lag_bytes`, and `min_lsn` query parameters constrain
+the result:
 
 - no parameters — any alive replica.
 - `?lag_ms=X` — alive replicas with `lag_ms ≤ X`.
 - `?lag_bytes=Y` — alive replicas with `lag_bytes ≤ Y`.
 - `?lag_ms=X&lag_bytes=Y` — alive replicas with both `lag_ms ≤ X` AND `lag_bytes ≤ Y`.
+- `?min_lsn=X/Y` — alive replicas that have replayed at least up to the given LSN (see "LSN query parameter" above). Composes with the lag filters.
 
 If no replica matches, the master’s host is returned instead.
 
@@ -114,6 +148,10 @@ The `sync_by_time` / `sync_by_bytes` flags reflect the current lag against
 the global `pg_status__sync_max_lag_*` thresholds. For a dead host
 (`alive: false`), the lag fields are `null` and the sync flags are omitted.
 
+The `lsn` field is the host's latest known WAL position as of the last
+successful poll: `pg_current_wal_lsn()` on the master,
+`pg_last_wal_replay_lsn()` on a replica. It is `null` for dead hosts.
+
 For example:
 ```json
 [
@@ -124,7 +162,8 @@ For example:
     "lag_ms": 0,
     "sync_by_time": true,
     "lag_bytes": 0,
-    "sync_by_bytes": true
+    "sync_by_bytes": true,
+    "lsn": "0/3000060"
   },
   {
     "host": "host-2",
@@ -133,7 +172,8 @@ For example:
     "lag_ms": 6193,
     "sync_by_time": false,
     "lag_bytes": 456,
-    "sync_by_bytes": true
+    "sync_by_bytes": true,
+    "lsn": "0/2FFFE98"
   },
   {
     "host": "host-3",
@@ -142,7 +182,8 @@ For example:
     "lag_ms": null,
     "sync_by_time": false,
     "lag_bytes": null,
-    "sync_by_bytes": false
+    "sync_by_bytes": false,
+    "lsn": null
   }
 ]
 ```
@@ -164,7 +205,8 @@ For example: `http://127.0.0.1:8000/status?host=host-1`
   "lag_ms": 0,
   "sync_by_time": true,
   "lag_bytes": 0,
-  "sync_by_bytes": true
+  "sync_by_bytes": true,
+  "lsn": "0/3000060"
 }
 ```
 

@@ -99,6 +99,7 @@ static void init_monitor_host(
   );
   atomic_store_explicit(&monitor_host->lag_ms, 0, memory_order_relaxed);
   atomic_store_explicit(&monitor_host->lag_bytes, 0, memory_order_relaxed);
+  atomic_store_explicit(&monitor_host->lsn, 0, memory_order_relaxed);
 }
 
 /**

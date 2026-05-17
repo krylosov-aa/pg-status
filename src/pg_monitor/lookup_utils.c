@@ -32,9 +32,9 @@ uint64_t atomic_get_lag_bytes(const MonitorHost *host) {
 }
 
 /**
- * Reads {status, lag_ms, lag_bytes} as a consistent snapshot via the
- * seqlock on host->seq. Spins until two reads of seq match and are even
- * (writer not in progress), so the returned values all come from the
+ * Reads {status, lag_ms, lag_bytes, lsn} as a consistent snapshot
+ * via the seqlock on host->seq. Spins until two reads of seq match and are
+ * even (writer not in progress), so the returned values all come from the
  * same writer epoch.
  */
 MonitorSnapshot atomic_get_snapshot(const MonitorHost *host) {
@@ -51,6 +51,7 @@ MonitorSnapshot atomic_get_snapshot(const MonitorHost *host) {
     snap.lag_bytes = atomic_load_explicit(
       &host->lag_bytes, memory_order_relaxed
     );
+    snap.lsn = atomic_load_explicit(&host->lsn, memory_order_relaxed);
     const uint64_t seq2 = atomic_load_explicit(
       &host->seq, memory_order_acquire
     );
@@ -86,12 +87,23 @@ const MonitorHost *find_host_by_name(const char *host) {
 }
 
 /**
- * condition_handler that searches for a live replica
+ * condition_handler that searches for a live replica. When the caller
+ * supplies a LagThresholds ctx with a non-zero min_lsn, the replica must
+ * also have replayed at least that LSN.
  */
 bool is_alive_replica(
   const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
-  return snap.status.alive && !snap.status.master;
+  if (!(snap.status.alive && !snap.status.master)) {
+    return false;
+  }
+  if (ctx) {
+    const LagThresholds *thresholds = ctx;
+    if (thresholds->min_lsn != 0 && snap.lsn < thresholds->min_lsn) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**

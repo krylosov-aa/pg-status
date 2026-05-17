@@ -245,6 +245,58 @@ bool try_str_to_ull(const char *value, uint64_t *out) {
 }
 
 /**
+ * Parses LSN "HEX/HEX" form into a 64-bit
+ * integer (high 32 bits | low 32 bits). Returns true on success and
+ * writes the result to *out. Returns false on any malformed input:
+ * NULL/empty, missing or leading '/', non-hex content, overflow of
+ * either half above 0xFFFFFFFF, or trailing garbage.
+ */
+bool try_parse_lsn(const char *value, uint64_t *out) {
+  if (!value || *value == '\0' || *value == '-' || *value == '+' ||
+      *value == '/') {
+    return false;
+  }
+
+  const char *slash = strchr(value, '/');
+  if (!slash) {
+    return false;
+  }
+
+  char *end_ptr = nullptr;
+  errno = 0;
+  const unsigned long long hi = strtoull(value, &end_ptr, 16);
+  if (end_ptr != slash || errno == ERANGE || hi > 0xFFFFFFFFULL) {
+    return false;
+  }
+
+  const char *lo_start = slash + 1;
+  if (*lo_start == '\0' || *lo_start == '-' || *lo_start == '+') {
+    return false;
+  }
+
+  errno = 0;
+  end_ptr = nullptr;
+  const unsigned long long lo = strtoull(lo_start, &end_ptr, 16);
+  if (end_ptr == lo_start || *end_ptr != '\0' || errno == ERANGE ||
+      lo > 0xFFFFFFFFULL) {
+    return false;
+  }
+
+  *out = ((uint64_t)hi << 32) | (uint64_t)lo;
+  return true;
+}
+
+/**
+ * Formats a 64-bit LSN value back to "HEX/HEX" form
+ * The result must be freed by the caller.
+ */
+char *format_lsn(const uint64_t lsn) {
+  return format_string(
+    "%lX/%lX", (unsigned long)(lsn >> 32), (unsigned long)(lsn & 0xFFFFFFFFULL)
+  );
+}
+
+/**
  * Converts string to int
  */
 int str_to_int(const char *value) {

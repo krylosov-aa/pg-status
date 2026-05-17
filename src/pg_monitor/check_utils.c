@@ -73,31 +73,12 @@ static const char streaming_replication_query[] = {
 };
 
 /**
- * Converts pg lsn to bytes
+ * Converts pg lsn to bytes; malformed/missing input yields 0.
  */
 static uint64_t parse_lsn(const char *lsn) {
-  if (!lsn) {
-    return 0;
-  }
-
-  const char *slash = strchr(lsn, '/');
-  if (!slash) {
-    return 0;
-  }
-
-  errno = 0;
-  const unsigned long hi = strtoul(lsn, NULL, 16);
-  if (errno != 0) {
-    return 0;
-  }
-
-  errno = 0;
-  const unsigned long lo = strtoul(slash + 1, NULL, 16);
-  if (errno != 0) {
-    return 0;
-  }
-
-  return (uint64_t)hi << 32 | lo;
+  uint64_t value = 0;
+  (void)try_parse_lsn(lsn, &value);
+  return value;
 }
 
 /**
@@ -237,6 +218,7 @@ void check_host_streaming_replication(
 
   uint64_t new_lag_ms = 0;
   uint64_t new_lag_bytes = 0;
+  uint64_t new_lsn = 0;
 
   if (!q_res) {
     host->failed_connections++;
@@ -255,16 +237,19 @@ void check_host_streaming_replication(
       const uint64_t replica_received_lsn = parse_lsn(PQgetvalue(q_res, 0, 2));
       const uint64_t replica_lsn = parse_lsn(PQgetvalue(q_res, 0, 3));
       new_lag_bytes = max_lsn(master_lsn, replica_received_lsn) - replica_lsn;
+      new_lsn = replica_lsn;
       new_status = replica_status();
     } else {
       new_status = master_status();
       master_lsn = parse_lsn(PQgetvalue(q_res, 0, 1));
+      new_lsn = master_lsn;
     }
   }
 
   atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);
   atomic_store_explicit(&host->lag_ms, new_lag_ms, memory_order_relaxed);
   atomic_store_explicit(&host->lag_bytes, new_lag_bytes, memory_order_relaxed);
+  atomic_store_explicit(&host->lsn, new_lsn, memory_order_relaxed);
   atomic_store_explicit(&host->status, new_status, memory_order_relaxed);
   atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);
 
