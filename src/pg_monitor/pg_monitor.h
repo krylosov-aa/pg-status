@@ -28,10 +28,10 @@ typedef struct {
   // pg database name
   char *database;
 
-  // pg hosts, separated by hosts_delimiter.
+  // pg hosts, comma-separated.
   char *hosts;
 
-  // pg Port. You can specify multiple ports, separated by hosts_delimiter
+  // pg port. You can specify multiple ports, comma-separated.
   char *port;
 
   // Time to attempt connection to host
@@ -46,12 +46,12 @@ typedef struct {
   // Time between checks in ms
   int sleep_ms;
 
-  // After this number of falls, the host is considered dead.
+  // After this number of failed checks in a row, the host is considered dead.
   unsigned int max_fails;
 } MonitorParameters;
 
 /**
- * pg-monitor parameters. The default parameters are set here.
+ * pg-monitor parameters. Default values are defined in parameters.c.
  */
 extern MonitorParameters parameters;
 
@@ -136,12 +136,12 @@ typedef struct {
 extern MonitorHost monitor_host_list[MAX_HOSTS];
 
 /**
- * Initializes MonitorHost linked list to its initial value.
+ * Initializes the MonitorHost array to its initial values.
  */
 void init_monitor_host_list(void);
 
 /**
- * Atomically saves the current master's host
+ * Atomically saves the current master index in the host array.
  */
 void save_master_index(int i);
 
@@ -185,13 +185,17 @@ typedef bool (*condition_handler)(
 );
 
 /**
- * A function for searching for a host that matches certain conditions using the
- * round-robin algorithm.
- * @param handler A function that determines whether the specified host has been
- * found
+ * Searches for a replica host that matches the given condition using the
+ * round-robin algorithm. Prefers a fully alive match; falls back to a
+ * `possible_dead` match if no alive replica satisfies the handler. If no
+ * replica matches at all, returns the current master as a fallback,
+ * or nullptr if there is no master either.
+ * @param handler A function that determines whether the specified host
+ * matches
  * @param ctx Opaque context forwarded to the handler
  * @param log_context The context that will be visible in the logs
- * @return Host name corresponding to conditions
+ * @return Host name matching the condition, or the master as a fallback, or
+ * nullptr if no host is available
  */
 const char *find_replica_round_robin(
   condition_handler handler, const void *ctx, const char *log_context

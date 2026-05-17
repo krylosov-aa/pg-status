@@ -39,7 +39,8 @@ static PGconn *db_connect(const char *connection_str) {
 }
 
 /**
- * Checks that the pg answer is valid. Fails with an error if it's not.
+ * Checks that the pg answer is valid. Returns 0 on success, 1 on error
+ * (and prints the pg error message to stderr).
  */
 static int check_exec_result(const PGconn *conn, const PGresult *result) {
   const ExecStatusType resStatus = PQresultStatus(result);
@@ -211,7 +212,7 @@ static MonitorStatus replica_status() {
  * writer is partway through monitor_host_list[], some hosts have the
  * new state and others still have the old one.
  *
- * A replica’s lsn lag is defined as the difference between its own lsn and
+ * A replica's lsn lag is defined as the difference between its own lsn and
  * the greater of the lsn received by the replica or the lsn on the master.
  * Therefore, even if a replica does not receive a new lsn, a measurable
  * lag can still occur.

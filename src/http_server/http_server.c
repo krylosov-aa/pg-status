@@ -220,8 +220,8 @@ static MHD_Result answer_to_connection(
   const char *version, const char *upload_data, size_t *upload_data_size,
   void **req_cls
 ) {
-  // pg-status always receive get requests
-  // we don't need two-step processing like we do for the POST requests
+  // pg-status only serves GET requests, so we don't need the two-step
+  // upload-data processing MHD requires for POST.
   return process_get(
     cls, connection, path, method, version, upload_data, req_cls
   );

@@ -48,8 +48,8 @@ static void check_hosts(void) {
           save_master_index(master_i);
         } else {
           possible_master = (int)i;
-          // We don’t need to update master_index if the master is marked
-          // as possible dead, because it’s already stored in there
+          // We don't need to update master_index if the master is marked
+          // as possible dead, because it's already stored in there
         }
       }
     }

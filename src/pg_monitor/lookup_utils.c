@@ -188,13 +188,17 @@ static unsigned int next_replica_round_robin(void) {
 }
 
 /**
- * A function for searching for a replica host that matches certain
- * conditions using the round-robin algorithm.
+ * Searches for a replica host that matches the given condition using the
+ * round-robin algorithm. Prefers a fully alive match; falls back to a
+ * `possible_dead` match if no alive replica satisfies the handler. If no
+ * replica matches at all, returns the current master as a fallback,
+ * or nullptr if there is no master either.
  * @param handler A function that determines whether the specified host
- * has been found
+ * matches
  * @param ctx Opaque context forwarded to the handler
  * @param log_context The context that will be visible in the logs
- * @return Host name corresponding to conditions
+ * @return Host name matching the condition, or the master as a fallback, or
+ * nullptr if no host is available
  */
 const char *find_replica_round_robin(
   const condition_handler handler, const void *ctx, const char *log_context
@@ -223,6 +227,11 @@ const char *find_replica_round_robin(
     return possible_mon_host->host;
   }
 
-  printf("Master was returned instead of replica. Context: %s \n", log_context);
-  return get_master_host();
+  const char *master = get_master_host();
+  if (master) {
+    printf(
+      "Master was returned instead of replica. Context: %s \n", log_context
+    );
+  }
+  return master;
 }

@@ -111,13 +111,13 @@ unsigned int str_to_uint(const char *value);
  */
 uint16_t str_to_uint16(const char *value);
 
+// ------------------------ Environment variables ------------------------
+
 /**
  * Takes a value from the environment variables if it is set,
  * pastes it by the result pointer.
  */
 void replace_from_env(const char *env_name, char **result);
-
-// ------------------------ Environment variables ------------------------
 
 /**
  * Takes a value from the environment variables if it is set,
@@ -151,7 +151,7 @@ cJSON *json_array(void);
 cJSON *json_object(void);
 
 /**
- * Adds a new key and value to json
+ * Adds a new key and string value to json
  */
 void add_str_to_json_object(cJSON *obj, const char *key, const char *val);
 

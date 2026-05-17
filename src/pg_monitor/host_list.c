@@ -102,7 +102,7 @@ static void init_monitor_host(
 }
 
 /**
- * Initializes MonitorHost linked list to its initial value.
+ * Initializes the MonitorHost array to its initial values.
  */
 void init_monitor_host_list(void) {
   char *hosts = copy_string(parameters.hosts);
