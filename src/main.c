@@ -34,7 +34,9 @@ static void add_host_status_to_json(
     );
   } else {
     add_null_to_json_object(json_obj, "lag_ms");
+    add_bool_to_json_object(json_obj, "sync_by_time", false);
     add_null_to_json_object(json_obj, "lag_bytes");
+    add_bool_to_json_object(json_obj, "sync_by_bytes", false);
   }
 }
 
@@ -71,12 +73,16 @@ static void return_single_host(HTTPResponse *response, const char *host) {
   }
 }
 
+static LagThresholds lag_thresholds_by_parameters(void) {
+  return (LagThresholds){
+    .max_lag_ms = parameters.sync_max_lag_ms,
+    .max_lag_bytes = parameters.sync_max_lag_bytes,
+  };
+}
+
 static bool parse_lag_thresholds(
   LagThresholds *thresholds, MHD_Connection *connection, HTTPResponse *response
 ) {
-  thresholds->max_lag_ms = parameters.sync_max_lag_ms;
-  thresholds->max_lag_bytes = parameters.sync_max_lag_bytes;
-
   bool parsed = parse_get_param_uint(
     connection, "lag_ms", &thresholds->max_lag_ms
   );
@@ -99,8 +105,17 @@ static bool parse_lag_thresholds(
 static void get_random_replica(
   MHD_Connection *connection, HTTPResponse *response
 ) {
+  LagThresholds thresholds = {
+    .max_lag_ms = UINT64_MAX,
+    .max_lag_bytes = UINT64_MAX,
+  };
+  const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
+  if (!parsed) {
+    return;
+  }
+
   const char *host = find_replica_round_robin(
-    is_alive_replica, nullptr, "/replica"
+    is_sync_replica_by_time_and_bytes, &thresholds, "/replica"
   );
   return_single_host(response, host);
 }
@@ -113,7 +128,7 @@ static void get_master(MHD_Connection *connection, HTTPResponse *response) {
 static void get_sync_host_by_time(
   MHD_Connection *connection, HTTPResponse *response
 ) {
-  LagThresholds thresholds;
+  LagThresholds thresholds = lag_thresholds_by_parameters();
   const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
   if (!parsed) {
     return;
@@ -128,7 +143,7 @@ static void get_sync_host_by_time(
 static void get_sync_host_by_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
-  LagThresholds thresholds;
+  LagThresholds thresholds = lag_thresholds_by_parameters();
   const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
   if (!parsed) {
     return;
@@ -143,7 +158,7 @@ static void get_sync_host_by_bytes(
 static void get_sync_host_by_time_or_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
-  LagThresholds thresholds;
+  LagThresholds thresholds = lag_thresholds_by_parameters();
   const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
   if (!parsed) {
     return;
@@ -158,7 +173,7 @@ static void get_sync_host_by_time_or_bytes(
 static void get_sync_host_by_time_and_bytes(
   MHD_Connection *connection, HTTPResponse *response
 ) {
-  LagThresholds thresholds;
+  LagThresholds thresholds = lag_thresholds_by_parameters();
   const bool parsed = parse_lag_thresholds(&thresholds, connection, response);
   if (!parsed) {
     return;

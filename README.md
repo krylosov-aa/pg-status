@@ -40,6 +40,25 @@ If the API cannot find a matching host, it will return a 404 status code.
 In this case, the response body will be empty for plain text mode, and `{"host": null}` for json mode.
 
 
+### Lag query parameters
+
+The `/replica` and `/sync_by_*` endpoints accept optional query parameters
+`lag_ms` and `lag_bytes` that override the lag thresholds for a single
+request. Values must be non-negative integers; otherwise the endpoint
+responds with HTTP 400 and a body like `{"error_text": "Invalid lag_ms"}`.
+
+How a missing parameter is interpreted depends on the route:
+
+- `/replica` — a missing parameter means **no constraint on that
+  dimension**. The global `pg_status__sync_max_lag_*` defaults are not
+  applied here.
+- `/sync_by_*` — a missing parameter falls back to the global
+  `pg_status__sync_max_lag_ms` / `pg_status__sync_max_lag_bytes`.
+
+A `/sync_by_time` request only consults the time threshold and a
+`/sync_by_bytes` request only consults the byte threshold; passing the
+other parameter to those endpoints is silently ignored.
+
 ### `GET /master`
 
 Returns the host of the current master, if one exists. If no master is available, it returns null.
@@ -47,31 +66,45 @@ Returns the host of the current master, if one exists. If no master is available
 ### `GET /replica`
 
 Returns the host of a replica, selected using the round-robin algorithm.
-If no replicas are available, the master’s host is returned instead.
+Optional `lag_ms` and `lag_bytes` query parameters constrain the result:
+
+- no parameters — any alive replica.
+- `?lag_ms=X` — alive replicas with `lag_ms ≤ X`.
+- `?lag_bytes=Y` — alive replicas with `lag_bytes ≤ Y`.
+- `?lag_ms=X&lag_bytes=Y` — alive replicas with both `lag_ms ≤ X` AND `lag_bytes ≤ Y`.
+
+If no replica matches, the master’s host is returned instead.
 
 ### `GET /sync_by_time`
 
-Returns the host of a replica (selected using the round-robin algorithm) considered time-synchronous — that is, its time lag is less than the value specified in `pg_status__sync_max_lag_ms`.
+Returns the host of a replica (selected using the round-robin algorithm) considered time-synchronous — its time lag is less than or equal to the threshold.
+The threshold is the `lag_ms` query parameter if provided, otherwise `pg_status__sync_max_lag_ms`.
 If no replica meets this condition, the master’s host is returned.
 
 ### `GET /sync_by_bytes`
 
-Returns the host of a replica (selected using the round-robin algorithm) considered byte-synchronous — that is, according to the WAL LSN, its lag is less than the value specified in `pg_status__sync_max_lag_bytes`.
+Returns the host of a replica (selected using the round-robin algorithm) considered byte-synchronous — according to the WAL LSN, its lag is less than or equal to the threshold.
+The threshold is the `lag_bytes` query parameter if provided, otherwise `pg_status__sync_max_lag_bytes`.
 If no replica meets this condition, the master’s host is returned.
 
 ### `GET /sync_by_time_or_bytes`
 
 Returns the host of a replica (selected using the round-robin algorithm) that is considered synchronous either by time or by bytes.
+Per-request `lag_ms` / `lag_bytes` query parameters override the corresponding global thresholds for this request only.
 If no such replica exists, the master’s host is returned.
 
 ### `GET /sync_by_time_and_bytes`
 
 Returns the host of a replica (selected using the round-robin algorithm) that is considered synchronous by both time and bytes.
+Per-request `lag_ms` / `lag_bytes` query parameters override the corresponding global thresholds for this request only.
 If no such replica exists, the master’s host is returned.
 
 ### `GET /hosts`
 
 Returns a list of all hosts with their status information in json format.
+The `sync_by_time` / `sync_by_bytes` flags reflect the current lag against
+the global `pg_status__sync_max_lag_*` thresholds. For a dead host
+(`alive: false`), the lag fields are `null` and the sync flags are omitted.
 
 For example:
 ```json
@@ -80,35 +113,38 @@ For example:
     "host": "host-1",
     "master": true,
     "alive": true,
-    "sync_by_time": true,
-    "sync_by_bytes": true,
     "lag_ms": 0,
-    "lag_bytes": 0
+    "sync_by_time": true,
+    "lag_bytes": 0,
+    "sync_by_bytes": true
   },
   {
     "host": "host-2",
     "master": false,
     "alive": true,
-    "sync_by_time": false,
-    "sync_by_bytes": true,
     "lag_ms": 6193,
-    "lag_bytes": 456
+    "sync_by_time": false,
+    "lag_bytes": 456,
+    "sync_by_bytes": true
   },
   {
     "host": "host-3",
     "master": false,
     "alive": false,
-    "sync_by_time": false,
-    "sync_by_bytes": false,
     "lag_ms": null,
-    "lag_bytes": null
+    "sync_by_time": false,
+    "lag_bytes": null,
+    "sync_by_bytes": false
   }
 ]
 ```
 
 ### `GET /status`
 
-Returns status of a host that you specified in the get parameter.
+Returns status of a host that you specified in the `host` query parameter.
+If the `host` parameter is missing, the endpoint responds with HTTP 400 and
+`{"error_text": "Get parameter 'host' wasn't passed"}`. If the host is not in
+the monitored list, a 404 is returned.
 
 You can also use this API to poll pg-status to check if it has started up and is alive.
 
@@ -117,10 +153,10 @@ For example: `http://127.0.0.1:8000/status?host=host-1`
 {
   "master": false,
   "alive": true,
-  "sync_by_time": true,
-  "sync_by_bytes": true,
   "lag_ms": 0,
-  "lag_bytes": 0
+  "sync_by_time": true,
+  "lag_bytes": 0,
+  "sync_by_bytes": true
 }
 ```
 
@@ -144,10 +180,6 @@ You can configure various parameters using environment variables:
 - `pg_status__sync_max_lag_ms` — The maximum acceptable replication lag (in milliseconds) for a replica to still be considered time-synchronous. Default: `1000`
 - `pg_status__sync_max_lag_bytes` — The maximum acceptable lag (in bytes) for a replica to still be considered byte-synchronous. Default: `1000000` (1 MB)
 - `pg_status__http_port` — the port on which the http server will listen. Default: `8000`
-
-#### Deprecated
-- `pg_status__sleep` — Use `pg_status__sleep_ms` instead. The delay (in seconds) between consecutive host status checks.
-If both `pg_status__sleep` and `pg_status__sleep_ms` are set, `pg_status__sleep_ms` takes precedence.
 
 
 # Installation
@@ -178,18 +210,18 @@ Depending on the API being called and the format selected
 
 ## Consistency
 
-There is one writer and many readers in the program. To ensure the fastest possible response for readers and to allow
-the writer to record new host statuses without delay, a lock-free approach was chosen.
+Cross-host consistency is intentionally not provided.
 
-The writer goes through all the hosts listed in `pg_status__hosts` every `pg_status__sleep_ms` milliseconds, attempting
-to connect to each host and read its status. Upon successfully receiving a response from a host, its status is updated
-immediately. This means if the writer has started traversing the hosts but hasn't finished yet, there will be
-inconsistency in the data: some hosts will have new data, while others will not. Thanks to the lock-free design,
-the writer cannot be blocked for long, so the window of inconsistency is quite small; however, it can grow depending
-on the value of `pg_status__connect_timeout`.
+There is one writer (the poll thread) and many readers (HTTP handlers).
+The design goal is that the writer never blocks the readers and the
+readers never block the writer.The writer traverses
+hosts one by one every `pg_status__sleep_ms` milliseconds, so while it is
+partway through, some hosts already have the new state and others still
+have the old one. The size of this window depends on
+`pg_status__connect_timeout`. For this project, the fastest response time
+and the most up-to-date per-host data mattered more, so cross-host
+consistency was intentionally sacrificed.
 
-For this project, it was more important to achieve the fastest response times and the most up-to-date data possible,
-so consistency was intentionally sacrificed.
 
 ## Reaction speed to host unavailability
 
@@ -220,13 +252,15 @@ Informational messages about service startup and shutdown are written to stdout.
 
 More importantly, information about host status changes is written to stdout:
 
-If a host is dead, the message will be: `<host-name>: dead`
+If a host fails a status check but has not yet exceeded `pg_status__max_fails`, the message will be: `<host-name>: possible dead`
+
+If a host is confirmed dead (after `pg_status__max_fails` consecutive failures), the message will be: `<host-name>: dead`
 
 If a host is revived or becomes a master after failover, the message will be: `<host-name>: master`
 
 If a host is revived or becomes a replica after failover, the message will be: `<host-name>: replica`
 
-For replicas, there are also messages about replica synchronicity:
+For replicas, there are also messages about replica synchronicity against the global `pg_status__sync_max_lag_*` thresholds:
 
 ```
 <host-name>: synchronous in time

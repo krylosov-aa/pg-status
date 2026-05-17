@@ -28,16 +28,6 @@ static void set_sleep(void) {
   const char *env_val = getenv("pg_status__sleep_ms");
   if (env_val && *env_val) {
     parameters.sleep_ms = str_to_int_greater_or_equal_zero(env_val);
-    return;
-  }
-
-  env_val = getenv("pg_status__sleep");
-  if (env_val && *env_val) {
-    const int sec = str_to_int_greater_or_equal_zero(env_val);
-    if (sec > INT_MAX / 1000) {
-      raise_error("pg_status__sleep=%d overflows when converted to ms", sec);
-    }
-    parameters.sleep_ms = sec * 1000;
   }
 }
 
