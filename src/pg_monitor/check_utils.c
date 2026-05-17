@@ -80,7 +80,7 @@ static uint64_t parse_lsn(const char *lsn) {
     return 0;
   }
 
-  char *slash = strchr(lsn, '/');
+  const char *slash = strchr(lsn, '/');
   if (!slash) {
     return 0;
   }

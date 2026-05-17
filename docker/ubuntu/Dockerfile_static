@@ -102,7 +102,7 @@ RUN cmake -B build -G Ninja \
         -DCMAKE_FIND_LIBRARY_SUFFIXES=".a" \
         -DCMAKE_PREFIX_PATH="/usr/local" \
         -DLIBPQ_INCLUDE_DIR="/usr/local/include" \
-        -DLIBPQ_LIBRARY="/usr/local/lib/libpq.a;/usr/local/lib/libpgcommon.a;/usr/local/lib/libpgport.a;/usr/lib/x86_64-linux-gnu/libssl.a;/usr/lib/x86_64-linux-gnu/libcrypto.a;m;z;dl" \
+        -DLIBPQ_LIBRARY="/usr/local/lib/libpq.a;/usr/local/lib/libpgcommon.a;/usr/local/lib/libpgport.a;/usr/local/lib64/libssl.a;/usr/local/lib64/libcrypto.a;m;z;dl" \
         . && \
     cmake --build build
 
@@ -198,7 +198,7 @@ EOF
 
 # README
 RUN <<'EOF' cat > README
-pg-status v1.6.1 (static build)
+pg-status v2.0.0 (static build)
 ===============================
 
 A microservice (sidecar) that helps instantly determine the status of your
@@ -217,7 +217,7 @@ Source Code
 https://github.com/krylosov-aa/pg-status
 EOF
 
-RUN tar -czvf /pg-status_1.6.1_linux_amd64_static.tar.gz \
+RUN tar -czvf /pg-status_2.0.0_linux_amd64_static.tar.gz \
     pg-status \
     LICENSE \
     THIRD-PARTY-NOTICES \
@@ -226,7 +226,7 @@ RUN tar -czvf /pg-status_1.6.1_linux_amd64_static.tar.gz \
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=packager /pg-status_1.6.1_linux_amd64_static.tar.gz /
+COPY --from=packager /pg-status_2.0.0_linux_amd64_static.tar.gz /
 
 # -------- Run --------
 FROM ubuntu:latest AS runner

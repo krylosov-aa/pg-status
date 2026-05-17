@@ -185,11 +185,11 @@ You can configure various parameters using environment variables:
 # Installation
 
 In short there is:
-- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/1.6.1/pg-status_1.6.1_amd64.deb)
+- [deb package](https://github.com/krylosov-aa/pg-status/releases/download/2.0.0/pg-status_2.0.0_amd64.deb)
 - [published container to Docker Hub](https://hub.docker.com/r/krylosovaa/pg-status)
 - various [docker containers](docker)
-- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/1.6.1/pg-status_1.6.1_linux_amd64_static.tar.gz)
-- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/1.6.1/pg-status_1.6.1_linux_amd64_shared.tar.gz)
+- [static binary](https://github.com/krylosov-aa/pg-status/releases/download/2.0.0/pg-status_2.0.0_linux_amd64_static.tar.gz)
+- [shared binary](https://github.com/krylosov-aa/pg-status/releases/download/2.0.0/pg-status_2.0.0_linux_amd64_shared.tar.gz)
 
 
 For more information, go to the [docs/installation.md](docs/installation.md) section.
