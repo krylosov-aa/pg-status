@@ -1,3 +1,19 @@
+cmake ?= cmake
+debug_build_dir ?= cmake-build-debug
+release_build_dir ?= cmake-build-release
+
+configure_debug:
+	$(cmake) -S . -B $(debug_build_dir) -DCMAKE_BUILD_TYPE=Debug
+
+configure_release:
+	$(cmake) -S . -B $(release_build_dir) -DCMAKE_BUILD_TYPE=Release
+
+build_debug: configure_debug
+	$(cmake) --build $(debug_build_dir)
+
+build_release: configure_release
+	$(cmake) --build $(release_build_dir)
+
 build_static_alpine:
 	docker build -f docker/alpine/Dockerfile_static -t pg-status-static-alpine .
 
@@ -62,14 +78,14 @@ down_test:
 
 
 
-scan-build:
-	scan-build -o scan_reports cmake --build cmake-build-release
+scan-build: configure_release
+	scan-build -o scan_reports $(cmake) --build $(release_build_dir)
 
 clean:
-	 cmake --build cmake-build-debug --verbose --target clean
+	$(cmake) --build $(debug_build_dir) --verbose --target clean
 
 clean_release:
-	 cmake --build cmake-build-release --verbose --target clean
+	$(cmake) --build $(release_build_dir) --verbose --target clean
 
 build_valgrind:
 	docker build -f test/valgrind/Dockerfile -t pg-status-valgrind .
@@ -86,5 +102,14 @@ build_push_amd_64:
 	sudo docker push ${r}/pg-status:${v}
 	sudo docker push ${r}/pg-status:latest
 
-format-warn:
-	cmake --build cmake-build-debug --target format-warn
+format: configure_debug
+	$(cmake) --build $(debug_build_dir) --target format
+
+format-check: configure_release
+	$(cmake) --build $(release_build_dir) --target format-check
+
+format-warn: configure_debug
+	$(cmake) --build $(debug_build_dir) --target format-warn
+
+lint: configure_debug
+	$(cmake) --build $(debug_build_dir) --target lint

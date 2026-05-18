@@ -1,5 +1,8 @@
 .env
 
+/cmake-build-*/
+/scan_reports/
+
 # Prerequisites
 *.d
 

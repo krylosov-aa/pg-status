@@ -324,6 +324,8 @@ For replicas, there are also messages about replica synchronicity against the gl
 
 You can start the containers and test the application however you like.
 
+For local formatting and linting commands, see [docs/development.md](docs/development.md).
+
 ### make build_up
 
 Builds [the lightweight container]((docker/alpine/Dockerfile_shared)) using parameters defined in
