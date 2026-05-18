@@ -58,7 +58,7 @@ void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
     cJSON_AddItemToArray(arr, json_obj);
   }
 
-  response->response = json_to_str(arr);
+  response->response = json_to_str(arr, &response->response_len);
   response->memory_mode = MHD_RESPMEM_MUST_FREE;
   response->content_type = "application/json";
 }
@@ -71,7 +71,7 @@ static void return_single_host(HTTPResponse *response, const char *host) {
   if (need_json_response(response)) {
     cJSON *json_obj = json_object();
     add_host_to_json(json_obj, host);
-    response->response = json_to_str(json_obj);
+    response->response = json_to_str(json_obj, &response->response_len);
     response->memory_mode = MHD_RESPMEM_MUST_FREE;
   } else {
     response->const_response = host;
@@ -235,7 +235,7 @@ static void get_host_status(
   cJSON *json_obj = json_object();
   add_host_status_to_json(json_obj, snap);
 
-  response->response = json_to_str(json_obj);
+  response->response = json_to_str(json_obj, &response->response_len);
   response->memory_mode = MHD_RESPMEM_MUST_FREE;
   response->content_type = "application/json";
 }
@@ -251,7 +251,9 @@ static void block_termination_signals(sigset_t *sigset) {
 }
 
 static void get_version(MHD_Connection *connection, HTTPResponse *response) {
-  response->const_response = "2.0.0";
+  static const char version[] = "2.0.0";
+  response->const_response = version;
+  response->response_len = sizeof(version) - 1;
 }
 
 static void wait_for_termination_signal(const sigset_t *sigset) {

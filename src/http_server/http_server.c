@@ -39,22 +39,25 @@ static void not_found(MHD_Connection *connection, HTTPResponse *response) {
 }
 
 /**
- * Generates an MHD_Response from string
+ * Generates an MHD_Response from string. If len is 0, falls back to strlen.
  */
 static MHD_Response *create_response_from_string(
-  char *string, const MHD_ResponseMemoryMode memory_mode
+  char *string, const MHD_ResponseMemoryMode memory_mode, const size_t len
 ) {
   return MHD_create_response_from_buffer(
-    strlen(string), (void *)string, memory_mode
+    len != 0 ? len : strlen(string), (void *)string, memory_mode
   );
 }
 
 /**
- * Generates an MHD_Response from static string
+ * Generates an MHD_Response from static string. If len is 0, falls back
+ * to strlen.
  */
-static MHD_Response *create_response_from_const_string(const char *string) {
+static MHD_Response *create_response_from_const_string(
+  const char *string, const size_t len
+) {
   return MHD_create_response_from_buffer(
-    strlen(string), (void *)string, MHD_RESPMEM_PERSISTENT
+    len != 0 ? len : strlen(string), (void *)string, MHD_RESPMEM_PERSISTENT
   );
 }
 
@@ -76,11 +79,11 @@ static MHD_Result queue_response(
   if (!mhd_response) {
     if (response->const_response) {
       mhd_response = create_response_from_const_string(
-        response->const_response
+        response->const_response, response->response_len
       );
     } else if (response->response) {
       mhd_response = create_response_from_string(
-        response->response, response->memory_mode
+        response->response, response->memory_mode, response->response_len
       );
     } else {
       mhd_response = MHD_create_response_from_buffer(
@@ -190,6 +193,7 @@ static MHD_Result process_get(
     .response = nullptr,
     .const_response = nullptr,
     .mhd_response = nullptr,
+    .response_len = 0,
     .content_type = nullptr,
     .memory_mode = MHD_RESPMEM_MUST_COPY,
     .status_code = MHD_HTTP_OK,

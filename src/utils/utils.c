@@ -460,15 +460,19 @@ void add_uint64_to_json_object(
 }
 
 /**
- * Converts json to string.
+ * Converts json to string. If len is not nullptr, writes the length
+ * of the result so the caller can avoid a second strlen pass.
  * The string must be freed by the caller.
  */
-char *json_to_str(cJSON *json) {
+char *json_to_str(cJSON *json, size_t *len) {
   assert(json);
   char *result = cJSON_PrintUnformatted(json);
   cJSON_Delete(json);
   if (!result) {
     raise_error("Can't convert json to string");
+  }
+  if (len) {
+    *len = strlen(result);
   }
   return result;
 }

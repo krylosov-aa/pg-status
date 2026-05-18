@@ -186,9 +186,11 @@ void add_bool_to_json_object(cJSON *obj, const char *key, bool val);
 void add_uint64_to_json_object(cJSON *obj, const char *key, uint64_t val);
 
 /**
- * Converts json to string.
+ * Converts json to string. If len is not nullptr, the length of the
+ * result is written to it in a single strlen pass right after cJSON
+ * printing, so the caller can avoid a second pass downstream.
  * The string must be freed by the caller.
  */
-char *json_to_str(cJSON *json);
+char *json_to_str(cJSON *json, size_t *len);
 
 #endif  // PG_STATUS_UTILS_H

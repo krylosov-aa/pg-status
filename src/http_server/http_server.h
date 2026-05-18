@@ -6,6 +6,7 @@
 #define PG_STATUS_HTTP_SERVER_H
 
 #include <microhttpd.h>
+#include <stddef.h>
 
 typedef struct MHD_Daemon MHD_Daemon;
 typedef struct MHD_Connection MHD_Connection;
@@ -30,6 +31,10 @@ typedef struct HTTPResponse {
   // For complex cases, you can manually generate MHD_Response.
   // Use memory_mode for memory management.
   MHD_Response *mhd_response;
+
+  // Length of response / const_response in bytes. If non-zero, used
+  // verbatim; if 0, the server falls back to strlen at queue time.
+  size_t response_len;
 
   // Response type. It can be set by the server or specified by handler.
   const char *content_type;
