@@ -5,7 +5,9 @@
 #ifndef PG_STATUS_PG_MONITOR_H
 #define PG_STATUS_PG_MONITOR_H
 
+#include <cjson/cJSON.h>
 #include <pthread.h>
+#include <stddef.h>
 #include <stdint.h>
 
 // ------------------------ Parameters ------------------------
@@ -150,6 +152,39 @@ void init_monitor_host_list(void);
  * Atomically saves the current master index in the host array.
  */
 void save_master_index(int i);
+
+// ------------------------ /hosts JSON cache ------------------------
+
+/**
+ * Adds the "host" key with the given host name (or null) to a JSON object.
+ */
+void add_host_to_json(cJSON *json_obj, const char *host);
+
+/**
+ * Adds {master, alive, lag_ms, lag_bytes, sync_by_*, lsn} keys to a JSON
+ * object, derived from the snapshot.
+ */
+void add_host_status_to_json(cJSON *json_obj, MonitorSnapshot snap);
+
+/**
+ * Rebuilds the cached JSON representation of all hosts. Called by the
+ * poll thread after every check_hosts iteration. Lock-free: a new entry
+ * is published via atomic_exchange, the previous one stays alive for
+ * one extra cycle as a grace period for in-flight readers.
+ */
+void update_hosts_cache(void);
+
+/**
+ * Returns a fresh malloc'ed copy of the cached /hosts JSON and writes
+ * its length to *len. Returns nullptr if the cache hasn't been built
+ * yet. The result must be freed by the caller.
+ */
+char *copy_hosts_cache(size_t *len);
+
+/**
+ * Releases the /hosts JSON cache. Called on shutdown.
+ */
+void free_hosts_cache(void);
 
 // ------------------------ Lookup utils ------------------------
 

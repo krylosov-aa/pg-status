@@ -9,56 +9,15 @@
 #include "pg_monitor.h"
 #include "utils.h"
 
-static void add_host_to_json(cJSON *json_obj, const char *host) {
-  if (!host) {
-    add_null_to_json_object(json_obj, "host");
-  } else {
-    add_str_to_json_object(json_obj, "host", host);
-  }
-}
-
-static void add_host_status_to_json(
-  cJSON *json_obj, const MonitorSnapshot snap
-) {
-  add_bool_to_json_object(json_obj, "master", snap.status.master);
-  add_bool_to_json_object(json_obj, "alive", snap.status.alive);
-  if (snap.status.alive) {
-    add_uint64_to_json_object(json_obj, "lag_ms", snap.lag_ms);
-    add_bool_to_json_object(
-      json_obj, "sync_by_time", snap.lag_ms <= parameters.sync_max_lag_ms
-    );
-
-    add_uint64_to_json_object(json_obj, "lag_bytes", snap.lag_bytes);
-    add_bool_to_json_object(
-      json_obj, "sync_by_bytes", snap.lag_bytes <= parameters.sync_max_lag_bytes
-    );
-
-    char *lsn_str = format_lsn(snap.lsn);
-    add_str_to_json_object(json_obj, "lsn", lsn_str);
-    free(lsn_str);
-  } else {
-    add_null_to_json_object(json_obj, "lag_ms");
-    add_bool_to_json_object(json_obj, "sync_by_time", false);
-    add_null_to_json_object(json_obj, "lag_bytes");
-    add_bool_to_json_object(json_obj, "sync_by_bytes", false);
-    add_null_to_json_object(json_obj, "lsn");
-  }
-}
-
 void get_all_hosts(MHD_Connection *connection, HTTPResponse *response) {
-  cJSON *arr = json_array();
-  for (unsigned int i = 0; i < host_count; i++) {
-    const MonitorHost *mon_host = &monitor_host_list[i];
-    cJSON *json_obj = json_object();
-    add_host_to_json(json_obj, mon_host->host);
-
-    const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
-    add_host_status_to_json(json_obj, snap);
-
-    cJSON_AddItemToArray(arr, json_obj);
+  size_t len = 0;
+  char *json = copy_hosts_cache(&len);
+  if (!json) {
+    response->const_response = "[]";
+    response->content_type = "application/json";
+    return;
   }
-
-  response->response = json_to_str(arr);
+  response->response = json;
   response->memory_mode = MHD_RESPMEM_MUST_FREE;
   response->content_type = "application/json";
 }

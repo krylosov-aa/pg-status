@@ -59,6 +59,8 @@ static void check_hosts(void) {
     save_master_index(-1);
   }
 
+  update_hosts_cache();
+
   (void)fflush(stdout);
 }
 
@@ -150,6 +152,8 @@ void stop_pg_monitor(void) {
   close(stop_pipe[1]);
   stop_pipe[0] = -1;
   stop_pipe[1] = -1;
+
+  free_hosts_cache();
 
   printf("pg_monitor stopped\n");
 }

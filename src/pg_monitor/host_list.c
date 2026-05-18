@@ -135,3 +135,137 @@ void init_monitor_host_list(void) {
 void save_master_index(const int i) {
   atomic_store_explicit(&master_index, i, memory_order_relaxed);
 }
+
+// ------------------------ /hosts JSON cache ------------------------
+
+void add_host_to_json(cJSON *json_obj, const char *host) {
+  if (!host) {
+    add_null_to_json_object(json_obj, "host");
+  } else {
+    add_str_to_json_object(json_obj, "host", host);
+  }
+}
+
+void add_host_status_to_json(
+  cJSON *json_obj, const MonitorSnapshot snap
+) {
+  add_bool_to_json_object(json_obj, "master", snap.status.master);
+  add_bool_to_json_object(json_obj, "alive", snap.status.alive);
+  if (snap.status.alive) {
+    add_uint64_to_json_object(json_obj, "lag_ms", snap.lag_ms);
+    add_bool_to_json_object(
+      json_obj, "sync_by_time", snap.lag_ms <= parameters.sync_max_lag_ms
+    );
+
+    add_uint64_to_json_object(json_obj, "lag_bytes", snap.lag_bytes);
+    add_bool_to_json_object(
+      json_obj, "sync_by_bytes",
+      snap.lag_bytes <= parameters.sync_max_lag_bytes
+    );
+
+    char *lsn_str = format_lsn(snap.lsn);
+    add_str_to_json_object(json_obj, "lsn", lsn_str);
+    free(lsn_str);
+  } else {
+    add_null_to_json_object(json_obj, "lag_ms");
+    add_bool_to_json_object(json_obj, "sync_by_time", false);
+    add_null_to_json_object(json_obj, "lag_bytes");
+    add_bool_to_json_object(json_obj, "sync_by_bytes", false);
+    add_null_to_json_object(json_obj, "lsn");
+  }
+}
+
+/**
+ * One generation of the /hosts JSON cache. Pointer to the current
+ * generation lives in `hosts_cache` and is updated atomically.
+ */
+typedef struct {
+  char *str;
+  size_t len;
+} HostsCacheEntry;
+
+/**
+ * Currently published /hosts JSON. Readers atomically load this and
+ * memcpy out before returning to MHD.
+ */
+static _Atomic(HostsCacheEntry *) hosts_cache = nullptr;
+
+/**
+ * Previous generation kept alive for one extra cycle as a grace period
+ * for any reader that loaded `hosts_cache` just before the writer swapped
+ * it. Writer-private — only the poll thread touches this.
+ */
+static HostsCacheEntry *prev_hosts_cache = nullptr;
+
+static void free_hosts_cache_entry(HostsCacheEntry *entry) {
+  if (entry) {
+    free(entry->str);
+    free(entry);
+  }
+}
+
+/**
+ * Builds a fresh /hosts JSON string. Runs outside any critical section
+ * so the writer doesn't compete with readers during cJSON allocations.
+ */
+static char *build_hosts_json(size_t *len) {
+  cJSON *arr = json_array();
+  for (unsigned int i = 0; i < host_count; i++) {
+    const MonitorHost *mon_host = &monitor_host_list[i];
+    cJSON *json_obj = json_object();
+    add_host_to_json(json_obj, mon_host->host);
+
+    const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
+    add_host_status_to_json(json_obj, snap);
+
+    cJSON_AddItemToArray(arr, json_obj);
+  }
+  char *result = json_to_str(arr);
+  *len = strlen(result);
+  return result;
+}
+
+void update_hosts_cache(void) {
+  HostsCacheEntry *next = malloc(sizeof(HostsCacheEntry));
+  if (!next) {
+    raise_error("Can't allocate /hosts cache entry");
+  }
+  next->str = build_hosts_json(&next->len);
+
+  HostsCacheEntry *swapped = atomic_exchange_explicit(
+    &hosts_cache, next, memory_order_acq_rel
+  );
+
+  // Free the generation older than `swapped` — by the time the writer
+  // is on iteration N, no in-flight reader still holds a pointer from
+  // iteration N-2 (HTTP requests finish in milliseconds; check_hosts
+  // cycles are sub-second at minimum).
+  free_hosts_cache_entry(prev_hosts_cache);
+  prev_hosts_cache = swapped;
+}
+
+char *copy_hosts_cache(size_t *len) {
+  const HostsCacheEntry *entry = atomic_load_explicit(
+    &hosts_cache, memory_order_acquire
+  );
+  if (!entry) {
+    *len = 0;
+    return nullptr;
+  }
+  char *copy = malloc(entry->len + 1);
+  if (!copy) {
+    raise_error("Can't allocate /hosts cache copy");
+  }
+  memcpy(copy, entry->str, entry->len + 1);
+  *len = entry->len;
+  return copy;
+}
+
+void free_hosts_cache(void) {
+  HostsCacheEntry *entry = atomic_exchange_explicit(
+    &hosts_cache, nullptr, memory_order_acq_rel
+  );
+  free_hosts_cache_entry(entry);
+  free_hosts_cache_entry(prev_hosts_cache);
+  prev_hosts_cache = nullptr;
+}
