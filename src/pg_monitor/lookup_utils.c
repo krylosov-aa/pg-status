@@ -174,9 +174,14 @@ static unsigned int next_cursor_in_circle(const unsigned int cursor) {
 }
 
 /**
- * A pointer to the last host returned in the round-robin algorithm
+ * Cursor of the round-robin algorithm.
+ *
+ * The HTTP server runs in a single internal thread (MHD_USE_AUTO_INTERNAL_THREAD
+ * without a pool), so this cursor has exactly one reader/writer and an
+ * atomic CAS loop is unnecessary. If the server ever switches to a
+ * thread pool, this needs to become atomic again.
  */
-static atomic_size_t round_robin_cursor = 0;
+static unsigned int round_robin_cursor = 0;
 
 /**
  * Moves the cursor of the round-robin algorithm and returns the host from
@@ -184,19 +189,12 @@ static atomic_size_t round_robin_cursor = 0;
  * doesn't interfere with fair load balancing across the replicas.
  */
 static unsigned int next_replica_round_robin(void) {
-  size_t cursor;
-  unsigned int new_cursor;
-  do {
-    cursor = atomic_load_explicit(&round_robin_cursor, memory_order_relaxed);
-    new_cursor = (cursor + 1) % host_count;
-    const int master_i = get_master_index();
-    if (master_i != -1 && new_cursor == (unsigned int)master_i) {
-      new_cursor = next_cursor_in_circle(new_cursor);
-    }
-  } while (
-    !atomic_compare_exchange_weak(&round_robin_cursor, &cursor, new_cursor)
-  );
-
+  unsigned int new_cursor = next_cursor_in_circle(round_robin_cursor);
+  const int master_i = get_master_index();
+  if (master_i != -1 && new_cursor == (unsigned int)master_i) {
+    new_cursor = next_cursor_in_circle(new_cursor);
+  }
+  round_robin_cursor = new_cursor;
   return new_cursor;
 }
 
