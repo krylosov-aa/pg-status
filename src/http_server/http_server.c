@@ -90,11 +90,15 @@ static MHD_Result queue_response(
   }
 
   if (mhd_response) {
-    if (response->content_type != nullptr) {
-      MHD_add_response_header(
-        mhd_response, MHD_HTTP_HEADER_CONTENT_TYPE, response->content_type
-      );
+    const char *content_type = response->content_type;
+    if (content_type == nullptr) {
+      content_type = response->wants_json
+        ? "application/json"
+        : "text/plain; charset=utf-8";
     }
+    MHD_add_response_header(
+      mhd_response, MHD_HTTP_HEADER_CONTENT_TYPE, content_type
+    );
 
     ret = MHD_queue_response(connection, response->status_code, mhd_response);
 
@@ -166,12 +170,10 @@ static MHD_Result process_handler(
   MHD_Result result = MHD_NO;
   const request_handler_t handler = find_handler(method, path);
 
-  const char *content_type = MHD_lookup_connection_value(
+  const char *accept = MHD_lookup_connection_value(
     connection, MHD_HEADER_KIND, MHD_HTTP_HEADER_ACCEPT
   );
-  if (content_type != nullptr) {
-    response->content_type = content_type;
-  }
+  response->wants_json = is_equal_strings(accept, "application/json");
 
   handler(connection, response);
 
@@ -191,6 +193,7 @@ static MHD_Result process_get(
     .const_response = nullptr,
     .mhd_response = nullptr,
     .content_type = nullptr,
+    .wants_json = false,
     .memory_mode = MHD_RESPMEM_MUST_COPY,
     .status_code = MHD_HTTP_OK,
   };
@@ -250,8 +253,7 @@ void stop_http_server(MHD_Daemon *daemon) {
 }
 
 bool need_json_response(const HTTPResponse *response) {
-  return response->content_type &&
-         is_equal_strings(response->content_type, "application/json");
+  return response->wants_json;
 }
 
 bool parse_get_param_uint(
@@ -291,4 +293,5 @@ bool parse_get_param_lsn(
 void bad_request(HTTPResponse *response, const char *const_response) {
   response->status_code = 400;
   response->const_response = const_response;
+  response->content_type = "application/json";
 }

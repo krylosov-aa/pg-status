@@ -31,8 +31,15 @@ typedef struct HTTPResponse {
   // Use memory_mode for memory management.
   MHD_Response *mhd_response;
 
-  // Response type. It can be set by the server or specified by handler.
+  // Content-Type of the response. If a handler leaves it null, the
+  // server picks "application/json" or "text/plain; charset=utf-8"
+  // automatically based on wants_json.
   const char *content_type;
+
+  // Set by the server before calling a handler: true if the client
+  // asked for JSON in the Accept header. Handlers that can render in
+  // both formats use this flag via need_json_response().
+  bool wants_json;
 
   // What to do with the response after mhd gives the response to the client
   MHD_ResponseMemoryMode memory_mode;

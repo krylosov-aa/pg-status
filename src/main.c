@@ -73,6 +73,7 @@ static void return_single_host(HTTPResponse *response, const char *host) {
     add_host_to_json(json_obj, host);
     response->response = json_to_str(json_obj);
     response->memory_mode = MHD_RESPMEM_MUST_FREE;
+    response->content_type = "application/json";
   } else {
     response->const_response = host;
   }
