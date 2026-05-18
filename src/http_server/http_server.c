@@ -22,7 +22,10 @@ typedef struct {
 /**
  * list of routes registered for processing
  */
-static Routes *routes_list = nullptr;
+static Routes routes_list = {
+  .routes = nullptr,
+  .cnt = 0,
+};
 
 /**
  * The default handler if no matching route is found is to return a 404.
@@ -147,9 +150,8 @@ static void request_completed(
  * Searches for a suitable route among registered routes
  */
 static request_handler_t find_handler(const char *method, const char *path) {
-  for (unsigned int i = 0; i < routes_list->cnt; i++) {
-    const Route *routes = routes_list->routes;
-
+  const Route *routes = routes_list.routes;
+  for (unsigned int i = 0; i < routes_list.cnt; i++) {
     if (strcmp(routes[i].method, method) == 0 &&
         strcmp(routes[i].path, path) == 0) {
       return routes[i].handler;
@@ -237,9 +239,8 @@ static MHD_Result answer_to_connection(
 MHD_Daemon *start_http_server(
   const uint16_t port, Route *routes, const unsigned int cnt_routes
 ) {
-  routes_list = malloc(sizeof(Routes));
-  routes_list->routes = routes;
-  routes_list->cnt = cnt_routes;
+  routes_list.routes = routes;
+  routes_list.cnt = cnt_routes;
 
   MHD_Daemon *daemon = MHD_start_daemon(
     MHD_USE_AUTO_INTERNAL_THREAD | MHD_USE_ERROR_LOG, port, nullptr, nullptr,
