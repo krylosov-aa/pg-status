@@ -151,5 +151,7 @@ void stop_pg_monitor(void) {
   stop_pipe[0] = -1;
   stop_pipe[1] = -1;
 
+  close_host_connections();
+
   printf("pg_monitor stopped\n");
 }

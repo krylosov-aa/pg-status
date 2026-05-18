@@ -115,15 +115,23 @@ typedef struct {
  *    atomic_get_* accessors remain available for places that only need
  *    one field (e.g. /hosts and /status JSON rendering).
  */
+/**
+ * Forward declaration of libpq connection handle so this header doesn't
+ * have to pull in libpq-fe.h.
+ */
+struct pg_conn;
+
 typedef struct {
-  char *host;                       // immutable after init
-  char *connection_str;             // immutable after init
-  _Atomic uint64_t seq;             // seqlock: odd = writing, even = stable
-  _Atomic uint64_t lag_ms;          // protected by seq
-  _Atomic uint64_t lag_bytes;       // protected by seq
-  _Atomic uint64_t lsn;             // protected by seq
-  unsigned int failed_connections;  // writer-private
-  _Atomic MonitorStatus status;     // protected by seq
+  char *host;                            // immutable after init
+  char *connection_str;                  // immutable after init
+  _Atomic uint64_t seq;                  // seqlock: odd = writing, even = stable
+  _Atomic uint64_t lag_ms;               // protected by seq
+  _Atomic uint64_t lag_bytes;            // protected by seq
+  _Atomic uint64_t lsn;                  // protected by seq
+  unsigned int failed_connections;       // writer-private
+  struct pg_conn *conn;                  // writer-private, reused across polls
+  unsigned int checks_since_reconnect;   // writer-private
+  _Atomic MonitorStatus status;          // protected by seq
 } MonitorHost;
 
 /**
@@ -150,6 +158,12 @@ void init_monitor_host_list(void);
  * Atomically saves the current master index in the host array.
  */
 void save_master_index(int i);
+
+/**
+ * Closes all persistent libpq connections held by the host list.
+ * Called from stop_pg_monitor after the poll thread has joined.
+ */
+void close_host_connections(void);
 
 // ------------------------ Lookup utils ------------------------
 

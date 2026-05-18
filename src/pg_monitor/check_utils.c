@@ -25,17 +25,65 @@ static bool is_t(const char *pg_val) {
 }
 
 /**
- * Creates a connection to pg
+ * Maximum lifetime of a persistent connection, in milliseconds.
+ * After this it is dropped so upstream proxies (e.g. haproxy with
+ * "disable server") get a chance to re-route the next session.
  */
-static PGconn *db_connect(const char *connection_str) {
-  PGconn *conn = PQconnectdb(connection_str);
+constexpr unsigned int RECONNECT_AFTER_MS = 30000;
+
+/**
+ * Returns a usable libpq connection for the host, reusing host->conn
+ * when possible. A broken connection is reset; if reset fails or the
+ * persistent connection has lived longer than RECONNECT_AFTER_MS, it
+ * is closed and host->conn is cleared so the next call reconnects.
+ */
+static PGconn *db_connect(MonitorHost *host) {
+  const unsigned int ms = parameters.sleep_ms > 0
+    ? (unsigned int)parameters.sleep_ms : RECONNECT_AFTER_MS;
+  const unsigned int every = ms >= RECONNECT_AFTER_MS
+    ? 1 : RECONNECT_AFTER_MS / ms;
+  if (host->conn && host->checks_since_reconnect >= every) {
+    PQfinish(host->conn);
+    host->conn = nullptr;
+    host->checks_since_reconnect = 0;
+  }
+
+  if (host->conn) {
+    if (PQstatus(host->conn) == CONNECTION_OK) {
+      return host->conn;
+    }
+    PQreset(host->conn);
+    if (PQstatus(host->conn) == CONNECTION_OK) {
+      return host->conn;
+    }
+    printf_error("connect error: %s \n ", PQerrorMessage(host->conn));
+    PQfinish(host->conn);
+    host->conn = nullptr;
+    return nullptr;
+  }
+
+  PGconn *conn = PQconnectdb(host->connection_str);
   if (PQstatus(conn) != CONNECTION_OK) {
     printf_error("connect error: %s \n ", PQerrorMessage(conn));
     PQfinish(conn);
     return nullptr;
   }
 
+  host->conn = conn;
   return conn;
+}
+
+/**
+ * Closes all persistent libpq connections held by the host list.
+ */
+void close_host_connections(void) {
+  for (unsigned int i = 0; i < host_count; i++) {
+    MonitorHost *item = &monitor_host_list[i];
+    if (item->conn) {
+      PQfinish(item->conn);
+      item->conn = nullptr;
+    }
+  }
 }
 
 /**
@@ -209,7 +257,7 @@ void check_host_streaming_replication(
   );
   MonitorStatus new_status = status;
 
-  PGconn *conn = db_connect(host->connection_str);
+  PGconn *conn = db_connect(host);
 
   PGresult *q_res = nullptr;
   if (conn) {
@@ -226,9 +274,17 @@ void check_host_streaming_replication(
     if (host->failed_connections >= max_fails) {
       new_status = dead_status();
     }
+    // A failed query may leave the connection in a bad state. Drop it so
+    // the next iteration reconnects from scratch.
+    if (host->conn) {
+      PQfinish(host->conn);
+      host->conn = nullptr;
+      host->checks_since_reconnect = 0;
+    }
   } else {
     host->failed_connections = 0;
     new_status.possible_dead = false;
+    host->checks_since_reconnect++;
 
     const bool is_replica = is_t(PQgetvalue(q_res, 0, 0));
     if (is_replica) {
@@ -259,9 +315,5 @@ void check_host_streaming_replication(
 
   if (q_res) {
     PQclear(q_res);
-  }
-
-  if (conn) {
-    PQfinish(conn);
   }
 }
