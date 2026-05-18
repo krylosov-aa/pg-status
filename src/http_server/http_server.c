@@ -143,13 +143,17 @@ static void request_completed(
 }
 
 /**
- * Searches for a suitable route among registered routes
+ * Searches for a suitable route among registered routes.
+ * Paths are unique within a method, so the path check happens first
+ * and the method check runs only on the matching entry.
  */
 static request_handler_t find_handler(const char *method, const char *path) {
   const Route *routes = routes_list.routes;
   for (unsigned int i = 0; i < routes_list.cnt; i++) {
-    if (strcmp(routes[i].method, method) == 0 &&
-        strcmp(routes[i].path, path) == 0) {
+    if (strcmp(routes[i].path, path) != 0) {
+      continue;
+    }
+    if (strcmp(routes[i].method, method) == 0) {
       return routes[i].handler;
     }
   }
