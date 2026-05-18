@@ -140,10 +140,6 @@ static void request_completed(
       printf_error("request completed with client abort\n");
       break;
   }
-  if (*req_cls) {
-    HTTPResponse *response = *req_cls;
-    free(response);
-  }
 }
 
 /**
@@ -184,34 +180,22 @@ static MHD_Result process_handler(
 }
 
 /**
- * Prepares a structure with default parameters to store the response
- */
-static HTTPResponse *allocate_response(void) {
-  HTTPResponse *response = malloc(sizeof(HTTPResponse));
-  if (!response) {
-    raise_error("Can't allocate memory for response");
-  }
-
-  response->mhd_response = nullptr;
-  response->response = nullptr;
-  response->const_response = nullptr;
-  response->memory_mode = MHD_RESPMEM_MUST_COPY;
-  response->content_type = nullptr;
-  response->status_code = MHD_HTTP_OK;
-  return response;
-}
-
-/**
  * Processing a get request
  */
 static MHD_Result process_get(
   void *cls, MHD_Connection *connection, const char *path, const char *method,
   const char *version, const char *upload_data, void **req_cls
 ) {
-  HTTPResponse *response = allocate_response();
-  *req_cls = (void *)response;
+  HTTPResponse response = {
+    .response = nullptr,
+    .const_response = nullptr,
+    .mhd_response = nullptr,
+    .content_type = nullptr,
+    .memory_mode = MHD_RESPMEM_MUST_COPY,
+    .status_code = MHD_HTTP_OK,
+  };
 
-  return process_handler(path, method, response, connection);
+  return process_handler(path, method, &response, connection);
 }
 
 /**
