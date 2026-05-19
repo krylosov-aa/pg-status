@@ -227,6 +227,8 @@ You can configure various parameters using environment variables:
 - `pg_status__connect_timeout` — The time limit (in seconds) for establishing a connection to PostgreSQL. Default: `2`
 - `pg_status__max_fails` — The number of consecutive errors allowed when checking a host’s status before it is considered dead. Default: `3`
 - `pg_status__sleep_ms` — The delay (in milliseconds) between consecutive host status checks. Default: `5000`
+- `pg_status__query_timeout_ms` — Hard deadline (in milliseconds) for a single poll iteration of a host (connect + send + read). If the iteration does not complete in time, the connection is closed and the host's failure counter is incremented. Default: `5000`
+- `pg_status__conn_max_age_ms` — Maximum age (in milliseconds) of a reused PostgreSQL connection. Connections older than this are closed and reopened on the next iteration so that stale connections do not stick around forever. Default: `300000` (5 minutes)
 - `pg_status__sync_max_lag_ms` — The maximum acceptable replication lag (in milliseconds) for a replica to still be considered time-synchronous. Default: `1000`
 - `pg_status__sync_max_lag_bytes` — The maximum acceptable lag (in bytes) for a replica to still be considered byte-synchronous. Default: `1000000` (1 MB)
 - `pg_status__http_port` — the port on which the http server will listen. Default: `8000`
@@ -258,25 +260,60 @@ Depending on the API being called and the format selected
 
 # Implementation Details
 
+## Concurrent polling
+
+A single writer thread polls **all hosts concurrently** through libpq's
+non-blocking API and one `poll()` system call over their sockets. Each
+host runs its own independent iteration: a new poll is started every
+`pg_status__sleep_ms` after the previous one completed, and each
+iteration has a hard deadline of `pg_status__query_timeout_ms` (after
+which the connection is torn down and the host's failure counter is
+incremented).
+
+This means a slow or hung host doesn't block updates for the other
+hosts — the rest of the cluster continues to refresh on its own cadence
+while the slow host waits for its own deadline.
+
+## Connection reuse
+
+PostgreSQL connections are kept alive between polling iterations:
+opening a fresh `PGconn` on every iteration would mean a full
+TCP + auth handshake every `pg_status__sleep_ms`, which is wasteful and
+adds needless load on the server. Instead, each host keeps its
+connection open and reuses it.
+
+To prevent a stale connection from sticking around forever
+(e.g. intermediate NAT state expiring, or server-side cleanup), each
+connection is recycled when its age exceeds
+`pg_status__conn_max_age_ms`. Connections are also closed and reopened
+on any query error or socket-level failure.
+
 ## Consistency
 
 Cross-host consistency is intentionally not provided.
 
 There is one writer (the poll thread) and many readers (HTTP handlers).
 The design goal is that the writer never blocks the readers and the
-readers never block the writer.The writer traverses
-hosts one by one every `pg_status__sleep_ms` milliseconds, so while it is
-partway through, some hosts already have the new state and others still
-have the old one. The size of this window depends on
-`pg_status__connect_timeout`. For this project, the fastest response time
-and the most up-to-date per-host data mattered more, so cross-host
-consistency was intentionally sacrificed.
+readers never block the writer.
+
+Per-host data is published as a
+consistent snapshot via a seqlock on each host, so readers always see
+all fields from the same poll iteration of a single host.
+
+But cross-host inconsistency is still permitted by design: at any given
+moment some hosts may already have data from their N-th iteration while
+others still have data from their (N−1)-th iteration. The size of this
+window is bounded by `pg_status__query_timeout_ms`. For this project,
+the fastest response time and the most up-to-date per-host data
+mattered more, so cross-host consistency was intentionally sacrificed.
 
 
 ## Reaction speed to host unavailability
 
 If a host doesn't respond to a request, it could mean either a temporary issue or that the host is actually down.
 To avoid marking a host as dead prematurely, a host is only considered dead after `pg_status__max_fails` attempts.
+A failing iteration aborts after at most `pg_status__query_timeout_ms`, so in the worst case a host transitions
+from healthy to dead in roughly `pg_status__max_fails × pg_status__query_timeout_ms`.
 
 To speed up our reaction to possible host unavailability, if a host doesn't respond and the number of attempts
 hasn't yet exceeded `pg_status__max_fails`, we mark it as possibly dead, and this affects which hosts get returned:
