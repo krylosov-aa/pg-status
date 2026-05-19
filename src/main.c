@@ -251,7 +251,7 @@ static void block_termination_signals(sigset_t *sigset) {
 }
 
 static void get_version(MHD_Connection *connection, HTTPResponse *response) {
-  response->const_response = "2.0.0";
+  response->const_response = "2.1.0";
 }
 
 static void wait_for_termination_signal(const sigset_t *sigset) {
