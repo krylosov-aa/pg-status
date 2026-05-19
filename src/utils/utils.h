@@ -191,4 +191,9 @@ void add_uint64_to_json_object(cJSON *obj, const char *key, uint64_t val);
  */
 char *json_to_str(cJSON *json);
 
+/**
+ * Monotonic time in milliseconds.
+ */
+uint64_t monotonic_ms(void);
+
 #endif  // PG_STATUS_UTILS_H

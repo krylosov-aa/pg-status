@@ -4,9 +4,9 @@
 
 #include "pg_monitor.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -30,36 +30,197 @@ static bool pg_monitor_ready = false;
 static int stop_pipe[2] = {-1, -1};
 
 /**
- * One iteration of host checking
+ * Picks the current master by scanning hosts in declared order:
+ * first fully-alive master wins; otherwise the previously stored
+ * master_index is left in place if any host is marked possible_dead
+ * master; only when no master exists at all is master_index cleared
+ * to -1. Same rules the synchronous loop used to apply.
  */
-static void check_hosts(void) {
+static void recompute_master_index(void) {
   int master_i = -1;
   int possible_master = -1;
-
   for (unsigned int i = 0; i < host_count; i++) {
-    MonitorHost *item = &monitor_host_list[i];
-    check_host_streaming_replication(item, parameters.max_fails);
-
-    if (master_i == -1) {
-      const MonitorStatus status = atomic_get_status(item);
-      if (status.master) {
-        if (!status.possible_dead) {
-          master_i = (int)i;
-          save_master_index(master_i);
-        } else {
-          possible_master = (int)i;
-          // We don't need to update master_index if the master is marked
-          // as possible dead, because it's already stored in there
-        }
-      }
+    const MonitorStatus status = atomic_get_status(&monitor_host_list[i]);
+    if (!status.master) {
+      continue;
+    }
+    if (!status.possible_dead) {
+      master_i = (int)i;
+      break;
+    }
+    if (possible_master == -1) {
+      possible_master = (int)i;
     }
   }
-
-  if (master_i == -1 && possible_master == -1) {
+  if (master_i != -1) {
+    save_master_index(master_i);
+  } else if (possible_master == -1) {
     save_master_index(-1);
   }
+}
 
+/**
+ * True once every host has completed at least one poll iteration
+ * (success or failure). Used to gate startup readiness.
+ */
+static bool all_hosts_have_polled(void) {
+  for (unsigned int i = 0; i < host_count; i++) {
+    if (monitor_host_list[i].next_poll_at_ms == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Starts any IDLE host whose next_poll_at_ms has elapsed; time out
+ * any non-IDLE host whose iter_deadline_ms has passed.
+ */
+static void start_and_timeout_hosts(const uint64_t now_ms) {
+  for (unsigned int i = 0; i < host_count; i++) {
+    MonitorHost *host = &monitor_host_list[i];
+    if (host->poll_state == HOST_POLL_IDLE) {
+      if (now_ms >= host->next_poll_at_ms) {
+        start_host_poll(host, now_ms);
+      }
+    } else if (now_ms >= host->iter_deadline_ms) {
+      timeout_host_poll(host, now_ms);
+    }
+  }
+}
+
+/**
+ * Builds pollfd[] across the stop pipe and all in-flight hosts.
+ */
+static int build_poll_fd(
+  const uint64_t now_ms, struct pollfd *pfds, int *timeout_ms
+) {
+  const struct pollfd stop_pipe_slot = {
+    .fd = stop_pipe[0], .events = POLLIN, .revents = 0
+  };
+  pfds[0] = stop_pipe_slot;
+
+  uint64_t soonest_wake = now_ms + (uint64_t)parameters.sleep_ms;
+
+  int n_pfds = 1;
+  for (unsigned int i = 0; i < host_count; i++) {
+    MonitorHost *host = &monitor_host_list[i];
+
+    if (host->poll_state == HOST_POLL_IDLE) {
+      if (host->next_poll_at_ms < soonest_wake) {
+        soonest_wake = host->next_poll_at_ms;
+      }
+      host->pollfd_slot = -1;
+      continue;
+    }
+
+    const int fd = host_socket(host);
+    if (fd < 0) {
+      // Connection vanished mid-iteration; force a timeout next tick.
+      host->iter_deadline_ms = now_ms;
+      host->pollfd_slot = -1;
+      continue;
+    }
+
+    if (host->iter_deadline_ms < soonest_wake) {
+      soonest_wake = host->iter_deadline_ms;
+    }
+
+    pfds[n_pfds] = (struct pollfd){
+      .fd = fd, .events = host->poll_events, .revents = 0
+    };
+    host->pollfd_slot = n_pfds;
+
+    n_pfds++;
+  }
+
+  const uint64_t delta_ms = soonest_wake > now_ms ? soonest_wake - now_ms : 0;
+  *timeout_ms = delta_ms > (uint64_t)INT_MAX ? INT_MAX : (int)delta_ms;
+  return n_pfds;
+}
+
+static bool is_poll_stopped(const struct pollfd *pfds) {
+  return (pfds[0].revents & POLLIN) != 0;
+}
+
+static void process_poll_result(const struct pollfd *pfds) {
+  const uint64_t now_ms = monotonic_ms();
+  for (unsigned int i = 0; i < host_count; i++) {
+    MonitorHost *host = &monitor_host_list[i];
+
+    if (host->pollfd_slot < 0) {
+      continue;
+    }
+
+    const short revents = pfds[host->pollfd_slot].revents;
+    if (revents != 0) {
+      advance_host_poll(host, now_ms);
+    } else if (now_ms >= host->iter_deadline_ms) {
+      timeout_host_poll(host, now_ms);
+    }
+  }
+}
+
+/**
+ * Drives one iteration of the async poll loop:
+ *   1. Process IDLE hosts.
+ *   2. Build pollfd[].
+ *   3. poll() until the earliest deadline (per-host iter_deadline_ms
+ *      or next_poll_at_ms).
+ *   4. Advance any host whose fd became ready; time out any host whose
+ *      deadline expired without ready events.
+ *   5. Recompute the master index from the freshly published statuses.
+ *
+ * Returns false if a stop signal was received, true otherwise.
+ */
+static bool pump_one_iteration(void) {
+  const uint64_t now_ms = monotonic_ms();
+
+  start_and_timeout_hosts(now_ms);
+
+  struct pollfd pfds[MAX_HOSTS + 1];  // +1 for stop pipe
+  int timeout_ms;
+  const int n_pfds = build_poll_fd(now_ms, pfds, &timeout_ms);
+
+  const int rc = poll(pfds, (nfds_t)n_pfds, timeout_ms);
+  if (rc < 0) {
+    if (errno == EINTR) {
+      return true;
+    }
+    printf_error("poll failed");
+    return true;
+  }
+
+  if (is_poll_stopped(pfds)) {
+    return false;
+  }
+
+  process_poll_result(pfds);
+
+  recompute_master_index();
   (void)fflush(stdout);
+  return true;
+}
+
+static void mark_pg_monitor_ready(void) {
+  pthread_mutex_lock(&start_mutex);
+  pg_monitor_ready = true;
+  pthread_cond_broadcast(&start_cond);
+  pthread_mutex_unlock(&start_mutex);
+}
+
+static void warmup(void) {
+  bool keep_running = true;
+  while (keep_running && !all_hosts_have_polled()) {
+    keep_running = pump_one_iteration();
+  }
+
+  recompute_master_index();
+  (void)fflush(stdout);
+
+  if (!keep_running) {
+    raise_error("warmup interrupted");
+  }
 }
 
 /**
@@ -70,37 +231,16 @@ static void *pg_monitor_thread(void *arg) {
   set_parameters_from_env();
   init_monitor_host_list();
 
-  check_hosts();
+  warmup();
 
-  pthread_mutex_lock(&start_mutex);
-  pg_monitor_ready = true;
-  pthread_cond_broadcast(&start_cond);
-  pthread_mutex_unlock(&start_mutex);
+  mark_pg_monitor_ready();
 
-  struct pollfd pfd = {
-    .fd = stop_pipe[0],
-    .events = POLLIN,
-    .revents = 0,
-  };
-
-  for (;;) {
-    const int rc = poll(&pfd, 1, parameters.sleep_ms);
-
-    if (rc < 0) {
-      if (errno == EINTR) {
-        continue;
-      }
-      printf_error("poll failed");
-      break;
-    }
-
-    if (rc > 0) {
-      break;
-    }
-
-    check_hosts();
+  bool keep_running = true;
+  while (keep_running) {
+    keep_running = pump_one_iteration();
   }
 
+  close_all_host_connections();
   return nullptr;
 }
 

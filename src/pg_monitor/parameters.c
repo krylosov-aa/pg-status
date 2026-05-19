@@ -22,6 +22,8 @@ MonitorParameters parameters = {
   .max_fails = 3,
   .sync_max_lag_ms = 1000,
   .sync_max_lag_bytes = 1000000,  // 1 mb
+  .conn_max_age_ms = 300000,      // 5 minutes
+  .query_timeout_ms = 5000,
 };
 
 static void set_sleep(void) {
@@ -60,6 +62,12 @@ void set_parameters_from_env(void) {
   );
   replace_from_env_ull(
     "pg_status__sync_max_lag_bytes", &parameters.sync_max_lag_bytes
+  );
+  replace_from_env_ull(
+    "pg_status__conn_max_age_ms", &parameters.conn_max_age_ms
+  );
+  replace_from_env_ull(
+    "pg_status__query_timeout_ms", &parameters.query_timeout_ms
   );
   set_sleep();
   set_hosts();

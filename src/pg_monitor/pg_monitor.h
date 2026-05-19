@@ -48,6 +48,15 @@ typedef struct {
 
   // After this number of failed checks in a row, the host is considered dead.
   unsigned int max_fails;
+
+  // Maximum age of a reused PGconn in ms. When the current connection is
+  // older than this, it is closed at the end of the current iteration and
+  // the next iteration reconnects.
+  uint64_t conn_max_age_ms;
+
+  // Hard deadline for a single poll iteration (connect + send + read) in ms.
+  // On expiry the connection is closed and failed_connections is incremented.
+  uint64_t query_timeout_ms;
 } MonitorParameters;
 
 /**
@@ -94,6 +103,21 @@ typedef struct {
 } MonitorStatus;
 
 /**
+ * Forward declaration of libpq opaque connection type.
+ */
+struct pg_conn;
+
+/**
+ * Phase of the per-host async poll state machine.
+ */
+typedef enum {
+  HOST_POLL_IDLE = 0,    // nothing in flight
+  HOST_POLL_CONNECTING,  // PQconnectStart issued
+  HOST_POLL_QUERY_SEND,  // PQsendQuery issued
+  HOST_POLL_QUERY_READ,  // reading the result
+} HostPollState;
+
+/**
  *  Host parameters.
  *
  *  Concurrency model: one writer (the poll thread) and many readers
@@ -124,6 +148,23 @@ typedef struct {
   _Atomic uint64_t lsn;             // protected by seq
   unsigned int failed_connections;  // writer-private
   _Atomic MonitorStatus status;     // protected by seq
+
+  // ---- writer-private async-poll state ----
+  struct pg_conn *conn;       // reused PGconn, or NULL when disconnected
+  HostPollState poll_state;   // current phase of the state machine
+  short poll_events;          // events to wait for on PQsocket(conn)
+  uint64_t next_poll_at_ms;   // monotonic deadline to start next iteration
+  uint64_t iter_deadline_ms;  // monotonic deadline for current iteration
+  uint64_t connected_at_ms;   // monotonic time of last successful connect
+  int pollfd_slot;            // transient index into the main-loop pollfd[]
+
+  // Staging area for the current iteration. Populated once the result row
+  // is parsed; published to {status, lag_ms, lag_bytes, lsn} on success.
+  bool iter_data_ready;
+  MonitorStatus iter_new_status;
+  uint64_t iter_new_lag_ms;
+  uint64_t iter_new_lag_bytes;
+  uint64_t iter_new_lsn;
 } MonitorHost;
 
 /**
@@ -285,10 +326,40 @@ const char *find_most_sync_replica_by_bytes(
 // ------------------------ Host checking utils ------------------------
 
 /**
- * Updates the host status
+ * Kicks off a new poll iteration for `host`: opens the connection if needed
+ * (or reuses the existing one, recycling it if older than conn_max_age_ms),
+ * fires PQsendQuery, and sets the iteration deadline. After the call the
+ * host is in CONNECTING or QUERY_SEND state and ready to be added to a
+ * poll() fd set.
  */
-void check_host_streaming_replication(
-  MonitorHost *host, unsigned int max_fails
-);
+void start_host_poll(MonitorHost *host, uint64_t now_ms);
+
+/**
+ * Drives the per-host state machine in response to `revents` from
+ * poll(). On completion (success or any error), the host returns to IDLE and
+ * its shared state (`status`, `lag_ms`, `lag_bytes`, `lsn`) is updated via the
+ * seqlock; `next_poll_at_ms` is scheduled `sleep_ms` into the future.
+ */
+void advance_host_poll(MonitorHost *host, uint64_t now_ms);
+
+/**
+ * Aborts the current iteration after iter_deadline_ms has passed. Closes
+ * the connection, bumps failed_connections, and returns the host to IDLE.
+ */
+void timeout_host_poll(MonitorHost *host, uint64_t now_ms);
+
+/**
+ * Returns the file descriptor of the underlying libpq connection, or -1
+ * if the host has no open connection. Used by the main loop to build
+ * the pollfd[] array without including libpq-fe.h.
+ */
+int host_socket(const MonitorHost *host);
+
+/**
+ * Closes every open PGconn in monitor_host_list and resets each host to
+ * IDLE. Called from the writer thread before it exits, so that valgrind
+ * sees a clean shutdown.
+ */
+void close_all_host_connections(void);
 
 #endif  // PG_STATUS_PG_MONITOR_H

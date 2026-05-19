@@ -91,6 +91,21 @@ static void init_monitor_host(
   monitor_host->connection_str = get_connection_string(host, port);
   monitor_host->failed_connections = 0;
 
+  monitor_host->conn = nullptr;
+  monitor_host->poll_state = HOST_POLL_IDLE;
+  monitor_host->poll_events = 0;
+  monitor_host->next_poll_at_ms = 0;
+  monitor_host->iter_deadline_ms = 0;
+  monitor_host->connected_at_ms = 0;
+  monitor_host->pollfd_slot = -1;
+  monitor_host->iter_data_ready = false;
+  monitor_host->iter_new_status = (MonitorStatus){
+    .alive = false, .master = false, .possible_dead = false
+  };
+  monitor_host->iter_new_lag_ms = 0;
+  monitor_host->iter_new_lag_bytes = 0;
+  monitor_host->iter_new_lsn = 0;
+
   atomic_store_explicit(&monitor_host->seq, 0, memory_order_relaxed);
   atomic_store_explicit(
     &monitor_host->status,

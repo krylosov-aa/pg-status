@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 static int fputs_error(void) {
@@ -471,4 +472,13 @@ char *json_to_str(cJSON *json) {
     raise_error("Can't convert json to string");
   }
   return result;
+}
+
+/**
+ * Monotonic time in milliseconds.
+ */
+uint64_t monotonic_ms(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ((uint64_t)ts.tv_sec * 1000ULL) + ((uint64_t)ts.tv_nsec / 1000000ULL);
 }
