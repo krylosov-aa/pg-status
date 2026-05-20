@@ -59,7 +59,7 @@ void raise_error(const char *format, ...) {
   (void)fputs(". strerror: ", stderr);
   (void)fputs_error();
   (void)fputc('\n', stderr);
-  abort();
+  exit(EXIT_FAILURE);
 }
 
 /**

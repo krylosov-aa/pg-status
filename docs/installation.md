@@ -6,11 +6,11 @@ You can currently set up and run the project in the following ways:
 
 You can download a deb package for Linux amd64 from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/2.1.0/pg-status_2.1.0_amd64.deb)
+[Latest deb package](https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_amd64.deb)
 
 ```shell
-wget https://github.com/krylosov-aa/pg-status/releases/download/2.1.0/pg-status_2.1.0_amd64.deb && \
-sudo apt install ./pg-status_2.1.0_amd64.deb
+wget https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_amd64.deb && \
+sudo apt install ./pg-status_2.1.1_amd64.deb
 ```
 
 then run:
@@ -41,10 +41,10 @@ There are several available options:
 A statically linked binary is provided — you can simply download it and run it without any additional setup.
 You can download pre-built Linux amd64 binaries from [releases](https://github.com/krylosov-aa/pg-status/releases/).
 
-[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/2.1.0/pg-status_2.1.0_linux_amd64_static.tar.gz)
+[Latest static binary](https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_linux_amd64_static.tar.gz)
 
 ```shell
-wget -qO- https://github.com/krylosov-aa/pg-status/releases/download/2.1.0/pg-status_2.1.0_linux_amd64_static.tar.gz | tar -xzv && \
+wget -qO- https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_linux_amd64_static.tar.gz | tar -xzv && \
 chmod +x pg-status
 ```
 
@@ -58,11 +58,11 @@ then run:
 
 A dynamically linked binary is available, which requires the necessary dependencies to be installed on your system.
 You can read about the required dependencies below, and also take a look at the Dockerfiles, which demonstrate the installation.
-[Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/2.1.0/pg-status_2.1.0_linux_amd64_shared.tar.gz)
+[Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_linux_amd64_shared.tar.gz)
 
 ```shell
 sudo apt-get install -y libpq5 libmicrohttpd12 libcjson1 && \
-wget -qO- https://github.com/krylosov-aa/pg-status/releases/download/2.1.0/pg-status_2.1.0_linux_amd64_shared.tar.gz | tar -xzv && \
+wget -qO- https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_linux_amd64_shared.tar.gz | tar -xzv && \
 chmod +x pg-status
 ```
 
