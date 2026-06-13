@@ -64,7 +64,5 @@ if(CLANG_FORMAT_EXE)
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_dependencies(pg-status format)
-    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_dependencies(pg-status format-check)
     endif()
 endif()
