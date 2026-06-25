@@ -26,11 +26,14 @@ build_deb:
 	sudo chown -R $$(id -u):$$(id -g) out/deb
 
 build_push:
-	sudo docker build -f docker/alpine/Dockerfile_shared -t pg-status:${v} .
-	sudo docker tag pg-status:${v} ${r}/pg-status:${v}
-	sudo docker tag pg-status:${v} ${r}/pg-status:latest
-	sudo docker push ${r}/pg-status:${v}
-	sudo docker push ${r}/pg-status:latest
+	sudo docker buildx build \
+		--platform linux/amd64 \
+		--provenance=false \
+		--sbom=false \
+		-f docker/alpine/Dockerfile_shared \
+		-t ${r}/pg-status:${v} \
+		-t ${r}/pg-status:latest \
+		--push .
 
 build:
 	docker build -f docker/alpine/Dockerfile_shared -t pg-status .
