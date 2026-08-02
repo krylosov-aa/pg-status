@@ -90,8 +90,9 @@ static void log_changes(
   const MonitorStatus status, const uint64_t new_lag_ms, const uint64_t lag_ms,
   const uint64_t new_lag_bytes, const uint64_t lag_bytes
 ) {
-  if (new_status.possible_dead != status.possible_dead &&
-      new_status.possible_dead) {
+  if (
+    new_status.possible_dead != status.possible_dead && new_status.possible_dead
+  ) {
     printf("%s: possible dead\n", host->host);
     return;
   }
@@ -317,8 +318,10 @@ static void finish_iteration(
     old_lag_bytes
   );
 
-  if (success && host->conn &&
-      (now_ms - host->connected_at_ms) > parameters.conn_max_age_ms) {
+  if (
+    success && host->conn &&
+    (now_ms - host->connected_at_ms) > parameters.conn_max_age_ms
+  ) {
     close_conn(host);
   }
 

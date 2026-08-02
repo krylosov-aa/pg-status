@@ -194,8 +194,7 @@ static unsigned int next_replica_round_robin(void) {
       new_cursor = next_cursor_in_circle(new_cursor);
     }
   } while (
-    !atomic_compare_exchange_weak(&round_robin_cursor, &cursor, new_cursor)
-  );
+    !atomic_compare_exchange_weak(&round_robin_cursor, &cursor, new_cursor));
 
   return new_cursor;
 }

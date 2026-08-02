@@ -22,7 +22,7 @@ MonitorHost monitor_host_list[MAX_HOSTS] = {0};
 /**
  * Just a master host index in the array to find it asap
  */
-atomic_int master_index = -1;
+static atomic_int master_index = -1;
 
 /**
  * Atomically gets the current master position in the array

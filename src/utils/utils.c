@@ -253,8 +253,9 @@ bool try_str_to_ull(const char *value, uint64_t *out) {
  * either half above 0xFFFFFFFF, or trailing garbage.
  */
 bool try_parse_lsn(const char *value, uint64_t *out) {
-  if (!value || *value == '\0' || *value == '-' || *value == '+' ||
-      *value == '/') {
+  if (
+    !value || *value == '\0' || *value == '-' || *value == '+' || *value == '/'
+  ) {
     return false;
   }
 
@@ -278,8 +279,10 @@ bool try_parse_lsn(const char *value, uint64_t *out) {
   errno = 0;
   end_ptr = nullptr;
   const unsigned long long lo = strtoull(lo_start, &end_ptr, 16);
-  if (end_ptr == lo_start || *end_ptr != '\0' || errno == ERANGE ||
-      lo > 0xFFFFFFFFULL) {
+  if (
+    end_ptr == lo_start || *end_ptr != '\0' || errno == ERANGE ||
+    lo > 0xFFFFFFFFULL
+  ) {
     return false;
   }
 

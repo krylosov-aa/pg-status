@@ -251,8 +251,10 @@ pthread_t start_pg_monitor() {
   if (pipe(stop_pipe) != 0) {
     raise_error("Failed to create stop pipe");
   }
-  if (fcntl(stop_pipe[0], F_SETFD, FD_CLOEXEC) != 0 ||
-      fcntl(stop_pipe[1], F_SETFD, FD_CLOEXEC) != 0) {
+  if (
+    fcntl(stop_pipe[0], F_SETFD, FD_CLOEXEC) != 0 ||
+    fcntl(stop_pipe[1], F_SETFD, FD_CLOEXEC) != 0
+  ) {
     raise_error("Failed to set FD_CLOEXEC on stop pipe");
   }
 
