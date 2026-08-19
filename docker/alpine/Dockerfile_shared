@@ -9,7 +9,7 @@ RUN apk add --no-cache \
         ninja \
         pkgconfig \
         libpq-dev \
-        libmicrohttpd-dev \
+        libevent-dev \
         cjson-dev
 
 ENV CC=clang
@@ -18,9 +18,11 @@ WORKDIR /app
 
 COPY CMakeLists.txt .
 COPY src/ src/
+COPY test/CMakeLists.txt test/http_server_test.c test/
 
 RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
-    cmake --build build
+    cmake --build build && \
+    ctest --test-dir build --output-on-failure
 
 # -------- Export --------
 FROM scratch AS export
@@ -32,7 +34,7 @@ FROM alpine:latest
 
 RUN apk add --no-cache \
         libpq \
-        libmicrohttpd \
+        libevent \
         cjson
 
 WORKDIR /app

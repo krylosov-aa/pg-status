@@ -227,6 +227,7 @@ You can configure various parameters using environment variables:
 - `pg_status__conn_max_age_ms` — Maximum age (in milliseconds) of a reused PostgreSQL connection. Connections older than this are closed and reopened on the next iteration so that stale connections do not stick around forever. Default: `300000` (5 minutes)
 - `pg_status__sync_max_lag_ms` — The maximum acceptable replication lag (in milliseconds) for a replica to still be considered time-synchronous. Default: `1000`
 - `pg_status__sync_max_lag_bytes` — The maximum acceptable lag (in bytes) for a replica to still be considered byte-synchronous. Default: `1000000` (1 MB)
+- `pg_status__http_listen_address` — the IP address on which the HTTP server will listen. Accepts an IPv4 address, an IPv6 address, or `*` for best-effort IPv4/IPv6 wildcard listeners. Default: `0.0.0.0`
 - `pg_status__http_port` — the port on which the http server will listen. Default: `8000`
 
 
@@ -384,6 +385,6 @@ Helper shell scripts are provided for this purpose:
 
 It uses the following third‑party components:
 
-- libmicrohttpd — licensed under [the GNU Lesser General Public License v2.1 or later](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+- libevent — licensed under [the BSD 3-Clause License](https://github.com/libevent/libevent/blob/master/LICENSE)
 - cJSON — licensed under [the MIT License](https://github.com/DaveGamble/cJSON/blob/master/LICENSE)
 - libpq — licensed under [the PostgreSQL License](https://www.postgresql.org/about/licence/)

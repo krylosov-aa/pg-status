@@ -9,7 +9,7 @@ brew install pkg-config
 ```
 
 ```zsh
-brew install libmicrohttpd
+brew install libevent
 ```
 
 ```zsh

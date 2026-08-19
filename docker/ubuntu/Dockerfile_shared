@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ninja-build \
     pkg-config \
     libpq-dev \
-    libmicrohttpd-dev \
+    libevent-dev \
     libcjson-dev && \
     rm -rf /var/lib/apt/lists/*
 
@@ -18,9 +18,11 @@ WORKDIR /app
 
 COPY CMakeLists.txt .
 COPY src/ src/
+COPY test/CMakeLists.txt test/http_server_test.c test/
 
 RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
-    cmake --build build
+    cmake --build build && \
+    ctest --test-dir build --output-on-failure
 
 # -------- Package Archive --------
 FROM ubuntu:latest AS packager
@@ -72,11 +74,11 @@ PostgreSQL is released under the PostgreSQL License, a liberal Open Source
 license, similar to the BSD or MIT licenses.
 
 --------------------------------------------------------------------------------
-libmicrohttpd
+libevent
 --------------------------------------------------------------------------------
-License: GNU Lesser General Public License v2.1 or later (LGPL-2.1-or-later)
-Website: https://www.gnu.org/software/libmicrohttpd/
-License URL: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+License: BSD 3-Clause License
+Website: https://libevent.org/
+License URL: https://github.com/libevent/libevent/blob/master/LICENSE
 
 --------------------------------------------------------------------------------
 cJSON
@@ -100,7 +102,7 @@ Requirements
 ------------
 This binary requires the following shared libraries:
   - libpq5
-  - libmicrohttpd12
+  - libevent-2.1-7t64
   - libcjson1
 
 For more information, visit:
@@ -126,7 +128,7 @@ FROM ubuntu:latest AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    libmicrohttpd12 \
+    libevent-2.1-7t64 \
     libcjson1 && \
     rm -rf /var/lib/apt/lists/*
 

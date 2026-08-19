@@ -5,7 +5,6 @@
 #ifndef PG_STATUS_PG_MONITOR_H
 #define PG_STATUS_PG_MONITOR_H
 
-#include <pthread.h>
 #include <stdint.h>
 
 // ------------------------ Parameters ------------------------
@@ -74,7 +73,7 @@ void set_parameters_from_env(void);
 /**
  * Starts a host monitoring thread
  */
-pthread_t start_pg_monitor();
+void start_pg_monitor(void);
 
 /**
  * Stops a host monitoring thread

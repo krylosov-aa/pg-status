@@ -247,7 +247,7 @@ static void *pg_monitor_thread(void *arg) {
 /**
  * Starts a host monitoring thread
  */
-pthread_t start_pg_monitor() {
+void start_pg_monitor(void) {
   if (pipe(stop_pipe) != 0) {
     raise_error("Failed to create stop pipe");
   }
@@ -273,7 +273,6 @@ pthread_t start_pg_monitor() {
   }
   pthread_mutex_unlock(&start_mutex);
   printf("pg_monitor started\n");
-  return monitor_tid;
 }
 
 /**

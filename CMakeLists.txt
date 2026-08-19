@@ -34,7 +34,13 @@ target_link_options(common_warnings INTERFACE
 )
 
 find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED)
+include(CTest)
 add_subdirectory(src)
+
+if(BUILD_TESTING)
+    add_subdirectory(test)
+endif()
 
 find_program(CLANG_FORMAT_EXE NAMES clang-format)
 
@@ -42,6 +48,7 @@ if(CLANG_FORMAT_EXE)
     file(GLOB_RECURSE FORMAT_SOURCES
             "${CMAKE_SOURCE_DIR}/src/*.c"
             "${CMAKE_SOURCE_DIR}/src/*.h"
+            "${CMAKE_SOURCE_DIR}/test/*.c"
     )
 
     add_custom_target(format

@@ -6,18 +6,11 @@ RUN apk add --no-cache \
     autoconf automake tar curl \
     zlib-dev zlib-static \
     openssl-dev openssl-libs-static \
+    libevent-dev libevent-static \
     icu-dev bison flex
 
 
 WORKDIR /tmp
-
-# ---- libmicrohttpd ----
-RUN curl -LO https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-1.0.2.tar.gz && \
-    tar xf libmicrohttpd-1.0.2.tar.gz && \
-    cd libmicrohttpd-1.0.2 && \
-    ./configure --disable-https --enable-static --disable-shared && \
-    make -j1 && \
-    make install
 
 # ---- cJSON ----
 RUN curl -LO https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz && \
@@ -51,6 +44,7 @@ WORKDIR /app
 
 COPY CMakeLists.txt .
 COPY src/ src/
+COPY test/CMakeLists.txt test/http_server_test.c test/
 
 ENV CC=clang
 ENV CFLAGS="-static -O2"
@@ -66,7 +60,8 @@ RUN cmake -B build -G Ninja \
         -DLIBPQ_INCLUDE_DIR="/usr/local/include" \
         -DLIBPQ_LIBRARY="/usr/local/lib/libpq.a;/usr/local/lib/libpgcommon.a;/usr/local/lib/libpgport.a;/usr/lib/libssl.a;/usr/lib/libcrypto.a" \
         . && \
-    cmake --build build
+    cmake --build build && \
+    ctest --test-dir build --output-on-failure
 
 # -------- Export --------
 FROM scratch AS export
@@ -78,7 +73,7 @@ FROM alpine:latest
 
 RUN apk add --no-cache \
         libpq \
-        libmicrohttpd \
+        libevent \
         cjson
 
 WORKDIR /app

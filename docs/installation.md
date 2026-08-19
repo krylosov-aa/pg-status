@@ -28,7 +28,6 @@ There are several available options:
 
 ### Alpine
 - [Fast build, very lightweight container](../docker/alpine/Dockerfile_shared)
-- [The lightest container, but takes slightly longer to build](../docker/alpine/Dockerfile_shared_disabled_https)
 - [The heaviest among the lightweight options, but provides a static binary](../docker/alpine/Dockerfile_static)
 
 ### Ubuntu
@@ -61,7 +60,7 @@ You can read about the required dependencies below, and also take a look at the 
 [Latest shared binary](https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_linux_amd64_shared.tar.gz)
 
 ```shell
-sudo apt-get install -y libpq5 libmicrohttpd12 libcjson1 && \
+sudo apt-get install -y libpq5 libevent-2.1-7t64 libcjson1 && \
 wget -qO- https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_linux_amd64_shared.tar.gz | tar -xzv && \
 chmod +x pg-status
 ```
@@ -82,7 +81,7 @@ depending on whether you prefer a dynamically linked or static binary.
 ## Dependencies
 
 This project depends on three external libraries:
-- [libmicrohttpd](https://www.gnu.org/software/libmicrohttpd/) — [LGPL-2.1-or-later](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+- [libevent](https://libevent.org/) — [BSD-3-Clause](https://github.com/libevent/libevent/blob/master/LICENSE)
 - [libpq](https://www.postgresql.org/docs/current/libpq.html) — [PostgreSQL License](https://www.postgresql.org/about/licence/)
 - [cJSON](https://github.com/DaveGamble/cJSON) — [MIT License](https://github.com/DaveGamble/cJSON/blob/master/LICENSE)
 

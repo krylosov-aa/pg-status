@@ -4,9 +4,6 @@ build_static_alpine:
 build_shared_alpine:
 	docker build -f docker/alpine/Dockerfile_shared -t pg-status-shared-alpine .
 
-build_shared_alpine_wo_https:
-	docker build -f docker/alpine/Dockerfile_shared_disabled_https -t pg-status-shared-alpine-wo-https .
-
 build_shared_ubuntu:
 	docker build -f docker/ubuntu/Dockerfile_shared -t pg-status-shared-ubuntu .
 

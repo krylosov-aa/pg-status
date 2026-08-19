@@ -13,10 +13,7 @@ target_link_libraries(pg-status
         http_server
         pg_monitor
         PkgConfig::CJSON
+        Threads::Threads
 )
-
-if(UNIX AND NOT APPLE)
-    target_link_libraries(pg-status PRIVATE pq microhttpd)
-endif()
 
 target_include_directories(pg-status PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

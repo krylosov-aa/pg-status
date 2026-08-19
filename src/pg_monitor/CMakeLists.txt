@@ -6,7 +6,14 @@ add_library(pg_monitor
         parameters.c
 )
 
-target_link_libraries(pg_monitor PUBLIC common_warnings utils)
+target_link_libraries(
+        pg_monitor
+        PUBLIC
+        common_warnings
+        utils
+        PRIVATE
+        Threads::Threads
+)
 
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(LIBPQ libpq QUIET)

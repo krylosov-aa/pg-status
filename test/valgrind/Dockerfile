@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ninja-build \
         pkg-config \
         libpq-dev \
-        libmicrohttpd-dev \
+        libevent-dev \
         libcjson-dev && \
     rm -rf /var/lib/apt/lists/*
 
@@ -15,16 +15,18 @@ WORKDIR /app
 
 COPY CMakeLists.txt .
 COPY src/ src/
+COPY test/CMakeLists.txt test/http_server_test.c test/
 
 RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
-    cmake --build build
+    cmake --build build && \
+    ctest --test-dir build --output-on-failure
 
 # -------- Run --------
 FROM debian:stable-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq5 \
-        libmicrohttpd12 \
+        libevent-2.1-7t64 \
         libcjson1 \
         valgrind && \
     rm -rf /var/lib/apt/lists/*

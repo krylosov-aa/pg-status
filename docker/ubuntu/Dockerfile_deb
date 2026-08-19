@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ninja-build \
     pkg-config \
     libpq-dev \
-    libmicrohttpd-dev \
+    libevent-dev \
     libcjson-dev && \
     rm -rf /var/lib/apt/lists/*
 
@@ -18,9 +18,11 @@ WORKDIR /app
 
 COPY CMakeLists.txt .
 COPY src/ src/
+COPY test/CMakeLists.txt test/http_server_test.c test/
 
 RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
-    cmake --build build
+    cmake --build build && \
+    ctest --test-dir build --output-on-failure
 
 # -------- Deb Package --------
 FROM ubuntu:latest AS packager
@@ -38,7 +40,7 @@ Version: 2.1.1
 Section: utils
 Priority: optional
 Architecture: amd64
-Depends: libpq5, libmicrohttpd12, libcjson1
+Depends: libpq5, libevent-2.1-7t64, libcjson1
 Maintainer: krylosov-aa <krylosov.andrew@gmail.com>
 Description: A microservice (sidecar) that helps instantly determine
  the status of your PostgreSQL hosts including whether they are alive,

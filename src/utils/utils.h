@@ -149,7 +149,7 @@ void replace_from_env_ull(const char *env_name, uint64_t *result);
 /**
  * Takes a value from the environment variables if it is set,
  * copies it and pastes it by the result pointer.
- * The string must be freed by the caller.
+ * The string must be released with cJSON_free by the caller.
  */
 void replace_from_env_copy(const char *env_name, char **result);
 
