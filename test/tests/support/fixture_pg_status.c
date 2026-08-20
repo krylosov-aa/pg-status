@@ -6,6 +6,7 @@
 
 #include <cjson/cJSON.h>
 #include <inttypes.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -75,6 +76,38 @@ char *fixture_pg_status_format_expected_lsn(const uint64_t lsn) {
   return formatted_lsn;
 }
 
+static void *publish_snapshots(void *arg) {
+  PgStatusSnapshotPublisher *publisher = arg;
+  while (atomic_load_explicit(&publisher->running, memory_order_relaxed)) {
+    publish_monitor_snapshot(publisher->host, publisher->first);
+    publish_monitor_snapshot(publisher->host, publisher->second);
+    sched_yield();
+  }
+  return nullptr;
+}
+
+void fixture_pg_status_snapshot_publisher_start(
+  PgStatusSnapshotPublisher *publisher, MonitorHost *host,
+  const MonitorSnapshot first, const MonitorSnapshot second
+) {
+  publisher->host = host;
+  publisher->first = first;
+  publisher->second = second;
+  atomic_init(&publisher->running, true);
+  const int result = pthread_create(
+    &publisher->thread, nullptr, publish_snapshots, publisher
+  );
+  http_test_assert_true(result == 0, "snapshot publisher start");
+}
+
+void fixture_pg_status_snapshot_publisher_stop(
+  PgStatusSnapshotPublisher *publisher
+) {
+  atomic_store_explicit(&publisher->running, false, memory_order_relaxed);
+  const int result = pthread_join(publisher->thread, nullptr);
+  http_test_assert_true(result == 0, "snapshot publisher stop");
+}
+
 PgStatusApiFixture fixture_pg_status_start(
   const TestHost *hosts, const size_t count, const int master_index
 ) {
@@ -100,22 +133,28 @@ void fixture_pg_status_stop(PgStatusApiFixture *api) {
   *api = (PgStatusApiFixture){0};
 }
 
-void fixture_pg_status_assert_json_body(
+bool fixture_pg_status_json_body_equals(
   const TestHTTPResponse *response, const char *expected_json
 ) {
   cJSON *actual = cJSON_Parse(response->body);
   cJSON *expected = cJSON_Parse(expected_json);
-  if (!actual || !expected || !cJSON_Compare(actual, expected, true)) {
+  const bool equal = actual && expected &&
+                     cJSON_Compare(actual, expected, true);
+  cJSON_Delete(actual);
+  cJSON_Delete(expected);
+  return equal;
+}
+
+void fixture_pg_status_assert_json_body(
+  const TestHTTPResponse *response, const char *expected_json
+) {
+  if (!fixture_pg_status_json_body_equals(response, expected_json)) {
     fprintf(
       stderr, "Expected JSON: %s\nActual body: %s\n", expected_json,
       response->body
     );
-    cJSON_Delete(actual);
-    cJSON_Delete(expected);
     http_test_fail("unexpected JSON body");
   }
-  cJSON_Delete(actual);
-  cJSON_Delete(expected);
 }
 
 void fixture_pg_status_expect_text(

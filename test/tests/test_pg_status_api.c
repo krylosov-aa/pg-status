@@ -39,6 +39,30 @@ static void test_version(void) {
   fixture_pg_status_stop(&api);
 }
 
+static void test_version_ignores_accept(void) {
+  // Arrange
+  const TestHost hosts[] = {fixture_pg_status_master_host("master")};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/version", "Accept: application/json\r\n"
+  );
+
+  // Assert
+  http_test_assert_status(&response, 200);
+  http_test_assert_contains(
+    &response, "Content-Type: text/plain; charset=utf-8"
+  );
+  http_test_assert_body(&response, PG_STATUS_VERSION);
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
 static void test_master_text(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
@@ -86,6 +110,32 @@ static void test_master_json(void) {
   // Act
   TestHTTPResponse response = http_test_get(
     api.port, "/master", "Accept: application/json\r\n"
+  );
+
+  // Assert
+  fixture_pg_status_expect_json(&response, 200, expected_json);
+
+  // Cleanup
+  free(expected_json);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_replica_json(void) {
+  // Arrange
+  char *replica_host_name = "replica";
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host(replica_host_name, 50, 500, 0x450),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *expected_json = format_string("{\"host\":\"%s\"}", replica_host_name);
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/replica", "Accept: application/json\r\n"
   );
 
   // Assert
@@ -156,6 +206,39 @@ static void test_hosts(void) {
   fixture_pg_status_stop(&api);
 }
 
+static void test_hosts_ignores_accept(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *master_host_name = "master";
+  const TestHost master = fixture_pg_status_master_host(master_host_name);
+  const TestHost hosts[] = {master};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *master_lsn = fixture_pg_status_format_expected_lsn(master.snapshot.lsn);
+  char *expected_json = format_string(
+    "[{\"host\":\"%s\",\"master\":true,\"alive\":true,"
+    "\"lag_ms\":%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
+    ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}]",
+    master.host, master.snapshot.lag_ms, master.snapshot.lag_bytes, master_lsn
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/hosts", "Accept: text/plain\r\n"
+  );
+
+  // Assert
+  fixture_pg_status_expect_json(&response, 200, expected_json);
+
+  // Cleanup
+  free(expected_json);
+  free(master_lsn);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
 static void test_status_alive(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
@@ -194,6 +277,185 @@ static void test_status_alive(void) {
   free(lsn);
   free(path);
   http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_status_mixed_sync(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *replica_host_name = "replica";
+  const TestHost replica = fixture_pg_status_replica_host(
+    replica_host_name, parameters.sync_max_lag_ms + 1,
+    parameters.sync_max_lag_bytes, 0x450
+  );
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    replica,
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *path = format_string("/status?host=%s", replica.host);
+  char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
+  char *expected_json = format_string(
+    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
+    ",\"sync_by_time\":false,\"lag_bytes\":%" PRIu64
+    ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
+    replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+  // Assert
+  fixture_pg_status_expect_json(&response, 200, expected_json);
+
+  // Cleanup
+  free(expected_json);
+  free(lsn);
+  free(path);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_status_max_lsn(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *replica_host_name = "replica";
+  const TestHost replica = fixture_pg_status_replica_host(
+    replica_host_name, 50, 500, UINT64_MAX
+  );
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    replica,
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *path = format_string("/status?host=%s", replica.host);
+  char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
+  char *expected_json = format_string(
+    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
+    ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
+    ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
+    replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+  // Assert
+  fixture_pg_status_expect_json(&response, 200, expected_json);
+
+  // Cleanup
+  free(expected_json);
+  free(lsn);
+  free(path);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_status_ignores_accept(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *replica_host_name = "replica";
+  const TestHost replica = fixture_pg_status_replica_host(
+    replica_host_name, 50, 500, 0x450
+  );
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    replica,
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *path = format_string("/status?host=%s", replica.host);
+  char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
+  char *expected_json = format_string(
+    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
+    ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
+    ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
+    replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, path, "Accept: text/plain\r\n"
+  );
+
+  // Assert
+  fixture_pg_status_expect_json(&response, 200, expected_json);
+
+  // Cleanup
+  free(expected_json);
+  free(lsn);
+  free(path);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_snapshot_consistency(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *host_name = "changing-host";
+  const TestHost first = fixture_pg_status_replica_host(
+    host_name, 10, 100, UINT64_C(0x100000010)
+  );
+  TestHost second = fixture_pg_status_replica_host(
+    host_name, 200, 2000, UINT64_C(0x200000020)
+  );
+  second.snapshot.status.master = true;
+  const TestHost hosts[] = {first};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), -1
+  );
+  char *path = format_string("/status?host=%s", host_name);
+  char *first_lsn = fixture_pg_status_format_expected_lsn(first.snapshot.lsn);
+  char *second_lsn = fixture_pg_status_format_expected_lsn(second.snapshot.lsn);
+  char *first_json = format_string(
+    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
+    ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
+    ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
+    first.snapshot.lag_ms, first.snapshot.lag_bytes, first_lsn
+  );
+  char *second_json = format_string(
+    "{\"master\":true,\"alive\":true,\"lag_ms\":%" PRIu64
+    ",\"sync_by_time\":false,\"lag_bytes\":%" PRIu64
+    ",\"sync_by_bytes\":false,\"lsn\":\"%s\"}",
+    second.snapshot.lag_ms, second.snapshot.lag_bytes, second_lsn
+  );
+  PgStatusSnapshotPublisher publisher;
+  fixture_pg_status_snapshot_publisher_start(
+    &publisher, &monitor_host_list[0], first.snapshot, second.snapshot
+  );
+
+  for (size_t i = 0; i < 200; i++) {
+    // Act
+    TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+    // Assert
+    http_test_assert_status(&response, 200);
+    http_test_assert_contains(&response, "Content-Type: application/json");
+    const bool is_consistent =
+      fixture_pg_status_json_body_equals(&response, first_json) ||
+      fixture_pg_status_json_body_equals(&response, second_json);
+    http_test_assert_true(is_consistent, "HTTP API returned a torn snapshot");
+
+    // Cleanup
+    http_test_response_free(&response);
+  }
+
+  // Cleanup
+  fixture_pg_status_snapshot_publisher_stop(&publisher);
+  free(second_json);
+  free(first_json);
+  free(second_lsn);
+  free(first_lsn);
+  free(path);
   fixture_pg_status_stop(&api);
 }
 
@@ -286,6 +548,124 @@ static void test_missing_replica(void) {
   fixture_pg_status_stop(&api);
 }
 
+static void test_missing_replica_json(void) {
+  // Arrange
+  const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), -1
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/replica", "Accept: application/json\r\n"
+  );
+
+  // Assert
+  fixture_pg_status_expect_json(&response, 404, "{\"host\":null}");
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_missing_sync_by_time(void) {
+  // Arrange
+  const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), -1
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, "/sync_by_time", nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 404, "");
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_missing_sync_by_bytes(void) {
+  // Arrange
+  const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), -1
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/sync_by_bytes", nullptr
+  );
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 404, "");
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_missing_sync_or(void) {
+  // Arrange
+  const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), -1
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/sync_by_time_or_bytes", nullptr
+  );
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 404, "");
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_missing_sync_and(void) {
+  // Arrange
+  const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), -1
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/sync_by_time_and_bytes", nullptr
+  );
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 404, "");
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_missing_most_sync(void) {
+  // Arrange
+  const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), -1
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/most_sync_by_bytes", nullptr
+  );
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 404, "");
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
 static void test_missing_status_host(void) {
   // Arrange
   const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
@@ -361,6 +741,40 @@ static void test_round_robin(void) {
     second_replica_host_name,
     first_replica_host_name,
     second_replica_host_name,
+  };
+
+  for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
+    // Act
+    TestHTTPResponse response = http_test_get(api.port, "/replica", nullptr);
+
+    // Assert
+    fixture_pg_status_expect_text(&response, 200, expected[i]);
+
+    // Cleanup
+    http_test_response_free(&response);
+  }
+
+  // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
+static void test_round_robin_master_in_middle(void) {
+  // Arrange
+  char *before_master_host_name = "before-master";
+  char *after_master_host_name = "after-master";
+  const TestHost hosts[] = {
+    fixture_pg_status_replica_host(before_master_host_name, 10, 10, 0x490),
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host(after_master_host_name, 20, 20, 0x480),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 1
+  );
+  const char *expected[] = {
+    after_master_host_name,
+    before_master_host_name,
+    after_master_host_name,
+    before_master_host_name,
   };
 
   for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
@@ -687,6 +1101,69 @@ static void test_sync_and_threshold_boundary(void) {
   fixture_pg_status_stop(&api);
 }
 
+static void test_sync_or_query_overrides_globals(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *candidate_host_name = "candidate";
+  const TestHost candidate = fixture_pg_status_replica_host(
+    candidate_host_name, 200, 2000, 0x450
+  );
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    candidate,
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *path = format_string(
+    "/sync_by_time_or_bytes?lag_ms=%" PRIu64, candidate.snapshot.lag_ms
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, candidate_host_name);
+
+  // Cleanup
+  free(path);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_sync_and_query_overrides_globals(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *candidate_host_name = "candidate";
+  const TestHost candidate = fixture_pg_status_replica_host(
+    candidate_host_name, 200, 2000, 0x450
+  );
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    candidate,
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *path = format_string(
+    "/sync_by_time_and_bytes?lag_ms=%" PRIu64 "&lag_bytes=%" PRIu64,
+    candidate.snapshot.lag_ms, candidate.snapshot.lag_bytes
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, candidate_host_name);
+
+  // Cleanup
+  free(path);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
 static void test_sync_by_time_ignores_lag_bytes(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
@@ -761,6 +1238,65 @@ static void test_sync_by_time_min_lsn(void) {
   fixture_pg_status_expect_text(&response, 200, master_host_name);
 
   // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_sync_by_bytes_min_lsn(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *replica_host_name = "replica";
+  const uint64_t replica_lsn = 0x450;
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host(replica_host_name, 500, 100, replica_lsn),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *minimum_lsn = fixture_pg_status_format_expected_lsn(replica_lsn);
+  char *path = format_string("/sync_by_bytes?min_lsn=%s", minimum_lsn);
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, replica_host_name);
+
+  // Cleanup
+  free(path);
+  free(minimum_lsn);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_sync_or_min_lsn(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  char *master_host_name = "master";
+  const uint64_t replica_lsn = 0x450;
+  const uint64_t minimum_lsn_value = replica_lsn + 1;
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host(master_host_name),
+    fixture_pg_status_replica_host("replica", 50, 2000, replica_lsn),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *minimum_lsn = fixture_pg_status_format_expected_lsn(minimum_lsn_value);
+  char *path = format_string("/sync_by_time_or_bytes?min_lsn=%s", minimum_lsn);
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, master_host_name);
+
+  // Cleanup
+  free(path);
+  free(minimum_lsn);
   http_test_response_free(&response);
   fixture_pg_status_stop(&api);
 }
@@ -1017,6 +1553,33 @@ static void test_replica_lsn_boundary(void) {
   parameters.sync_max_lag_bytes = 1000;
   char *replica_host_name = "replica";
   const uint64_t replica_lsn = 0x450;
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host(replica_host_name, 50, 100, replica_lsn),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *minimum_lsn = fixture_pg_status_format_expected_lsn(replica_lsn);
+  char *path = format_string("/replica?min_lsn=%s", minimum_lsn);
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, replica_host_name);
+
+  // Cleanup
+  free(path);
+  free(minimum_lsn);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_replica_high_lsn_boundary(void) {
+  // Arrange
+  char *replica_host_name = "replica";
+  const uint64_t replica_lsn = UINT64_C(1) << 32;
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(replica_host_name, 50, 100, replica_lsn),
@@ -1309,18 +1872,32 @@ static const struct {
   test_function_t function;
 } test_cases[] = {
   {"version", test_version},
+  {"version_ignores_accept", test_version_ignores_accept},
   {"master_text", test_master_text},
   {"master_json", test_master_json},
+  {"replica_json", test_replica_json},
   {"hosts", test_hosts},
+  {"hosts_ignores_accept", test_hosts_ignores_accept},
   {"status_alive", test_status_alive},
+  {"status_mixed_sync", test_status_mixed_sync},
+  {"status_max_lsn", test_status_max_lsn},
+  {"status_ignores_accept", test_status_ignores_accept},
+  {"snapshot_consistency", test_snapshot_consistency},
   {"status_dead", test_status_dead},
   {"missing_master_text", test_missing_master_text},
   {"missing_master_json", test_missing_master_json},
   {"missing_replica", test_missing_replica},
+  {"missing_replica_json", test_missing_replica_json},
+  {"missing_sync_by_time", test_missing_sync_by_time},
+  {"missing_sync_by_bytes", test_missing_sync_by_bytes},
+  {"missing_sync_or", test_missing_sync_or},
+  {"missing_sync_and", test_missing_sync_and},
+  {"missing_most_sync", test_missing_most_sync},
   {"missing_status_host", test_missing_status_host},
   {"unknown_status_host", test_unknown_status_host},
   {"unknown_route", test_unknown_route},
   {"round_robin", test_round_robin},
+  {"round_robin_master_in_middle", test_round_robin_master_in_middle},
   {"replica_combined_lag_filters", test_replica_combined_lag_filters},
   {"replica_lag_ms_fallback", test_replica_lag_ms_fallback},
   {"replica_lag_bytes_fallback", test_replica_lag_bytes_fallback},
@@ -1333,9 +1910,13 @@ static const struct {
   {"sync_or_bytes_match", test_sync_or_bytes_match},
   {"sync_and_rejects_bytes_only", test_sync_and_rejects_bytes_only},
   {"sync_and_threshold_boundary", test_sync_and_threshold_boundary},
+  {"sync_or_query_overrides_globals", test_sync_or_query_overrides_globals},
+  {"sync_and_query_overrides_globals", test_sync_and_query_overrides_globals},
   {"sync_by_time_ignores_lag_bytes", test_sync_by_time_ignores_lag_bytes},
   {"sync_by_bytes_ignores_lag_ms", test_sync_by_bytes_ignores_lag_ms},
   {"sync_by_time_min_lsn", test_sync_by_time_min_lsn},
+  {"sync_by_bytes_min_lsn", test_sync_by_bytes_min_lsn},
+  {"sync_or_min_lsn", test_sync_or_min_lsn},
   {"most_sync_by_bytes", test_most_sync_by_bytes},
   {"most_sync_lag_bytes_filter", test_most_sync_lag_bytes_filter},
   {"most_sync_min_lsn_filter", test_most_sync_min_lsn_filter},
@@ -1346,6 +1927,7 @@ static const struct {
   {"most_sync_uses_possible_dead", test_most_sync_uses_possible_dead},
   {"most_sync_tie_break", test_most_sync_tie_break},
   {"replica_lsn_boundary", test_replica_lsn_boundary},
+  {"replica_high_lsn_boundary", test_replica_high_lsn_boundary},
   {"sync_and_lsn_boundary", test_sync_and_lsn_boundary},
   {"most_sync_lsn_boundary", test_most_sync_lsn_boundary},
   {"replica_lsn_above_boundary", test_replica_lsn_above_boundary},
