@@ -37,4 +37,4 @@ Checks: >
   -readability-non-const-parameter
 
 WarningsAsErrors: '*'
-HeaderFilterRegex: 'src/.*'
+HeaderFilterRegex: '(^|.*/)(src|test)/.*'
