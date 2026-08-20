@@ -28,6 +28,13 @@ target_compile_options(common_warnings INTERFACE
         -Wundef
         -Wno-unused-parameter
         -Wmissing-field-initializers
+        -Wmissing-prototypes
+        -Wcast-align
+        -Wvla
+        -Walloca
+        -Wimplicit-fallthrough
+        -Wnull-dereference
+        -Wdouble-promotion
 
         "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
         "$<$<CONFIG:Debug>:-fno-sanitize-recover=undefined>"
@@ -39,6 +46,10 @@ target_compile_options(common_warnings INTERFACE
 
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     target_compile_options(common_warnings INTERFACE
+            -Wmissing-variable-declarations
+            -Wcomma
+            -Wdocumentation
+
             "$<$<CONFIG:Debug>:-fno-sanitize-merge>"
     )
 endif()
