@@ -1,4 +1,6 @@
 #!/bin/bash
+# Creates the replica from a base backup and starts PostgreSQL.
+
 set -e
 
 DATA_DIR="${PGDATA:-/var/lib/postgresql/data}"

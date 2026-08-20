@@ -1,3 +1,5 @@
+# HAProxy image initially routing traffic to the replica.
+
 FROM haproxy:2.9
 
 USER root

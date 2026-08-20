@@ -49,16 +49,20 @@ build_up:
 build_up_test:
 	make down_test
 	make build
-	docker-compose -f test/docker-compose.yml up -d
+	docker-compose -p test -f test/docker/docker-compose.yml --profile pg-status up -d
+
+build_up_test_only_pg:
+	make down_test
+	docker-compose -p test -f test/docker/docker-compose.yml up -d
 
 down_test:
-	docker-compose -f test/docker-compose.yml down --remove-orphans
+	docker-compose -p test -f test/docker/docker-compose.yml --profile pg-status down --remove-orphans
 
 1-master:
-	./test/pg-proxy-1_is_master.sh
+	./test/docker/pg-proxy-1_is_master.sh
 
 2-master:
-	./test/pg-proxy-2_is_master.sh
+	./test/docker/pg-proxy-2_is_master.sh
 
 
 
@@ -88,3 +92,6 @@ build_push_amd_64:
 
 format-warn:
 	cmake --build cmake-build-debug --target format-warn
+
+benchmark_rps:
+	./test/rps/run.sh

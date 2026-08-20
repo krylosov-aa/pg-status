@@ -1,4 +1,6 @@
 #!/bin/bash
+# Initializes replication on the topology master.
+
 set -e
 
 psql -U "$POSTGRES_USER" -d postgres <<-EOSQL

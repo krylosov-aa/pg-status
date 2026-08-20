@@ -1,0 +1,7 @@
+# Weight  Path
+8 /master
+6 /replica
+2 /sync_by_time
+2 /most_sync_by_bytes
+1 /replica?min_lsn=0/0
+1 /hosts

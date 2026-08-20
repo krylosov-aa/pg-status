@@ -257,24 +257,6 @@ static bool parse_result(MonitorHost *host, const PGresult *res) {
 }
 
 /**
- * Publishes the host's new shared state via the seqlock on host->seq.
- * Bump to odd → store four fields → bump back to even. Readers loop in
- * atomic_get_snapshot() until they see two equal, even seq values
- * around their reads, so they never observe a torn snapshot.
- */
-static void publish_snapshot(
-  MonitorHost *host, const MonitorStatus new_status, const uint64_t new_lag_ms,
-  const uint64_t new_lag_bytes, const uint64_t new_lsn
-) {
-  atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);
-  atomic_store_explicit(&host->lag_ms, new_lag_ms, memory_order_relaxed);
-  atomic_store_explicit(&host->lag_bytes, new_lag_bytes, memory_order_relaxed);
-  atomic_store_explicit(&host->lsn, new_lsn, memory_order_relaxed);
-  atomic_store_explicit(&host->status, new_status, memory_order_relaxed);
-  atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);
-}
-
-/**
  * Closes out one poll iteration. On success, publishes the staged data;
  * on failure, bumps failed_connections, marks possible_dead (or dead),
  * and closes the connection so the next iteration will reconnect.
@@ -312,7 +294,14 @@ static void finish_iteration(
     close_conn(host);
   }
 
-  publish_snapshot(host, new_status, new_lag_ms, new_lag_bytes, new_lsn);
+  publish_monitor_snapshot(
+    host, (MonitorSnapshot){
+            .status = new_status,
+            .lag_ms = new_lag_ms,
+            .lag_bytes = new_lag_bytes,
+            .lsn = new_lsn,
+          }
+  );
   log_changes(
     host, new_status, old_status, new_lag_ms, old_lag_ms, new_lag_bytes,
     old_lag_bytes

@@ -221,6 +221,12 @@ uint64_t atomic_get_lag_bytes(const MonitorHost *host);
 MonitorSnapshot atomic_get_snapshot(const MonitorHost *host);
 
 /**
+ * Atomically publishes a consistent snapshot for a host.
+ * There must be only one writer for a given host.
+ */
+void publish_monitor_snapshot(MonitorHost *host, MonitorSnapshot snapshot);
+
+/**
  * Describes the interface of the function for searching hosts.
  * Receives a consistent MonitorSnapshot (status + lags from the same
  * poll), the host itself (for host->host name access), and an opaque

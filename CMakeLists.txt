@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.12)
-project(pg-status C)
+project(pg-status VERSION 2.1.1 LANGUAGES C)
+
+configure_file(
+        src/pg_status_version.h.in
+        ${CMAKE_CURRENT_BINARY_DIR}/pg_status_version.h
+        @ONLY
+)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -49,6 +55,7 @@ if(CLANG_FORMAT_EXE)
             "${CMAKE_SOURCE_DIR}/src/*.c"
             "${CMAKE_SOURCE_DIR}/src/*.h"
             "${CMAKE_SOURCE_DIR}/test/*.c"
+            "${CMAKE_SOURCE_DIR}/test/*.h"
     )
 
     add_custom_target(format

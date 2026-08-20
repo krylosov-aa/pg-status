@@ -2,7 +2,7 @@
 FROM alpine:latest AS builder
 
 RUN apk add --no-cache \
-    bash clang clang-extra-tools build-base cmake ninja pkgconfig libtool \
+    bash clang clang-extra-tools build-base bsd-compat-headers cmake ninja pkgconfig libtool \
     autoconf automake tar curl \
     zlib-dev zlib-static \
     openssl-dev openssl-libs-static \
@@ -44,7 +44,8 @@ WORKDIR /app
 
 COPY CMakeLists.txt .
 COPY src/ src/
-COPY test/CMakeLists.txt test/http_server_test.c test/
+COPY test/CMakeLists.txt test/
+COPY test/tests/ test/tests/
 
 ENV CC=clang
 ENV CFLAGS="-static -O2"

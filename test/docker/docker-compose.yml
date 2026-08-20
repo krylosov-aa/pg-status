@@ -1,5 +1,9 @@
+# Complete Docker environment used for manual topology tests.
+
 services:
   pg-status:
+    profiles:
+      - pg-status
     image: pg-status:latest
     ports:
       - 8000:8000
@@ -16,7 +20,7 @@ services:
       - pg_status__pg_password=postgres
       - pg_status__pg_user=postgres
       - pg_status__pg_port=5432
-      - pg_status__sleep=5
+      - pg_status__sleep_ms=5000
 
   postgres_master:
     build:

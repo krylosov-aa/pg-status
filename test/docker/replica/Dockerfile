@@ -1,3 +1,5 @@
+# PostgreSQL replica used by the Docker test topology.
+
 FROM postgres:16
 
 ENV POSTGRES_USER=postgres

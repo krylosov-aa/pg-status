@@ -5,6 +5,7 @@ RUN apk add --no-cache \
         clang \
         clang-extra-tools \
         build-base \
+        bsd-compat-headers \
         cmake \
         ninja \
         pkgconfig \
@@ -18,7 +19,8 @@ WORKDIR /app
 
 COPY CMakeLists.txt .
 COPY src/ src/
-COPY test/CMakeLists.txt test/http_server_test.c test/
+COPY test/CMakeLists.txt test/
+COPY test/tests/ test/tests/
 
 RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
     cmake --build build && \

@@ -84,7 +84,8 @@ WORKDIR /app
 
 COPY CMakeLists.txt .
 COPY src/ src/
-COPY test/CMakeLists.txt test/http_server_test.c test/
+COPY test/CMakeLists.txt test/
+COPY test/tests/ test/tests/
 
 ENV CC=clang
 ENV CFLAGS="-static -O2"

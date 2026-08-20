@@ -17,6 +17,14 @@ target_link_libraries(
 
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(LIBPQ libpq QUIET)
+    if (LIBPQ_FOUND)
+        if (NOT LIBPQ_INCLUDE_DIR)
+            set(LIBPQ_INCLUDE_DIR ${LIBPQ_INCLUDE_DIRS})
+        endif ()
+        if (NOT LIBPQ_LIBRARY)
+            set(LIBPQ_LIBRARY ${LIBPQ_LINK_LIBRARIES})
+        endif ()
+    endif ()
 endif ()
 
 if (NOT LIBPQ_FOUND)

@@ -1,7 +1,12 @@
 # Performance
 
-The measurements were taken using [this Docker compose setup](../test/docker-compose.yml)
-with [this container](../docker/alpine/Dockerfile_shared).
+For a repeatable fixed-rate localhost benchmark with an application-like route
+mix and automatic SLO checks, see the
+[manual sustainable-RPS benchmark](../test/rps/README.md).
+
+The measurements were taken using
+[this Docker compose setup](../test/docker/docker-compose.yml) with
+[this container](../docker/alpine/Dockerfile_shared).
 
 Host machine:
 - Ubuntu 24.04 LTS

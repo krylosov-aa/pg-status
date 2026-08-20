@@ -58,3 +58,6 @@ dkms.conf
 
 
 /.idea/*
+
+# Manual benchmark results
+/test/rps/results/
