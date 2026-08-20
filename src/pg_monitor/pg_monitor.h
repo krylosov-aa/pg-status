@@ -19,22 +19,22 @@ constexpr unsigned int MAX_HOSTS = 10;
  */
 typedef struct {
   // pg user
-  char *user;
+  const char *user;
 
   // pg password
-  char *password;
+  const char *password;
 
   // pg database name
-  char *database;
+  const char *database;
 
   // pg hosts, comma-separated.
-  char *hosts;
+  const char *hosts;
 
   // pg port. You can specify multiple ports, comma-separated.
-  char *port;
+  const char *port;
 
   // Time to attempt connection to host
-  char *connect_timeout;
+  const char *connect_timeout;
 
   // The lag in ms below which a replica is considered synchronous
   uint64_t sync_max_lag_ms;
@@ -139,7 +139,7 @@ typedef enum {
  *    one field (e.g. /hosts and /status JSON rendering).
  */
 typedef struct {
-  char *host;                       // immutable after init
+  const char *host;                 // immutable after init
   char *connection_str;             // immutable after init
   _Atomic uint64_t seq;             // seqlock: odd = writing, even = stable
   _Atomic uint64_t lag_ms;          // protected by seq

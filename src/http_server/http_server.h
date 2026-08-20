@@ -67,12 +67,18 @@ const char *http_request_get_query_param(
 bool http_request_accepts_json(const HTTPRequest *request);
 
 /**
- * Sets a response body. If cleanup is non-null, it is called exactly once with
- * body after the body is no longer needed. A null cleanup means that the body
- * is borrowed and remains owned by the caller.
+ * Sets a borrowed response body that remains owned by the caller.
  */
-void http_response_set_body(
-  HTTPResponse *response, const char *body, const char *content_type,
+void http_response_set_borrowed_body(
+  HTTPResponse *response, const char *body, const char *content_type
+);
+
+/**
+ * Transfers ownership of a response body to the response. Cleanup must be
+ * non-null and is called exactly once after the body is no longer needed.
+ */
+void http_response_set_owned_body(
+  HTTPResponse *response, char *body, const char *content_type,
   response_body_cleanup_t cleanup
 );
 

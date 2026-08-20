@@ -132,7 +132,7 @@ uint16_t str_to_uint16(const char *value);
  * Takes a value from the environment variables if it is set,
  * pastes it by the result pointer.
  */
-void replace_from_env(const char *env_name, char **result);
+void replace_from_env(const char *env_name, const char **result);
 
 /**
  * Takes a value from the environment variables if it is set,

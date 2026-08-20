@@ -348,9 +348,9 @@ uint16_t str_to_uint16(const char *value) {
  * Takes a value from the environment variables if it is set,
  * pastes it by the result pointer.
  */
-void replace_from_env(const char *env_name, char **result) {
+void replace_from_env(const char *env_name, const char **result) {
   assert(env_name);
-  char *env_val = getenv(env_name);
+  const char *env_val = getenv(env_name);
   if (env_val && *env_val) {
     *result = env_val;
   }

@@ -14,17 +14,17 @@ static void echo_handler(const HTTPRequest *request, HTTPResponse *response) {
     bad_request(response, "{\"error_text\":\"missing value\"}");
     return;
   }
-  http_response_set_body(response, value, "text/plain; charset=utf-8", nullptr);
+  http_response_set_borrowed_body(response, value, "text/plain; charset=utf-8");
 }
 
 static void format_handler(const HTTPRequest *request, HTTPResponse *response) {
   if (http_request_accepts_json(request)) {
-    http_response_set_body(
-      response, "{\"format\":\"json\"}", "application/json", nullptr
+    http_response_set_borrowed_body(
+      response, "{\"format\":\"json\"}", "application/json"
     );
   } else {
-    http_response_set_body(
-      response, "text", "text/plain; charset=utf-8", nullptr
+    http_response_set_borrowed_body(
+      response, "text", "text/plain; charset=utf-8"
     );
   }
 }
@@ -40,7 +40,7 @@ static void cleanup_handler(
   const HTTPRequest *request, HTTPResponse *response
 ) {
   (void)request;
-  http_response_set_body(
+  http_response_set_owned_body(
     response, custom_body, "text/plain; charset=utf-8", custom_body_cleanup
   );
 }

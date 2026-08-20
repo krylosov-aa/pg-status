@@ -424,6 +424,7 @@ static void advance_connecting(MonitorHost *host, const uint64_t now_ms) {
       poll_state_query_send(host);
       flush_step(host, now_ms);
       return;
+    case PGRES_POLLING_ACTIVE:
     case PGRES_POLLING_FAILED:
     default:
       printf_error("connect error: %s", PQerrorMessage(host->conn));

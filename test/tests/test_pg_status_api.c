@@ -67,7 +67,7 @@ static void test_master_text(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("replica", 50, 500, 0x450),
@@ -96,7 +96,7 @@ static void test_master_json(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("replica", 50, 500, 0x450),
@@ -123,7 +123,7 @@ static void test_master_json(void) {
 
 static void test_replica_json(void) {
   // Arrange
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(replica_host_name, 50, 500, 0x450),
@@ -151,9 +151,9 @@ static void test_hosts(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
-  char *replica_host_name = "replica";
-  char *dead_host_name = "dead";
+  const char *master_host_name = "master";
+  const char *replica_host_name = "replica";
+  const char *dead_host_name = "dead";
   const TestHost master = fixture_pg_status_master_host(master_host_name);
   const TestHost replica = fixture_pg_status_replica_host(
     replica_host_name, 50, 500, 0x450
@@ -210,7 +210,7 @@ static void test_hosts_ignores_accept(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost master = fixture_pg_status_master_host(master_host_name);
   const TestHost hosts[] = {master};
   PgStatusApiFixture api = fixture_pg_status_start(
@@ -243,7 +243,7 @@ static void test_status_alive(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const TestHost replica = fixture_pg_status_replica_host(
     replica_host_name, 50, 500, 0x450
   );
@@ -284,7 +284,7 @@ static void test_status_mixed_sync(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const TestHost replica = fixture_pg_status_replica_host(
     replica_host_name, parameters.sync_max_lag_ms + 1,
     parameters.sync_max_lag_bytes, 0x450
@@ -323,7 +323,7 @@ static void test_status_max_lsn(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const TestHost replica = fixture_pg_status_replica_host(
     replica_host_name, 50, 500, UINT64_MAX
   );
@@ -361,7 +361,7 @@ static void test_status_ignores_accept(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const TestHost replica = fixture_pg_status_replica_host(
     replica_host_name, 50, 500, 0x450
   );
@@ -401,7 +401,7 @@ static void test_snapshot_consistency(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *host_name = "changing-host";
+  const char *host_name = "changing-host";
   const TestHost first = fixture_pg_status_replica_host(
     host_name, 10, 100, UINT64_C(0x100000010)
   );
@@ -463,7 +463,7 @@ static void test_status_dead(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *dead_host_name = "dead";
+  const char *dead_host_name = "dead";
   const TestHost dead = fixture_pg_status_dead_host(dead_host_name);
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
@@ -726,8 +726,8 @@ static void test_unknown_route(void) {
 
 static void test_round_robin(void) {
   // Arrange
-  char *first_replica_host_name = "replica-1";
-  char *second_replica_host_name = "replica-2";
+  const char *first_replica_host_name = "replica-1";
+  const char *second_replica_host_name = "replica-2";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(first_replica_host_name, 10, 10, 0x490),
@@ -760,8 +760,8 @@ static void test_round_robin(void) {
 
 static void test_round_robin_master_in_middle(void) {
   // Arrange
-  char *before_master_host_name = "before-master";
-  char *after_master_host_name = "after-master";
+  const char *before_master_host_name = "before-master";
+  const char *after_master_host_name = "after-master";
   const TestHost hosts[] = {
     fixture_pg_status_replica_host(before_master_host_name, 10, 10, 0x490),
     fixture_pg_status_master_host("master"),
@@ -794,7 +794,7 @@ static void test_round_robin_master_in_middle(void) {
 
 static void test_replica_combined_lag_filters(void) {
   // Arrange
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(candidate_host_name, 50, 100, 0x450),
@@ -819,7 +819,7 @@ static void test_replica_combined_lag_filters(void) {
 
 static void test_replica_lag_ms_fallback(void) {
   // Arrange
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("candidate", 50, 100, 0x450),
@@ -844,7 +844,7 @@ static void test_replica_lag_ms_fallback(void) {
 
 static void test_replica_lag_bytes_fallback(void) {
   // Arrange
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("candidate", 50, 100, 0x450),
@@ -869,7 +869,7 @@ static void test_replica_lag_bytes_fallback(void) {
 
 static void test_replica_min_lsn_match(void) {
   // Arrange
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(candidate_host_name, 50, 100, 0x450),
@@ -894,7 +894,7 @@ static void test_replica_min_lsn_match(void) {
 
 static void test_replica_min_lsn_fallback(void) {
   // Arrange
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("candidate", 50, 100, 0x450),
@@ -921,7 +921,7 @@ static void test_sync_by_time_selects_candidate(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(candidate_host_name, 50, 2000, 0x450),
@@ -945,7 +945,7 @@ static void test_sync_by_bytes_falls_back(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("candidate", 50, 2000, 0x450),
@@ -971,7 +971,7 @@ static void test_sync_or_time_match(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(candidate_host_name, 50, 2000, 0x450),
@@ -997,7 +997,7 @@ static void test_sync_and_rejects_time_only(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("candidate", 50, 2000, 0x450),
@@ -1023,7 +1023,7 @@ static void test_sync_or_bytes_match(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(candidate_host_name, 200, 100, 0x450),
@@ -1049,7 +1049,7 @@ static void test_sync_and_rejects_bytes_only(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("candidate", 200, 100, 0x450),
@@ -1077,7 +1077,7 @@ static void test_sync_and_threshold_boundary(void) {
   const uint64_t max_lag_bytes = 1000;
   parameters.sync_max_lag_ms = max_lag_ms;
   parameters.sync_max_lag_bytes = max_lag_bytes;
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(
@@ -1105,7 +1105,7 @@ static void test_sync_or_query_overrides_globals(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost candidate = fixture_pg_status_replica_host(
     candidate_host_name, 200, 2000, 0x450
   );
@@ -1136,7 +1136,7 @@ static void test_sync_and_query_overrides_globals(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost candidate = fixture_pg_status_replica_host(
     candidate_host_name, 200, 2000, 0x450
   );
@@ -1168,7 +1168,7 @@ static void test_sync_by_time_ignores_lag_bytes(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("candidate", 100, 1000, 0x450),
@@ -1194,7 +1194,7 @@ static void test_sync_by_bytes_ignores_lag_ms(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *candidate_host_name = "candidate";
+  const char *candidate_host_name = "candidate";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(candidate_host_name, 100, 1000, 0x450),
@@ -1220,7 +1220,7 @@ static void test_sync_by_time_min_lsn(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("candidate", 100, 1000, 0x450),
@@ -1246,7 +1246,7 @@ static void test_sync_by_bytes_min_lsn(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const uint64_t replica_lsn = 0x450;
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
@@ -1275,7 +1275,7 @@ static void test_sync_or_min_lsn(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const uint64_t replica_lsn = 0x450;
   const uint64_t minimum_lsn_value = replica_lsn + 1;
   const TestHost hosts[] = {
@@ -1305,7 +1305,7 @@ static void test_most_sync_by_bytes(void) {
   // Arrange
   parameters.sync_max_lag_ms = 1000;
   parameters.sync_max_lag_bytes = 1000;
-  char *closest_replica_host_name = "replica-50";
+  const char *closest_replica_host_name = "replica-50";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host("replica-100", 50, 100, 0x450),
@@ -1333,7 +1333,7 @@ static void test_most_sync_lag_bytes_filter(void) {
   // Arrange
   parameters.sync_max_lag_ms = 1000;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const TestHost hosts[] = {
     fixture_pg_status_master_host(master_host_name),
     fixture_pg_status_replica_host("replica-100", 50, 100, 0x450),
@@ -1361,7 +1361,7 @@ static void test_most_sync_min_lsn_filter(void) {
   // Arrange
   parameters.sync_max_lag_ms = 1000;
   parameters.sync_max_lag_bytes = 1000;
-  char *expected_replica_host_name = "replica-100";
+  const char *expected_replica_host_name = "replica-100";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(expected_replica_host_name, 50, 100, 0x450),
@@ -1389,7 +1389,7 @@ static void test_most_sync_ignores_lag_ms(void) {
   // Arrange
   parameters.sync_max_lag_ms = 1000;
   parameters.sync_max_lag_bytes = 1000;
-  char *closest_replica_host_name = "replica-50";
+  const char *closest_replica_host_name = "replica-50";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host("replica-100", 50, 100, 0x450),
@@ -1417,7 +1417,7 @@ static void test_replica_prefers_alive(void) {
   // Arrange
   parameters.sync_max_lag_ms = 1000;
   parameters.sync_max_lag_bytes = 1000;
-  char *alive_host_name = "alive";
+  const char *alive_host_name = "alive";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_possible_dead_replica_host("possible", 10, 10, 0x490),
@@ -1442,7 +1442,7 @@ static void test_most_sync_prefers_alive(void) {
   // Arrange
   parameters.sync_max_lag_ms = 1000;
   parameters.sync_max_lag_bytes = 1000;
-  char *alive_host_name = "alive";
+  const char *alive_host_name = "alive";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_possible_dead_replica_host("possible", 10, 10, 0x490),
@@ -1469,7 +1469,7 @@ static void test_replica_uses_possible_dead(void) {
   // Arrange
   parameters.sync_max_lag_ms = 1000;
   parameters.sync_max_lag_bytes = 1000;
-  char *possible_dead_host_name = "possible";
+  const char *possible_dead_host_name = "possible";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_possible_dead_replica_host(
@@ -1496,7 +1496,7 @@ static void test_most_sync_uses_possible_dead(void) {
   // Arrange
   parameters.sync_max_lag_ms = 1000;
   parameters.sync_max_lag_bytes = 1000;
-  char *possible_dead_host_name = "possible";
+  const char *possible_dead_host_name = "possible";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_possible_dead_replica_host(
@@ -1524,7 +1524,7 @@ static void test_most_sync_uses_possible_dead(void) {
 static void test_most_sync_tie_break(void) {
   // Arrange
   parameters.sync_max_lag_bytes = 1000;
-  char *first_replica_host_name = "first";
+  const char *first_replica_host_name = "first";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
     fixture_pg_status_replica_host(first_replica_host_name, 200, 100, 0x400),
@@ -1551,7 +1551,7 @@ static void test_replica_lsn_boundary(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const uint64_t replica_lsn = 0x450;
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
@@ -1578,7 +1578,7 @@ static void test_replica_lsn_boundary(void) {
 
 static void test_replica_high_lsn_boundary(void) {
   // Arrange
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const uint64_t replica_lsn = UINT64_C(1) << 32;
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
@@ -1607,7 +1607,7 @@ static void test_sync_and_lsn_boundary(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const uint64_t replica_lsn = 0x450;
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
@@ -1636,7 +1636,7 @@ static void test_most_sync_lsn_boundary(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *replica_host_name = "replica";
+  const char *replica_host_name = "replica";
   const uint64_t replica_lsn = 0x450;
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
@@ -1665,7 +1665,7 @@ static void test_replica_lsn_above_boundary(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *master_host_name = "master";
+  const char *master_host_name = "master";
   const uint64_t replica_lsn = 0x450;
   const uint64_t minimum_lsn_value = replica_lsn + 1;
   const TestHost hosts[] = {
@@ -1695,8 +1695,8 @@ static void test_master_switch_master(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *old_master_host_name = "master";
-  char *new_master_host_name = "new-master";
+  const char *old_master_host_name = "master";
+  const char *new_master_host_name = "new-master";
   const TestHost initial_hosts[] = {
     fixture_pg_status_master_host(old_master_host_name),
     fixture_pg_status_replica_host(new_master_host_name, 20, 20, 0x480),
@@ -1729,8 +1729,8 @@ static void test_master_switch_replica(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *old_master_host_name = "master";
-  char *new_master_host_name = "new-master";
+  const char *old_master_host_name = "master";
+  const char *new_master_host_name = "new-master";
   const TestHost initial_hosts[] = {
     fixture_pg_status_master_host(old_master_host_name),
     fixture_pg_status_replica_host(new_master_host_name, 20, 20, 0x480),
@@ -1763,8 +1763,8 @@ static void test_master_switch_hosts(void) {
   // Arrange
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
-  char *old_master_host_name = "master";
-  char *new_master_host_name = "new-master";
+  const char *old_master_host_name = "master";
+  const char *new_master_host_name = "new-master";
   const TestHost initial_hosts[] = {
     fixture_pg_status_master_host(old_master_host_name),
     fixture_pg_status_replica_host(new_master_host_name, 20, 20, 0x480),

@@ -14,7 +14,7 @@
 
 static constexpr size_t FORMATTED_LSN_CAPACITY = sizeof("FFFFFFFF/FFFFFFFF");
 
-TestHost fixture_pg_status_master_host(char *name) {
+TestHost fixture_pg_status_master_host(const char *name) {
   return (TestHost){
     .host = name,
     .snapshot = {
@@ -27,7 +27,7 @@ TestHost fixture_pg_status_master_host(char *name) {
 }
 
 TestHost fixture_pg_status_replica_host(
-  char *name, const uint64_t lag_ms, const uint64_t lag_bytes,
+  const char *name, const uint64_t lag_ms, const uint64_t lag_bytes,
   const uint64_t lsn
 ) {
   return (TestHost){
@@ -42,7 +42,7 @@ TestHost fixture_pg_status_replica_host(
 }
 
 TestHost fixture_pg_status_possible_dead_replica_host(
-  char *name, const uint64_t lag_ms, const uint64_t lag_bytes,
+  const char *name, const uint64_t lag_ms, const uint64_t lag_bytes,
   const uint64_t lsn
 ) {
   TestHost host = fixture_pg_status_replica_host(name, lag_ms, lag_bytes, lsn);
@@ -50,7 +50,7 @@ TestHost fixture_pg_status_possible_dead_replica_host(
   return host;
 }
 
-TestHost fixture_pg_status_dead_host(char *name) {
+TestHost fixture_pg_status_dead_host(const char *name) {
   return (TestHost){
     .host = name,
     .snapshot = {

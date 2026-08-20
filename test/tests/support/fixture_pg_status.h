@@ -11,7 +11,7 @@
 #include "pg_status_api.h"
 
 typedef struct {
-  char *host;
+  const char *host;
   MonitorSnapshot snapshot;
 } TestHost;
 
@@ -28,14 +28,14 @@ typedef struct {
   MonitorSnapshot second;
 } PgStatusSnapshotPublisher;
 
-TestHost fixture_pg_status_master_host(char *name);
+TestHost fixture_pg_status_master_host(const char *name);
 TestHost fixture_pg_status_replica_host(
-  char *name, uint64_t lag_ms, uint64_t lag_bytes, uint64_t lsn
+  const char *name, uint64_t lag_ms, uint64_t lag_bytes, uint64_t lsn
 );
 TestHost fixture_pg_status_possible_dead_replica_host(
-  char *name, uint64_t lag_ms, uint64_t lag_bytes, uint64_t lsn
+  const char *name, uint64_t lag_ms, uint64_t lag_bytes, uint64_t lsn
 );
-TestHost fixture_pg_status_dead_host(char *name);
+TestHost fixture_pg_status_dead_host(const char *name);
 char *fixture_pg_status_format_expected_lsn(uint64_t lsn);
 void fixture_pg_status_snapshot_publisher_start(
   PgStatusSnapshotPublisher *publisher, MonitorHost *host,

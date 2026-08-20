@@ -34,8 +34,18 @@ struct HTTPRequest {
   struct evkeyvalq query_params;
 };
 
+typedef enum {
+  HTTP_BODY_NONE,
+  HTTP_BODY_BORROWED,
+  HTTP_BODY_OWNED,
+} HTTPBodyKind;
+
 struct HTTPResponse {
-  const char *body;
+  union {
+    const char *borrowed;
+    char *owned;
+  } body;
+  HTTPBodyKind body_kind;
   const char *content_type;
   response_body_cleanup_t body_cleanup;
   unsigned int status_code;
@@ -216,19 +226,53 @@ const char *http_request_get_query_param(
 }
 
 static void release_response_body(HTTPResponse *response) {
-  if (response->body_cleanup) {
-    response->body_cleanup((void *)response->body);
-    response->body = nullptr;
-    response->body_cleanup = nullptr;
+  switch (response->body_kind) {
+    case HTTP_BODY_NONE:
+    case HTTP_BODY_BORROWED:
+      break;
+    case HTTP_BODY_OWNED:
+      response->body_cleanup(response->body.owned);
+      break;
+    default:
+      raise_error("Invalid HTTP response body kind");
+  }
+  response->body.borrowed = nullptr;
+  response->body_kind = HTTP_BODY_NONE;
+  response->body_cleanup = nullptr;
+}
+
+static const char *get_response_body(const HTTPResponse *response) {
+  switch (response->body_kind) {
+    case HTTP_BODY_NONE:
+      return nullptr;
+    case HTTP_BODY_BORROWED:
+      return response->body.borrowed;
+    case HTTP_BODY_OWNED:
+      return response->body.owned;
+    default:
+      raise_error("Invalid HTTP response body kind");
   }
 }
 
-void http_response_set_body(
-  HTTPResponse *response, const char *body, const char *content_type,
-  const response_body_cleanup_t cleanup
+void http_response_set_borrowed_body(
+  HTTPResponse *response, const char *body, const char *content_type
 ) {
   release_response_body(response);
-  response->body = body;
+  response->body.borrowed = body;
+  response->body_kind = HTTP_BODY_BORROWED;
+  response->content_type = content_type;
+}
+
+void http_response_set_owned_body(
+  HTTPResponse *response, char *body, const char *content_type,
+  const response_body_cleanup_t cleanup
+) {
+  if (!cleanup) {
+    raise_error("Owned HTTP response body cleanup must not be null");
+  }
+  release_response_body(response);
+  response->body.owned = body;
+  response->body_kind = HTTP_BODY_OWNED;
   response->content_type = content_type;
   response->body_cleanup = cleanup;
 }
@@ -260,9 +304,10 @@ static void send_response(
     return;
   }
 
-  if (response->body) {
-    const size_t body_len = strlen(response->body);
-    if (evbuffer_add(body, response->body, body_len) != 0) {
+  const char *response_body = get_response_body(response);
+  if (response_body) {
+    const size_t body_len = strlen(response_body);
+    if (evbuffer_add(body, response_body, body_len) != 0) {
       evbuffer_free(body);
       release_response_body(response);
       evhttp_send_error(request, HTTP_INTERNAL, nullptr);
@@ -291,7 +336,8 @@ static void send_empty_response(
   struct evhttp_request *request, const unsigned int status_code
 ) {
   HTTPResponse response = {
-    .body = nullptr,
+    .body = {.borrowed = nullptr},
+    .body_kind = HTTP_BODY_NONE,
     .content_type = nullptr,
     .body_cleanup = nullptr,
     .status_code = status_code,
@@ -356,7 +402,8 @@ static void process_request(struct evhttp_request *raw_request, void *arg) {
   }
 
   HTTPResponse response = {
-    .body = nullptr,
+    .body = {.borrowed = nullptr},
+    .body_kind = HTTP_BODY_NONE,
     .content_type = nullptr,
     .body_cleanup = nullptr,
     .status_code = HTTP_OK,
@@ -748,5 +795,5 @@ bool parse_get_param_lsn(
 
 void bad_request(HTTPResponse *response, const char *body) {
   http_response_set_status(response, HTTP_BADREQUEST);
-  http_response_set_body(response, body, "application/json", nullptr);
+  http_response_set_borrowed_body(response, body, "application/json");
 }

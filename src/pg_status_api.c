@@ -61,7 +61,7 @@ static void get_all_hosts(const HTTPRequest *request, HTTPResponse *response) {
     cJSON_AddItemToArray(arr, json_obj);
   }
 
-  http_response_set_body(
+  http_response_set_owned_body(
     response, json_to_str(arr), "application/json", cJSON_free
   );
 }
@@ -76,12 +76,12 @@ static void return_single_host(
   if (http_request_accepts_json(request)) {
     cJSON *json_obj = json_object();
     add_host_to_json(json_obj, host);
-    http_response_set_body(
+    http_response_set_owned_body(
       response, json_to_str(json_obj), "application/json", cJSON_free
     );
   } else {
-    http_response_set_body(
-      response, host, host ? "text/plain; charset=utf-8" : nullptr, nullptr
+    http_response_set_borrowed_body(
+      response, host, host ? "text/plain; charset=utf-8" : nullptr
     );
   }
 }
@@ -218,15 +218,15 @@ static void get_host_status(
   const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
   cJSON *json_obj = json_object();
   add_host_status_to_json(json_obj, snap);
-  http_response_set_body(
+  http_response_set_owned_body(
     response, json_to_str(json_obj), "application/json", cJSON_free
   );
 }
 
 static void get_version(const HTTPRequest *request, HTTPResponse *response) {
   (void)request;
-  http_response_set_body(
-    response, PG_STATUS_VERSION, "text/plain; charset=utf-8", nullptr
+  http_response_set_borrowed_body(
+    response, PG_STATUS_VERSION, "text/plain; charset=utf-8"
   );
 }
 

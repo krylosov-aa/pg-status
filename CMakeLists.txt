@@ -35,6 +35,9 @@ target_compile_options(common_warnings INTERFACE
         -Wimplicit-fallthrough
         -Wnull-dereference
         -Wdouble-promotion
+        -Wswitch-enum
+        -Wwrite-strings
+        -Wcast-qual
 
         "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
         "$<$<CONFIG:Debug>:-fno-sanitize-recover=undefined>"
