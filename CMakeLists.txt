@@ -30,13 +30,21 @@ target_compile_options(common_warnings INTERFACE
         -Wmissing-field-initializers
 
         "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
+        "$<$<CONFIG:Debug>:-fno-sanitize-recover=undefined>"
+        "$<$<CONFIG:Debug>:-fsanitize-address-use-after-scope>"
         "$<$<CONFIG:Debug>:-fno-omit-frame-pointer>"
+        "$<$<CONFIG:Debug>:-fno-optimize-sibling-calls>"
         "$<$<CONFIG:Debug>:-g3>"
 )
+
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(common_warnings INTERFACE
+            "$<$<CONFIG:Debug>:-fno-sanitize-merge>"
+    )
+endif()
+
 target_link_options(common_warnings INTERFACE
         "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
-        "$<$<CONFIG:Debug>:-fno-omit-frame-pointer>"
-        "$<$<CONFIG:Debug>:-g3>"
 )
 
 find_package(PkgConfig REQUIRED)

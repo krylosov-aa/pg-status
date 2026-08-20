@@ -28,7 +28,13 @@ target_link_libraries(
 )
 
 add_test(NAME http_server_test COMMAND http_server_test)
-set_tests_properties(http_server_test PROPERTIES TIMEOUT 15)
+set_tests_properties(
+        http_server_test
+        PROPERTIES
+        TIMEOUT 15
+        ENVIRONMENT
+        "ASAN_OPTIONS=abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1;UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1"
+)
 
 add_executable(pg_status_api_test test_pg_status_api.c)
 target_link_libraries(
@@ -112,5 +118,7 @@ foreach(TEST_CASE IN LISTS PG_STATUS_API_TEST_CASES)
             PROPERTIES
             LABELS functional
             TIMEOUT 15
+            ENVIRONMENT
+            "ASAN_OPTIONS=abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1;UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1"
     )
 endforeach()
