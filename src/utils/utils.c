@@ -40,6 +40,8 @@ char *copy_string(const char *str) {
 void printf_error(const char *format, ...) {
   va_list args;
   va_start(args, format);
+  // Clang 21 does not model C23's __builtin_c23_va_start correctly.
+  // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
   (void)vfprintf(stderr, format, args);
   va_end(args);
   (void)fputs(". strerror: ", stderr);
@@ -54,6 +56,8 @@ void printf_error(const char *format, ...) {
 void raise_error(const char *format, ...) {
   va_list args;
   va_start(args, format);
+  // Clang 21 does not model C23's __builtin_c23_va_start correctly.
+  // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
   (void)vfprintf(stderr, format, args);
   va_end(args);
   (void)fputs(". strerror: ", stderr);

@@ -10,8 +10,46 @@ configure_file(
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+set(PG_STATUS_DEFAULT_SANITIZER "none")
+set(PG_STATUS_DEFAULT_CLANG_TIDY OFF)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_C_CLANG_TIDY "clang-tidy")
+    set(PG_STATUS_DEFAULT_SANITIZER "address-undefined")
+    set(PG_STATUS_DEFAULT_CLANG_TIDY ON)
+endif()
+
+set(PG_STATUS_SANITIZER
+        "${PG_STATUS_DEFAULT_SANITIZER}"
+        CACHE STRING
+        "Runtime sanitizer: none, address-undefined, or thread"
+)
+set_property(
+        CACHE PG_STATUS_SANITIZER
+        PROPERTY STRINGS none address-undefined thread
+)
+
+if(NOT PG_STATUS_SANITIZER STREQUAL "none" AND
+        NOT PG_STATUS_SANITIZER STREQUAL "address-undefined" AND
+        NOT PG_STATUS_SANITIZER STREQUAL "thread")
+    message(FATAL_ERROR
+            "Invalid PG_STATUS_SANITIZER='${PG_STATUS_SANITIZER}'. "
+            "Expected none, address-undefined, or thread."
+    )
+endif()
+
+option(
+        PG_STATUS_ENABLE_CLANG_TIDY
+        "Run clang-tidy while compiling"
+        ${PG_STATUS_DEFAULT_CLANG_TIDY}
+)
+
+if(PG_STATUS_ENABLE_CLANG_TIDY)
+    find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+    if(NOT CLANG_TIDY_EXE)
+        message(FATAL_ERROR
+                "PG_STATUS_ENABLE_CLANG_TIDY requires clang-tidy"
+        )
+    endif()
+    set(CMAKE_C_CLANG_TIDY "${CLANG_TIDY_EXE}")
 endif()
 
 add_library(common_warnings INTERFACE)
@@ -39,11 +77,6 @@ target_compile_options(common_warnings INTERFACE
         -Wwrite-strings
         -Wcast-qual
 
-        "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
-        "$<$<CONFIG:Debug>:-fno-sanitize-recover=undefined>"
-        "$<$<CONFIG:Debug>:-fsanitize-address-use-after-scope>"
-        "$<$<CONFIG:Debug>:-fno-omit-frame-pointer>"
-        "$<$<CONFIG:Debug>:-fno-optimize-sibling-calls>"
         "$<$<CONFIG:Debug>:-g3>"
 )
 
@@ -52,14 +85,59 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
             -Wmissing-variable-declarations
             -Wcomma
             -Wdocumentation
-
-            "$<$<CONFIG:Debug>:-fno-sanitize-merge>"
     )
 endif()
 
-target_link_options(common_warnings INTERFACE
-        "$<$<CONFIG:Debug>:-fsanitize=address,undefined>"
-)
+set(PG_STATUS_TEST_ENVIRONMENT)
+
+if(PG_STATUS_SANITIZER STREQUAL "address-undefined")
+    target_compile_options(common_warnings INTERFACE
+            -fsanitize=address,undefined
+            -fno-sanitize-recover=undefined
+            -fsanitize-address-use-after-scope
+            -fno-omit-frame-pointer
+            -fno-optimize-sibling-calls
+    )
+    target_link_options(common_warnings INTERFACE
+            -fsanitize=address,undefined
+    )
+
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        include(CheckCCompilerFlag)
+        check_c_compiler_flag(
+                "-fno-sanitize-merge"
+                PG_STATUS_HAS_FNO_SANITIZE_MERGE
+        )
+        if(PG_STATUS_HAS_FNO_SANITIZE_MERGE)
+            target_compile_options(common_warnings INTERFACE
+                    -fno-sanitize-merge
+            )
+        endif()
+    endif()
+
+    set(PG_STATUS_TEST_ENVIRONMENT
+            "ASAN_OPTIONS=abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1"
+            "UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1"
+    )
+elseif(PG_STATUS_SANITIZER STREQUAL "thread")
+    target_compile_options(common_warnings INTERFACE
+            -fsanitize=thread
+            -O1
+            -g
+            -fno-omit-frame-pointer
+            -fno-optimize-sibling-calls
+    )
+    target_link_options(common_warnings INTERFACE
+            -fsanitize=thread
+    )
+
+    set(PG_STATUS_TEST_ENVIRONMENT
+            "TSAN_OPTIONS=halt_on_error=1"
+    )
+endif()
+
+message(STATUS "pg-status sanitizer: ${PG_STATUS_SANITIZER}")
+message(STATUS "pg-status clang-tidy: ${PG_STATUS_ENABLE_CLANG_TIDY}")
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)

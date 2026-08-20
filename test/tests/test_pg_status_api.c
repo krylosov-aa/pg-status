@@ -443,7 +443,14 @@ static void test_snapshot_consistency(void) {
     const bool is_consistent =
       fixture_pg_status_json_body_equals(&response, first_json) ||
       fixture_pg_status_json_body_equals(&response, second_json);
-    http_test_assert_true(is_consistent, "HTTP API returned a torn snapshot");
+    if (!is_consistent) {
+      fprintf(
+        stderr,
+        "Expected either snapshot:\n%s\n%s\nActual response body:\n%s\n",
+        first_json, second_json, response.body
+      );
+      http_test_fail("HTTP API returned a torn snapshot");
+    }
 
     // Cleanup
     http_test_response_free(&response);

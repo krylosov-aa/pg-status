@@ -287,6 +287,44 @@ Available installation options:
 
 For more information, see the [installation guide](docs/installation.md).
 
+## Quick demo
+
+The demo requires Docker with Docker Compose.
+
+To build pg-status and start a ready-to-use PostgreSQL topology, run:
+
+```sh
+make build_up_test
+```
+
+This starts pg-status, one PostgreSQL master, one replica, and proxy services
+used to simulate role changes. After the containers become healthy and the
+initial host checks complete, query the API at `http://127.0.0.1:8000`:
+
+```sh
+curl http://127.0.0.1:8000/master
+curl http://127.0.0.1:8000/replica
+curl http://127.0.0.1:8000/hosts
+```
+
+Switch the simulated master and query pg-status again after the next polling
+cycle:
+
+```sh
+make 2-master
+curl http://127.0.0.1:8000/master
+```
+
+Restore the original topology or stop the demo with:
+
+```sh
+make 1-master
+make down_test
+```
+
+See [test/README.md](test/README.md) for details about the topology and project
+testing.
+
 ## Performance
 
 Approximate memory usage: 9 MiB.
@@ -398,56 +436,6 @@ For replicas, pg-status also logs changes relative to the global
 <host-name>: synchronous in bytes
 <host-name>: out of sync in bytes
 ```
-
-## Testing the service
-
-### Automated tests
-
-Configure and build the project, then run the CTest suite:
-
-```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-Debug builds enable AddressSanitizer and UndefinedBehaviorSanitizer. The
-functional HTTP API tests are deterministic and do not require PostgreSQL or
-Docker.
-
-### `make build_up`
-
-Builds the [lightweight container](docker/alpine/Dockerfile_shared) and starts
-it using [docker-compose.yml](docker-compose.yml).
-
-You can create a `.env` file from [the provided example](.env_example) or set
-the required parameters directly in
-[docker-compose.yml](docker-compose.yml). This allows you to test pg-status
-with your own database setup.
-
-### `make build_up_test`
-
-Builds the [lightweight container](docker/alpine/Dockerfile_shared) and starts
-the full test environment defined in
-[test/docker/docker-compose.yml](test/docker/docker-compose.yml).
-
-The environment contains pg-status, two PostgreSQL instances (one master and
-one replica), and three proxy services. Switching a proxy's target simulates a
-role change or disconnection without stopping PostgreSQL.
-
-To run only the PostgreSQL test topology without pg-status, use:
-
-```sh
-make build_up_test_only_pg
-```
-
-This starts the master, replica, and three proxy services. You can then run a
-locally built pg-status instance against the proxy ports exposed by Docker.
-
-Use these helper scripts to change the proxy configuration:
-
-- [test/docker/pg-proxy-1_is_master.sh](test/docker/pg-proxy-1_is_master.sh)
-- [test/docker/pg-proxy-2_is_master.sh](test/docker/pg-proxy-2_is_master.sh)
 
 ## Third-party components
 

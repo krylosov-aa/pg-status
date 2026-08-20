@@ -52,8 +52,10 @@ MonitorSnapshot atomic_get_snapshot(const MonitorHost *host) {
       &host->lag_bytes, memory_order_relaxed
     );
     snap.lsn = atomic_load_explicit(&host->lsn, memory_order_relaxed);
+    // Keep all snapshot loads before the final sequence validation.
+    atomic_thread_fence(memory_order_acquire);
     const uint64_t seq2 = atomic_load_explicit(
-      &host->seq, memory_order_acquire
+      &host->seq, memory_order_relaxed
     );
     if (seq1 == seq2) {
       return snap;

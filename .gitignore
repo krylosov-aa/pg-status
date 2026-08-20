@@ -1,5 +1,12 @@
 .env
 
+# CMake build trees
+/cmake-builds/
+/cmake-build-*/
+
+# Clang Static Analyzer reports
+/scan_reports/
+
 # Prerequisites
 *.d
 

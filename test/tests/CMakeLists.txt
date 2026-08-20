@@ -33,7 +33,7 @@ set_tests_properties(
         PROPERTIES
         TIMEOUT 15
         ENVIRONMENT
-        "ASAN_OPTIONS=abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1;UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1"
+        "${PG_STATUS_TEST_ENVIRONMENT}"
 )
 
 add_executable(pg_status_api_test test_pg_status_api.c)
@@ -119,6 +119,6 @@ foreach(TEST_CASE IN LISTS PG_STATUS_API_TEST_CASES)
             LABELS functional
             TIMEOUT 15
             ENVIRONMENT
-            "ASAN_OPTIONS=abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1;UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1"
+            "${PG_STATUS_TEST_ENVIRONMENT}"
     )
 endforeach()

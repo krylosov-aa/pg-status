@@ -154,12 +154,15 @@ void save_master_index(const int i) {
 void publish_monitor_snapshot(
   MonitorHost *host, const MonitorSnapshot snapshot
 ) {
-  atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);
-  atomic_store_explicit(&host->lag_ms, snapshot.lag_ms, memory_order_relaxed);
+  atomic_fetch_add_explicit(&host->seq, 1, memory_order_relaxed);
+
+  // Release stores keep the odd sequence marker before the snapshot data.
+  atomic_store_explicit(&host->lag_ms, snapshot.lag_ms, memory_order_release);
   atomic_store_explicit(
-    &host->lag_bytes, snapshot.lag_bytes, memory_order_relaxed
+    &host->lag_bytes, snapshot.lag_bytes, memory_order_release
   );
-  atomic_store_explicit(&host->lsn, snapshot.lsn, memory_order_relaxed);
-  atomic_store_explicit(&host->status, snapshot.status, memory_order_relaxed);
+  atomic_store_explicit(&host->lsn, snapshot.lsn, memory_order_release);
+  atomic_store_explicit(&host->status, snapshot.status, memory_order_release);
+  // Publish the complete snapshot by restoring an even sequence number.
   atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);
 }
