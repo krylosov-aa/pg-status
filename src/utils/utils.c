@@ -173,6 +173,10 @@ char *uint_to_str(const unsigned int value) {
  * Converts string to long
  */
 long str_to_long(const char *value) {
+  if (!value) {
+    raise_error("Failed to convert null to long");
+  }
+
   char *end_ptr = nullptr;
   errno = 0;
 
@@ -189,7 +193,10 @@ long str_to_long(const char *value) {
  * Converts string to unsigned long
  */
 unsigned long str_to_ulong(const char *value) {
-  if (!value || *value == '\0' || *value == '-') {
+  if (!value) {
+    raise_error("Failed to convert null to ulong");
+  }
+  if (*value == '\0' || *value == '-') {
     raise_error("Failed to convert '%s' to ulong", value);
   }
 
@@ -209,7 +216,10 @@ unsigned long str_to_ulong(const char *value) {
  * Converts string to uint64_t
  */
 uint64_t str_to_ull(const char *value) {
-  if (!value || *value == '\0' || *value == '-') {
+  if (!value) {
+    raise_error("Failed to convert null to ull");
+  }
+  if (*value == '\0' || *value == '-') {
     raise_error("Failed to convert '%s' to ull", value);
   }
 

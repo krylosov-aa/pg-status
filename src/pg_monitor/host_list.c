@@ -2,6 +2,7 @@
  * Utilities for initializing and writing an array of monitoring hosts
  */
 
+#include <errno.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,44 +30,6 @@ static atomic_int master_index = -1;
  */
 int get_master_index(void) {
   return atomic_load_explicit(&master_index, memory_order_relaxed);
-}
-
-/**
- * Returns hosts sequentially. When no more hosts are available,
- * it returns nullptr.
- */
-static char *next_host(char *hosts) {
-  static char *save_ptr = nullptr;
-  static char *host = nullptr;
-
-  if (host == nullptr) {
-    host = strtok_r(hosts, ",", &save_ptr);
-  } else {
-    host = strtok_r(nullptr, ",", &save_ptr);
-  }
-  return host;
-}
-
-/**
- * Returns ports sequentially. When no more ports are available,
- * it continues returning the last one.
- * This allows a single port to be used for all hosts.
- */
-static char *next_port(char *ports) {
-  static char *last_port = nullptr;
-  static char *save_ptr = nullptr;
-  static char *port = nullptr;
-
-  if (port == nullptr) {
-    port = strtok_r(ports, ",", &save_ptr);
-  } else {
-    port = strtok_r(nullptr, ",", &save_ptr);
-  }
-
-  if (port != nullptr) {
-    last_port = port;
-  }
-  return last_port;
 }
 
 /**
@@ -122,10 +85,18 @@ static void init_monitor_host(
  */
 void init_monitor_host_list(void) {
   char *hosts = copy_string(parameters.hosts);
-  char *host = next_host(hosts);
+  char *host_save_ptr = nullptr;
+  char *host = strtok_r(hosts, ",", &host_save_ptr);
 
   char *ports = copy_string(parameters.port);
-  char *port = next_port(ports);
+  char *port_save_ptr = nullptr;
+  char *port = strtok_r(ports, ",", &port_save_ptr);
+  if (!port) {
+    free(hosts);
+    free(ports);
+    errno = EINVAL;
+    raise_error("pg_status__pg_port must contain at least one port");
+  }
 
   while (host) {
     if (host_count == MAX_HOSTS) {
@@ -133,8 +104,11 @@ void init_monitor_host_list(void) {
     }
     init_monitor_host(&monitor_host_list[host_count], host, port);
 
-    host = next_host(hosts);
-    port = next_port(ports);
+    host = strtok_r(nullptr, ",", &host_save_ptr);
+    char *next_port = strtok_r(nullptr, ",", &port_save_ptr);
+    if (next_port) {
+      port = next_port;
+    }
     host_count++;
   }
   if (host_count == 0) {

@@ -555,6 +555,21 @@ static void test_missing_replica(void) {
   fixture_pg_status_stop(&api);
 }
 
+static void test_empty_topology_replica(void) {
+  // Arrange
+  PgStatusApiFixture api = fixture_pg_status_start(nullptr, 0, -1);
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, "/replica", nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 404, "");
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
 static void test_missing_replica_json(void) {
   // Arrange
   const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
@@ -1894,6 +1909,7 @@ static const struct {
   {"missing_master_text", test_missing_master_text},
   {"missing_master_json", test_missing_master_json},
   {"missing_replica", test_missing_replica},
+  {"empty_topology_replica", test_empty_topology_replica},
   {"missing_replica_json", test_missing_replica_json},
   {"missing_sync_by_time", test_missing_sync_by_time},
   {"missing_sync_by_bytes", test_missing_sync_by_bytes},

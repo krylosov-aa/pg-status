@@ -111,9 +111,9 @@ void fixture_pg_status_snapshot_publisher_stop(
 PgStatusApiFixture fixture_pg_status_start(
   const TestHost *hosts, const size_t count, const int master_index
 ) {
-  http_test_assert_true(
-    count > 0 && count <= MAX_HOSTS, "invalid test host count"
-  );
+  if (count > MAX_HOSTS || (count != 0 && hosts == nullptr)) {
+    http_test_fail("invalid test host count");
+  }
   host_count = (unsigned int)count;
   for (size_t i = 0; i < count; i++) {
     monitor_host_list[i].host = hosts[i].host;

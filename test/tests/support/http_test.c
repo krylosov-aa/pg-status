@@ -15,7 +15,7 @@
 static constexpr size_t RESPONSE_CAPACITY = (size_t)64 * 1024;
 static constexpr size_t REQUEST_CAPACITY = (size_t)2 * 1024;
 
-void http_test_fail(const char *message) {
+[[noreturn]] void http_test_fail(const char *message) {
   fprintf(stderr, "FAIL: %s\n", message);
   exit(EXIT_FAILURE);
 }

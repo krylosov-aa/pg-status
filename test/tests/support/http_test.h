@@ -10,7 +10,7 @@ typedef struct {
   unsigned int status;
 } TestHTTPResponse;
 
-void http_test_fail(const char *message);
+[[noreturn]] void http_test_fail(const char *message);
 void http_test_assert_true(bool condition, const char *message);
 
 bool http_test_ipv6_loopback_is_available(void);

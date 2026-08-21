@@ -217,6 +217,10 @@ static unsigned int next_replica_round_robin(void) {
 const char *find_replica_round_robin(
   const condition_handler handler, const void *ctx, const char *log_context
 ) {
+  if (host_count == 0) {
+    return nullptr;
+  }
+
   unsigned int cursor = next_replica_round_robin();
   const unsigned int start_cursor = cursor;
   const MonitorHost *possible_mon_host = nullptr;
