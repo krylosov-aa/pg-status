@@ -25,7 +25,6 @@ target_link_libraries(pg-status
         PRIVATE
         common_warnings
         pg_status_api
-        utils
         http_server
         pg_monitor
         PkgConfig::CJSON

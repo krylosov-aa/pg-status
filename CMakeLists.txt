@@ -80,6 +80,12 @@ target_compile_options(common_warnings INTERFACE
         "$<$<CONFIG:Debug>:-g3>"
 )
 
+if(APPLE)
+    target_link_options(common_warnings INTERFACE -Wl,-fatal_warnings)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(common_warnings INTERFACE -Wl,--fatal-warnings)
+endif()
+
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     target_compile_options(common_warnings INTERFACE
             -Wmissing-variable-declarations
