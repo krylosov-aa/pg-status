@@ -12,11 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 #include "logger.h"
-
-static constexpr size_t LEGACY_ERROR_CAPACITY = 2048;
 
 /**
  * Copies a string. The result must be freed by the caller.
@@ -29,67 +26,6 @@ char *copy_string(const char *str) {
     pg_status_log_system_fatal("utils", error_number, "failed to copy string");
   }
   return result;
-}
-
-/**
- * Prints the message to stderr with \n and also adds the error text from errno
- */
-void printf_error(const char *format, ...) {
-  const int error_number = errno;
-  char message[LEGACY_ERROR_CAPACITY];
-  va_list args;
-  va_start(args, format);
-  // Clang 21 does not model C23's __builtin_c23_va_start correctly.
-  // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
-  const int length = vsnprintf(message, sizeof(message), format, args);
-  va_end(args);
-  if (length < 0) {
-    (void)snprintf(message, sizeof(message), "unable to format error");
-  }
-  pg_status_log_system_error(
-    PG_STATUS_LOG_ERROR, "utils", error_number, "%s", message
-  );
-}
-
-/**
- * Prints the message to stderr with \n and also adds the
- * error text from errno and abort
- */
-void raise_error(const char *format, ...) {
-  const int error_number = errno;
-  char message[LEGACY_ERROR_CAPACITY];
-  va_list args;
-  va_start(args, format);
-  // Clang 21 does not model C23's __builtin_c23_va_start correctly.
-  // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
-  const int length = vsnprintf(message, sizeof(message), format, args);
-  va_end(args);
-  if (length < 0) {
-    (void)snprintf(message, sizeof(message), "unable to format fatal error");
-  }
-  pg_status_log_system_fatal("utils", error_number, "%s", message);
-}
-
-/**
- * Concatenates strings and returns the new string.
- * The result must be freed by the caller.
- */
-char *concatenate_strings(const char *first, const char *second) {
-  assert(first);
-  assert(second);
-  const size_t len1 = strlen(first);
-  const size_t len2 = strlen(second);
-  char *new = malloc(len1 + len2 + 1);
-  if (!new) {
-    const int error_number = errno != 0 ? errno : ENOMEM;
-    pg_status_log_system_fatal(
-      "utils", error_number, "failed to concatenate strings '%s' and '%s'",
-      first, second
-    );
-  }
-  strlcpy(new, first, len1 + len2 + 1);
-  strlcat(new, second, len1 + len2 + 1);
-  return new;
 }
 
 /**
@@ -120,74 +56,6 @@ char *format_string(const char *format, ...) {
     );
   }
   return string;
-}
-
-/**
- * Converts unsigned long to string. The result must be freed by the caller.
- */
-char *ulong_to_str(const unsigned long value) {
-  const int len = snprintf(nullptr, 0, "%lu", value);
-  const size_t size = (size_t)len + 1;
-  char *str = malloc(size);
-  if (!str) {
-    const int error_number = errno != 0 ? errno : ENOMEM;
-    pg_status_log_system_fatal(
-      "utils", error_number, "failed to format unsigned long value=%lu", value
-    );
-  }
-  (void)snprintf(str, size, "%lu", value);
-  return str;
-}
-
-/**
- * Converts long to string. The result must be freed by the caller.
- */
-char *long_to_str(const long value) {
-  const int len = snprintf(nullptr, 0, "%ld", value);
-  const size_t size = (size_t)len + 1;
-  char *str = malloc(size);
-  if (!str) {
-    const int error_number = errno != 0 ? errno : ENOMEM;
-    pg_status_log_system_fatal(
-      "utils", error_number, "failed to format long value=%ld", value
-    );
-  }
-  (void)snprintf(str, size, "%ld", value);
-  return str;
-}
-
-/**
- * Converts int to string. The result must be freed by the caller.
- */
-char *int_to_str(const int value) {
-  const int len = snprintf(nullptr, 0, "%d", value);
-  const size_t size = (size_t)len + 1;
-  char *str = malloc(size);
-  if (!str) {
-    const int error_number = errno != 0 ? errno : ENOMEM;
-    pg_status_log_system_fatal(
-      "utils", error_number, "failed to format int value=%d", value
-    );
-  }
-  (void)snprintf(str, size, "%d", value);
-  return str;
-}
-
-/**
- * Converts unsigned int to string. The result must be freed by the caller.
- */
-char *uint_to_str(const unsigned int value) {
-  const int len = snprintf(nullptr, 0, "%u", value);
-  const size_t size = (size_t)len + 1;
-  char *str = malloc(size);
-  if (!str) {
-    const int error_number = errno != 0 ? errno : ENOMEM;
-    pg_status_log_system_fatal(
-      "utils", error_number, "failed to format unsigned int value=%u", value
-    );
-  }
-  (void)snprintf(str, size, "%u", value);
-  return str;
 }
 
 /**
@@ -414,20 +282,6 @@ void replace_from_env_ull(const char *env_name, uint64_t *result) {
   const char *env_val = getenv(env_name);
   if (env_val && *env_val) {
     *result = str_to_ull(env_val);
-  }
-}
-
-/**
- * Takes a value from the environment variables if it is set,
- * copies it and pastes it by the result pointer.
- * The string must be released with cJSON_free by the caller.
- */
-void replace_from_env_copy(const char *env_name, char **result) {
-  assert(env_name);
-  const char *env_val = getenv(env_name);
-  if (env_val != nullptr && *env_val) {
-    char *env_val_copy = copy_string(env_val);
-    *result = env_val_copy;
   }
 }
 

@@ -15,8 +15,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "logger.h"
 #include "common_support.h"
+#include "logger.h"
 
 typedef void (*logger_test_function_t)(void);
 

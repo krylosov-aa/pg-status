@@ -8,33 +8,12 @@
 #include <cjson/cJSON.h>
 #include <stdint.h>
 
-// ------------------------ Errors ------------------------
-
-/**
- * Prints the message to stderr with \n and also adds the error text from errno
- */
-[[gnu::format(printf, 1, 2)]]
-void printf_error(const char *format, ...);
-
-/**
- * Prints the message to stderr with \n and also adds the
- * error text from errno and abort
- */
-[[noreturn, gnu::format(printf, 1, 2)]]
-void raise_error(const char *format, ...);
-
 // ------------------------ Strings ------------------------
 
 /**
  * Copies a string. The result must be freed by the caller.
  */
 char *copy_string(const char *str);
-
-/**
- * Concatenates strings and returns the new string.
- * The result must be freed by the caller.
- */
-char *concatenate_strings(const char *first, const char *second);
 
 /**
  * Checks if strings are the same
@@ -47,26 +26,6 @@ bool is_equal_strings(const char *first, const char *second);
  */
 [[gnu::format(printf, 1, 2)]]
 char *format_string(const char *format, ...);
-
-/**
- * Converts unsigned long to string. The result must be freed by the caller.
- */
-char *ulong_to_str(unsigned long value);
-
-/**
- * Converts long to string. The result must be freed by the caller.
- */
-char *long_to_str(long value);
-
-/**
- * Converts int to string. The result must be freed by the caller.
- */
-char *int_to_str(int value);
-
-/**
- * Converts unsigned int to string. The result must be freed by the caller.
- */
-char *uint_to_str(unsigned int value);
 
 /**
  * Converts string to long
@@ -145,13 +104,6 @@ void replace_from_env_uint(const char *env_name, unsigned int *result);
  * pastes it by the result pointer.
  */
 void replace_from_env_ull(const char *env_name, uint64_t *result);
-
-/**
- * Takes a value from the environment variables if it is set,
- * copies it and pastes it by the result pointer.
- * The string must be released with cJSON_free by the caller.
- */
-void replace_from_env_copy(const char *env_name, char **result);
 
 // ------------------------ JSON ------------------------
 

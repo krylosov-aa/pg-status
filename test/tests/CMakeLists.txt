@@ -10,16 +10,6 @@ target_include_directories(
         common_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/support
 )
 
-add_library(utils_test_support support/utils_test_support.c)
-target_link_libraries(
-        utils_test_support
-        PUBLIC common_support utils
-        PRIVATE common_warnings
-)
-target_include_directories(
-        utils_test_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/support
-)
-
 add_executable(logger_test test_logger.c)
 target_link_libraries(
         logger_test PRIVATE
@@ -115,19 +105,13 @@ set_tests_properties(
 
 add_executable(utils_test test_utils.c)
 target_link_libraries(
-        utils_test PRIVATE common_warnings utils_test_support
+        utils_test PRIVATE common_warnings common_support utils
 )
 
 set(UTILS_TEST_CASES
-        printf_error
         copy_string
-        concatenate_strings
         is_equal_strings
         format_string
-        ulong_to_str
-        long_to_str
-        int_to_str
-        uint_to_str
         str_to_long
         str_to_ulong
         str_to_ull
@@ -143,7 +127,6 @@ set(UTILS_TEST_CASES
         replace_from_env
         replace_from_env_uint
         replace_from_env_ull
-        replace_from_env_copy
         replace_from_empty_env
         json_array
         json_object
@@ -184,7 +167,6 @@ function(add_utils_failure_test TEST_CASE EXPECTED_OUTPUT)
     )
 endfunction()
 
-add_utils_failure_test(raise_error "Cannot open file")
 add_utils_failure_test(str_to_long_null "failed to convert null to long")
 add_utils_failure_test(str_to_long_invalid "failed to convert '42x' to long")
 add_utils_failure_test(str_to_ulong_null "failed to convert null to ulong")

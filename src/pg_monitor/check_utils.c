@@ -194,7 +194,9 @@ static MonitorStatus master_status(void) {
 
 static MonitorStatus replica_status() {
   return (MonitorStatus){
-    .alive = true, .master = false, .possible_dead = false,
+    .alive = true,
+    .master = false,
+    .possible_dead = false,
   };
 }
 

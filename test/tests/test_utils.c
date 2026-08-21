@@ -1,6 +1,5 @@
 /** Test scenarios for general-purpose utilities. */
 
-#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,40 +8,6 @@
 
 #include "common_support.h"
 #include "utils.h"
-#include "utils_test_support.h"
-
-static void test_printf_error(void) {
-  // Arrange
-  char expected_error[512];
-  const int length = snprintf(
-    expected_error, sizeof(expected_error), "%s (errno=%d)\n", strerror(ENOENT),
-    ENOENT
-  );
-  support_assert_true(
-    length > 0 && (size_t)length < sizeof(expected_error),
-    "printf_error expected output is too large"
-  );
-
-  // Act
-  char *actual = support_capture_standard_error(support_emit_printf_error);
-
-  // Assert
-  support_assert_contains(
-    actual, " ERROR utils: Cannot open file:", "printf_error output"
-  );
-  support_assert_contains(actual, expected_error, "printf_error errno");
-
-  // Cleanup
-  free(actual);
-}
-
-static void test_raise_error(void) {
-  // Arrange
-  errno = ENOENT;
-
-  // Act
-  raise_error("Cannot open %s", "file");
-}
 
 static void test_copy_string(void) {
   // Arrange
@@ -59,23 +24,6 @@ static void test_copy_string(void) {
 
   // Cleanup
   free(copy);
-}
-
-static void test_concatenate_strings(void) {
-  // Arrange
-  const char *first = "first";
-  const char *second = " second";
-
-  // Act
-  char *result = concatenate_strings(first, second);
-
-  // Assert
-  support_assert_string_equal(
-    result, "first second", "concatenate_strings value"
-  );
-
-  // Cleanup
-  free(result);
 }
 
 static void test_is_equal_strings(void) {
@@ -106,50 +54,6 @@ static void test_format_string(void) {
 
   // Assert
   support_assert_string_equal(result, "replica:5432", "format_string value");
-
-  // Cleanup
-  free(result);
-}
-
-static void test_ulong_to_str(void) {
-  // Arrange & Act
-  char *result = ulong_to_str(42UL);
-
-  // Assert
-  support_assert_string_equal(result, "42", "ulong_to_str value");
-
-  // Cleanup
-  free(result);
-}
-
-static void test_long_to_str(void) {
-  // Arrange & Act
-  char *result = long_to_str(-42L);
-
-  // Assert
-  support_assert_string_equal(result, "-42", "long_to_str value");
-
-  // Cleanup
-  free(result);
-}
-
-static void test_int_to_str(void) {
-  // Arrange & Act
-  char *result = int_to_str(INT_MIN);
-
-  // Assert
-  support_assert_string_equal(result, "-2147483648", "int_to_str value");
-
-  // Cleanup
-  free(result);
-}
-
-static void test_uint_to_str(void) {
-  // Arrange & Act
-  char *result = uint_to_str(UINT_MAX);
-
-  // Assert
-  support_assert_string_equal(result, "4294967295", "uint_to_str value");
 
   // Cleanup
   free(result);
@@ -391,42 +295,17 @@ static void test_replace_from_env_ull(void) {
   support_clear_environment(ENV_NAME);
 }
 
-static void test_replace_from_env_copy(void) {
-  // Arrange
-  char *result = nullptr;
-  support_set_environment(ENV_NAME, "copied environment value");
-  const char *environment_value = getenv(ENV_NAME);
-
-  // Act
-  replace_from_env_copy(ENV_NAME, &result);
-
-  // Assert
-  support_assert_string_equal(
-    result, "copied environment value", "replace_from_env_copy value"
-  );
-  support_assert_true(
-    result != environment_value,
-    "replace_from_env_copy returned the environment pointer"
-  );
-
-  // Cleanup
-  cJSON_free(result);
-  support_clear_environment(ENV_NAME);
-}
-
 static void test_replace_from_empty_env(void) {
   // Arrange
   const char *string_result = "default";
   unsigned int uint_result = 12;
   uint64_t ull_result = 34;
-  char *copy_result = nullptr;
   support_set_environment(ENV_NAME, "");
 
   // Act
   replace_from_env(ENV_NAME, &string_result);
   replace_from_env_uint(ENV_NAME, &uint_result);
   replace_from_env_ull(ENV_NAME, &ull_result);
-  replace_from_env_copy(ENV_NAME, &copy_result);
 
   // Assert
   support_assert_string_equal(
@@ -434,9 +313,6 @@ static void test_replace_from_empty_env(void) {
   );
   support_assert_true(uint_result == 12, "empty environment replaced uint");
   support_assert_true(ull_result == 34, "empty environment replaced uint64");
-  support_assert_true(
-    !copy_result, "empty environment allocated a string copy"
-  );
 
   // Cleanup
   support_clear_environment(ENV_NAME);
@@ -576,16 +452,9 @@ static const struct {
   const char *name;
   support_action_t function;
 } test_cases[] = {
-  {"printf_error", test_printf_error},
-  {"raise_error", test_raise_error},
   {"copy_string", test_copy_string},
-  {"concatenate_strings", test_concatenate_strings},
   {"is_equal_strings", test_is_equal_strings},
   {"format_string", test_format_string},
-  {"ulong_to_str", test_ulong_to_str},
-  {"long_to_str", test_long_to_str},
-  {"int_to_str", test_int_to_str},
-  {"uint_to_str", test_uint_to_str},
   {"str_to_long", test_str_to_long},
   {"str_to_long_null", test_str_to_long_null},
   {"str_to_long_invalid", test_str_to_long_invalid},
@@ -612,7 +481,6 @@ static const struct {
   {"replace_from_env", test_replace_from_env},
   {"replace_from_env_uint", test_replace_from_env_uint},
   {"replace_from_env_ull", test_replace_from_env_ull},
-  {"replace_from_env_copy", test_replace_from_env_copy},
   {"replace_from_empty_env", test_replace_from_empty_env},
   {"json_array", test_json_array},
   {"json_object", test_json_object},
