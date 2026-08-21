@@ -1,5 +1,5 @@
 # -------- Build --------
-FROM alpine:latest AS builder
+FROM alpine:3.22 AS builder
 
 RUN apk add --no-cache \
         clang \
@@ -32,7 +32,7 @@ COPY --from=builder /app/build/src/pg-status /pg-status
 
 
 # -------- Run --------
-FROM alpine:latest
+FROM alpine:3.22
 
 RUN apk add --no-cache \
         libpq \

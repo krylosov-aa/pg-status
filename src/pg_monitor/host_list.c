@@ -73,7 +73,7 @@ static void init_monitor_host(
   atomic_store_explicit(&monitor_host->seq, 0, memory_order_relaxed);
   atomic_store_explicit(
     &monitor_host->status,
-    (MonitorStatus){.alive = false, .master = false, .possible_dead = false},
+    ((MonitorStatus){.alive = false, .master = false, .possible_dead = false}),
     memory_order_relaxed
   );
   atomic_store_explicit(&monitor_host->lag_ms, 0, memory_order_relaxed);

@@ -1,0 +1,100 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/cmake-builds/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "PG_STATUS_ENABLE_CLANG_TIDY": "OFF",
+        "PG_STATUS_SANITIZER": "none"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "Debug with AddressSanitizer and UBSan",
+      "inherits": "debug",
+      "cacheVariables": {
+        "PG_STATUS_ENABLE_CLANG_TIDY": "ON",
+        "PG_STATUS_SANITIZER": "address-undefined"
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "Debug with ThreadSanitizer",
+      "inherits": "debug",
+      "cacheVariables": {
+        "PG_STATUS_ENABLE_CLANG_TIDY": "ON",
+        "PG_STATUS_SANITIZER": "thread"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "inherits": "debug"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "inherits": "debug"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan",
+      "inherits": "debug"
+    }
+  ]
+}

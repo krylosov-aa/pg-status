@@ -6,76 +6,41 @@ add_library(pg_monitor
         parameters.c
 )
 
+set_property(
+        DIRECTORY APPEND
+        PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/streaming_replication_query.sql"
+)
+file(
+        READ
+        "${CMAKE_CURRENT_SOURCE_DIR}/streaming_replication_query.sql"
+        PG_STATUS_STREAMING_REPLICATION_QUERY_HEX
+        HEX
+)
+string(
+        REGEX REPLACE
+        "(..)" "0x\\1, "
+        PG_STATUS_STREAMING_REPLICATION_QUERY_BYTES
+        "${PG_STATUS_STREAMING_REPLICATION_QUERY_HEX}"
+)
+configure_file(
+        streaming_replication_query.h.in
+        "${CMAKE_CURRENT_BINARY_DIR}/streaming_replication_query.h"
+        @ONLY
+)
+
 target_link_libraries(
         pg_monitor
-        PUBLIC
+        PRIVATE
         common_warnings
         utils
-        PRIVATE
         logging
+        pg_status_libpq
         Threads::Threads
 )
 
-if (PKG_CONFIG_FOUND)
-    pkg_check_modules(LIBPQ libpq QUIET)
-    if (LIBPQ_FOUND)
-        if (NOT LIBPQ_INCLUDE_DIR)
-            set(LIBPQ_INCLUDE_DIR ${LIBPQ_INCLUDE_DIRS})
-        endif ()
-        if (NOT LIBPQ_LIBRARY)
-            set(LIBPQ_LIBRARY ${LIBPQ_LINK_LIBRARIES})
-        endif ()
-    endif ()
-endif ()
-
-if (NOT LIBPQ_FOUND)
-    if (APPLE)
-        set(HOMEBREW_PREFIX "/opt/homebrew") # ARM
-        if (NOT EXISTS "${HOMEBREW_PREFIX}/opt/libpq/lib/libpq.dylib")
-            set(HOMEBREW_PREFIX "/usr/local") # Intel
-        endif ()
-
-        find_path(LIBPQ_INCLUDE_DIR libpq-fe.h
-                HINTS
-                ${HOMEBREW_PREFIX}/opt/libpq/include
-                ${HOMEBREW_PREFIX}/include
-                /usr/include
-        )
-
-        find_library(LIBPQ_LIBRARY pq
-                HINTS
-                ${HOMEBREW_PREFIX}/opt/libpq/lib
-                ${HOMEBREW_PREFIX}/lib
-                /usr/lib
-        )
-    endif ()
-
-    if (UNIX AND NOT APPLE)
-        find_path(LIBPQ_INCLUDE_DIR libpq-fe.h
-                HINTS
-                /usr/include
-                /usr/include/postgresql
-                /usr/local/include
-        )
-        find_library(LIBPQ_LIBRARY pq
-                HINTS
-                /usr/lib
-                /usr/lib/x86_64-linux-gnu
-                /usr/local/lib
-        )
-    endif ()
-
-    if (LIBPQ_INCLUDE_DIR AND LIBPQ_LIBRARY)
-        set(LIBPQ_FOUND TRUE)
-    endif ()
-endif ()
-
-if (NOT LIBPQ_FOUND)
-    message(FATAL_ERROR "libpq not found!")
-endif ()
-
-target_include_directories(pg_monitor PRIVATE ${LIBPQ_INCLUDE_DIR})
-target_link_libraries(pg_monitor PRIVATE ${LIBPQ_LIBRARY})
-
-
-target_include_directories(pg_monitor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(
+        pg_monitor
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+        PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+)

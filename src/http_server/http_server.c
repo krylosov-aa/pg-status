@@ -22,12 +22,13 @@
 #include "logger.h"
 #include "utils.h"
 
-static constexpr int HTTP_LISTEN_BACKLOG = 512;
-static constexpr ev_ssize_t HTTP_MAX_HEADERS_SIZE = (ev_ssize_t)8 * 1024;
-static constexpr int HTTP_IO_TIMEOUT_SECONDS = 5;
-static constexpr unsigned HTTP_LISTENER_OPTIONS = LEV_OPT_CLOSE_ON_FREE |
-                                                  LEV_OPT_CLOSE_ON_EXEC |
-                                                  LEV_OPT_REUSEABLE;
+enum {
+  HTTP_LISTEN_BACKLOG = 512,
+  HTTP_MAX_HEADERS_SIZE = 8 * 1024,
+  HTTP_IO_TIMEOUT_SECONDS = 5,
+  HTTP_LISTENER_OPTIONS = LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC |
+                          LEV_OPT_REUSEABLE,
+};
 
 struct HTTPRequest {
   struct evhttp_request *request;
@@ -186,7 +187,7 @@ static bool media_range_accepts_json(
   const char *trimmed_media_end = trim_optional_whitespace_end(
     range_begin, media_end
   );
-  static constexpr char json_media_type[] = "application/json";
+  static const char json_media_type[] = "application/json";
   const size_t media_len = (size_t)(trimmed_media_end - range_begin);
   if (
     media_len != sizeof(json_media_type) - 1 ||
@@ -774,7 +775,7 @@ void stop_http_server(HTTPServer *server) {
     return;
   }
 
-  constexpr char byte = 1;
+  const char byte = 1;
   ssize_t write_result;
   do {
     write_result = write(server->stop_pipe[1], &byte, 1);

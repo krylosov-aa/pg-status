@@ -1,0 +1,11 @@
+Package: pg-status
+Version: 2.1.1
+Section: utils
+Priority: optional
+Architecture: PACKAGE_ARCHITECTURE
+Depends: libpq5, libevent-2.1-7t64, libcjson1
+Maintainer: krylosov-aa <krylosov.andrew@gmail.com>
+Description: A microservice (sidecar) that helps instantly determine
+ the status of your PostgreSQL hosts including whether they are alive,
+ which one is the master, which ones are replicas, and how far each
+ replica is lagging behind the master.

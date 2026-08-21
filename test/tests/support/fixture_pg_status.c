@@ -12,7 +12,7 @@
 
 #include "http_test.h"
 
-static constexpr size_t FORMATTED_LSN_CAPACITY = sizeof("FFFFFFFF/FFFFFFFF");
+enum { FORMATTED_LSN_CAPACITY = sizeof("FFFFFFFF/FFFFFFFF") };
 
 TestHost fixture_pg_status_master_host(const char *name) {
   return (TestHost){

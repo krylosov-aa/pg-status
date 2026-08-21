@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdatomic.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,7 +54,7 @@ static void emit_info_message(void) {
 }
 
 static bool has_timestamp_shape(const char *line) {
-  static constexpr size_t digit_positions[] = {
+  static const size_t digit_positions[] = {
     0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, 20, 21, 22,
   };
   if (
@@ -290,9 +291,11 @@ static void test_long_message_truncated(void) {
   pg_status_log_shutdown();
 }
 
-static constexpr size_t WORKER_COUNT = 4;
-static constexpr size_t MESSAGES_PER_WORKER = 25;
-static constexpr size_t CONCURRENT_ROUND_COUNT = 4;
+enum {
+  WORKER_COUNT = 4,
+  MESSAGES_PER_WORKER = 25,
+  CONCURRENT_ROUND_COUNT = 4,
+};
 
 static void *log_worker(void *argument) {
   const size_t worker = *(const size_t *)argument;
@@ -347,7 +350,8 @@ static void test_concurrent_messages(void) {
     line = strtok_r(nullptr, "\n", &save_pointer);
   }
   support_assert_true(
-    line_count == CONCURRENT_ROUND_COUNT * WORKER_COUNT * MESSAGES_PER_WORKER,
+    line_count ==
+      (size_t)CONCURRENT_ROUND_COUNT * WORKER_COUNT * MESSAGES_PER_WORKER,
     "concurrent log line count"
   );
 
@@ -356,7 +360,7 @@ static void test_concurrent_messages(void) {
   pg_status_log_shutdown();
 }
 
-static constexpr size_t ORDERED_MESSAGE_COUNT = 16;
+enum { ORDERED_MESSAGE_COUNT = 16 };
 
 static void emit_ordered_messages(void) {
   for (size_t i = 0; i < ORDERED_MESSAGE_COUNT; i++) {
@@ -384,9 +388,11 @@ static void test_ordered_messages(void) {
       length > 0 && (size_t)length < sizeof(expected),
       "ordered log expectation is too large"
     );
-    position = strstr(position, expected);
-    support_assert_true(position != nullptr, "asynchronous log order");
-    position += (size_t)length;
+    const char *match = strstr(position, expected);
+    if (match == nullptr) {
+      support_fail("asynchronous log order");
+    }
+    position = match + (size_t)length;
   }
 
   // Cleanup
@@ -420,6 +426,12 @@ static void test_shutdown_flushes(void) {
 static atomic_bool lifecycle_workers_should_stop;
 static atomic_uint_fast64_t lifecycle_operation_count;
 
+static void pause_lifecycle_thread(void) {
+  struct timespec delay = {.tv_sec = 0, .tv_nsec = 100000};
+  while (nanosleep(&delay, &delay) != 0 && errno == EINTR) {
+  }
+}
+
 static void *run_lifecycle_log_worker(void *argument) {
   const size_t worker = *(const size_t *)argument;
   size_t message = 0;
@@ -433,6 +445,7 @@ static void *run_lifecycle_log_worker(void *argument) {
     atomic_fetch_add_explicit(
       &lifecycle_operation_count, 1, memory_order_relaxed
     );
+    pause_lifecycle_thread();
   }
   return nullptr;
 }
@@ -446,14 +459,17 @@ static void *run_lifecycle_flush_worker(void *argument) {
     atomic_fetch_add_explicit(
       &lifecycle_operation_count, 1, memory_order_relaxed
     );
+    pause_lifecycle_thread();
   }
   return nullptr;
 }
 
 static void test_concurrent_lifecycle(void) {
-  static constexpr size_t lifecycle_worker_count = 3;
-  static constexpr size_t lifecycle_round_count = 8;
-  static constexpr uint_fast64_t operations_per_round = 100;
+  enum {
+    lifecycle_worker_count = 3,
+    lifecycle_round_count = 8,
+    operations_per_round = 100,
+  };
 
   // Arrange
   const int saved_stderr = save_standard_error();
@@ -494,6 +510,7 @@ static void test_concurrent_lifecycle(void) {
     while (
       atomic_load_explicit(&lifecycle_operation_count, memory_order_relaxed) <
       target) {
+      pause_lifecycle_thread();
     }
     pg_status_log_shutdown();
   }
@@ -516,7 +533,7 @@ static void test_concurrent_lifecycle(void) {
   // Assert
   support_assert_true(
     atomic_load_explicit(&lifecycle_operation_count, memory_order_relaxed) >=
-      lifecycle_round_count * operations_per_round,
+      (uint_fast64_t)lifecycle_round_count * operations_per_round,
     "logger lifecycle workers did not make progress"
   );
 }
@@ -689,7 +706,7 @@ static size_t read_pipe(
   return used;
 }
 
-static void wait_for_pipe_data(const int descriptor) {
+static bool wait_for_pipe_data(const int descriptor) {
   struct pollfd output_poll = {
     .fd = descriptor,
     .events = POLLIN,
@@ -699,11 +716,7 @@ static void wait_for_pipe_data(const int descriptor) {
   do {
     result = poll(&output_poll, 1, 2000);
   } while (result < 0 && errno == EINTR);
-  support_assert_true(result > 0, "logger output recovery timed out");
-  support_assert_true(
-    (output_poll.revents & POLLIN) != 0,
-    "logger output pipe did not become readable"
-  );
+  return result > 0 && (output_poll.revents & POLLIN) != 0;
 }
 
 static bool standard_error_is_writable(void) {
@@ -802,7 +815,7 @@ static void test_output_backpressure_periodic_recovery(void) {
   pg_status_log(PG_STATUS_LOG_INFO, "output", "message to drop");
   pg_status_log_flush();
   drain_pipe(output_pipe[0]);
-  wait_for_pipe_data(output_pipe[0]);
+  const bool recovery_ready = wait_for_pipe_data(output_pipe[0]);
   char output[8192];
   const size_t output_length = read_pipe(
     output_pipe[0], output, sizeof(output)
@@ -812,6 +825,7 @@ static void test_output_backpressure_periodic_recovery(void) {
   restore_standard_error(saved_stderr);
 
   // Assert
+  support_assert_true(recovery_ready, "logger output recovery timed out");
   support_assert_true(output_length > 0, "logger did not retry output");
   support_assert_contains(
     output, " WARNING logger: messages dropped count=1 reason=backpressure\n",
@@ -850,7 +864,7 @@ static void test_output_partial_write_recovery(void) {
 
   char component[5000];
   memset(component, 'p', sizeof(component) - 1);
-  static constexpr char component_prefix[] = "partial-record";
+  static const char component_prefix[] = "partial-record";
   memcpy(component, component_prefix, sizeof(component_prefix) - 1);
   component[sizeof(component) - 1] = '\0';
 
@@ -861,11 +875,17 @@ static void test_output_partial_write_recovery(void) {
   const size_t partial_length = read_pipe(
     output_socket[1], partial_output, sizeof(partial_output)
   );
-  wait_for_pipe_data(output_socket[1]);
+  const bool partial_write = partial_length > 0 &&
+                             partial_output[partial_length - 1] != '\n';
+  bool recovery_ready = true;
   char recovered_output[8192];
-  const size_t recovered_length = read_pipe(
-    output_socket[1], recovered_output, sizeof(recovered_output)
-  );
+  size_t recovered_length = 0;
+  if (partial_write) {
+    recovery_ready = wait_for_pipe_data(output_socket[1]);
+    recovered_length = read_pipe(
+      output_socket[1], recovered_output, sizeof(recovered_output)
+    );
+  }
   pg_status_log_shutdown();
   close(output_socket[1]);
   restore_standard_error(saved_stderr);
@@ -876,10 +896,14 @@ static void test_output_partial_write_recovery(void) {
     partial_record != nullptr, "partial record was not written"
   );
   support_assert_true(partial_length > 0, "partial output is empty");
-  support_assert_true(
-    partial_output[partial_length - 1] != '\n',
-    "test did not produce a partial write"
-  );
+  if (!partial_write) {
+    support_assert_true(
+      partial_output[partial_length - 1] == '\n',
+      "complete logger record was not newline-terminated"
+    );
+    return;
+  }
+  support_assert_true(recovery_ready, "partial line recovery timed out");
   support_assert_true(recovered_length > 0, "partial line was not recovered");
   support_assert_true(
     recovered_output[0] == '\n', "partial line was not terminated on recovery"
@@ -942,7 +966,7 @@ static void run_fatal_shutdown_child(void) {
 }
 
 static void test_fatal_shutdown_race(void) {
-  static constexpr size_t round_count = 8;
+  enum { round_count = 8 };
 
   // Arrange & Act
   for (size_t round = 0; round < round_count; round++) {

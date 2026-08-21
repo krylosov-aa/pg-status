@@ -1,0 +1,4 @@
+/* Generated from streaming_replication_query.sql. */
+static const char streaming_replication_query[] = {
+  @PG_STATUS_STREAMING_REPLICATION_QUERY_BYTES@ '\0',
+};

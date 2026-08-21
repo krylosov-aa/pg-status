@@ -31,7 +31,8 @@ default pg-status listen address, `0.0.0.0`, is IPv4-only.
 - [Vegeta](https://github.com/tsenart/vegeta) for fixed-rate load generation.
 - `curl` and `jq`.
 
-Do not benchmark a Debug build: this project enables sanitizers for Debug.
+Do not benchmark a Debug or sanitizer build: use the `release` preset so the
+result represents the optimized production binary.
 
 ## Run
 

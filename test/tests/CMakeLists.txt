@@ -218,6 +218,7 @@ target_link_libraries(
         pg_monitor
         PRIVATE
         common_warnings
+        pg_status_cjson
         Threads::Threads
 )
 target_include_directories(
@@ -246,6 +247,7 @@ target_link_libraries(
         pg_status_api_test PRIVATE
         common_warnings
         pg_status_test_support
+        utils
 )
 
 set(PG_STATUS_API_TEST_CASES

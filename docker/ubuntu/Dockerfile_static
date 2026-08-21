@@ -1,7 +1,14 @@
 # -------- Build --------
-FROM ubuntu:latest AS builder
+FROM ubuntu:24.04 AS builder
 
-ENV DEBIAN_FRONTEND=noninteractive
+ARG CJSON_VERSION=1.7.19
+ARG CJSON_SHA256=7fa616e3046edfa7a28a32d5f9eacfd23f92900fe1f8ccd988c1662f30454562
+ARG OPENSSL_VERSION=3.5.7
+ARG OPENSSL_SHA256=a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8
+ARG POSTGRESQL_VERSION=18.6
+ARG POSTGRESQL_SHA256=983ee554ec53dbeb9b70797bef9fcf4e67e117e7e48ca1463cc80b3ff8e8ff3f
+
+ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash clang clang-tools build-essential cmake ninja-build pkg-config libtool \
@@ -16,9 +23,10 @@ WORKDIR /tmp
 RUN cp /usr/share/doc/libevent-dev/copyright /tmp/LICENSE-libevent
 
 # ---- cJSON ----
-RUN curl -LO https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz && \
-    tar xf v1.7.19.tar.gz && \
-    cd cJSON-1.7.19 && \
+RUN curl -fSLO "https://github.com/DaveGamble/cJSON/archive/refs/tags/v${CJSON_VERSION}.tar.gz" && \
+    echo "${CJSON_SHA256}  v${CJSON_VERSION}.tar.gz" | sha256sum -c - && \
+    tar xf "v${CJSON_VERSION}.tar.gz" && \
+    cd "cJSON-${CJSON_VERSION}" && \
     sed -i '/cmake_minimum_required/d' CMakeLists.txt && \
     sed -i '1i cmake_minimum_required(VERSION 3.10)' CMakeLists.txt && \
     cmake -B build -G Ninja \
@@ -29,17 +37,20 @@ RUN curl -LO https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.g
     cp LICENSE /tmp/LICENSE-cJSON
 
 # ---- OpenSSL ----
-RUN curl -LO https://www.openssl.org/source/openssl-3.3.1.tar.gz && \
-    tar xf openssl-3.3.1.tar.gz && \
-    cd openssl-3.3.1 && \
-    env CC=gcc ./Configure linux-x86_64 no-shared no-dso no-tests --prefix=/usr/local && \
+RUN curl -fSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" && \
+    echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | sha256sum -c - && \
+    tar xf "openssl-${OPENSSL_VERSION}.tar.gz" && \
+    cd "openssl-${OPENSSL_VERSION}" && \
+    env CC=gcc ./config no-shared no-dso no-tests \
+        --prefix=/usr/local --libdir=lib && \
     make -j$(nproc) && make install_sw && \
     cp LICENSE.txt /tmp/LICENSE-OpenSSL
 
 # ---- libpq ----
-RUN curl -LO https://ftp.postgresql.org/pub/source/v18.1/postgresql-18.1.tar.gz && \
-    tar xf postgresql-18.1.tar.gz && \
-    cd postgresql-18.1 && \
+RUN curl -fSLO "https://ftp.postgresql.org/pub/source/v${POSTGRESQL_VERSION}/postgresql-${POSTGRESQL_VERSION}.tar.gz" && \
+    echo "${POSTGRESQL_SHA256}  postgresql-${POSTGRESQL_VERSION}.tar.gz" | sha256sum -c - && \
+    tar xf "postgresql-${POSTGRESQL_VERSION}.tar.gz" && \
+    cd "postgresql-${POSTGRESQL_VERSION}" && \
     ./configure --prefix=/usr/local --without-readline --with-openssl --without-icu CFLAGS="-O2" && \
     make -C src/common && make -C src/port && make -C src/interfaces/libpq && \
     ar rcs src/common/libpgcommon.a src/common/*.o && \
@@ -54,30 +65,7 @@ RUN curl -LO https://ftp.postgresql.org/pub/source/v18.1/postgresql-18.1.tar.gz 
     cp COPYRIGHT /tmp/LICENSE-PostgreSQL
 
 # ---- zlib license ----
-RUN <<'EOF' cat > /tmp/LICENSE-zlib
-zlib License
-
-Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
-
-This software is provided 'as-is', without any express or implied
-warranty.  In no event will the authors be held liable for any damages
-arising from the use of this software.
-
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute it
-freely, subject to the following restrictions:
-
-1. The origin of this software must not be misrepresented; you must not
-   claim that you wrote the original software. If you use this software
-   in a product, an acknowledgment in the product documentation would be
-   appreciated but is not required.
-2. Altered source versions must be plainly marked as such, and must not be
-   misrepresented as being the original software.
-3. This notice may not be removed or altered from any source distribution.
-
-Jean-loup Gailly        Mark Adler
-jloup@gzip.org          madler@alumni.caltech.edu
-EOF
+COPY docker/ubuntu/package/zlib-license.txt /tmp/LICENSE-zlib
 
 # ---- Build app ----
 WORKDIR /app
@@ -93,18 +81,20 @@ ENV CFLAGS="-static -O2"
 RUN cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=OFF \
+        -DPG_STATUS_STATIC_DEPENDENCIES=ON \
+        -DPG_STATUS_LINK_WARNINGS_AS_ERRORS=OFF \
         -DCMAKE_EXE_LINKER_FLAGS="-static" \
         -DCMAKE_SHARED_LIBRARY_LINK_C_FLAGS="" \
         -DCMAKE_FIND_LIBRARY_SUFFIXES=".a" \
         -DCMAKE_PREFIX_PATH="/usr/local" \
-        -DLIBPQ_INCLUDE_DIR="/usr/local/include" \
-        -DLIBPQ_LIBRARY="/usr/local/lib/libpq.a;/usr/local/lib/libpgcommon.a;/usr/local/lib/libpgport.a;/usr/local/lib64/libssl.a;/usr/local/lib64/libcrypto.a;m;z;dl" \
+        -DLIBPQ_INCLUDE_DIR="/usr/local/include/postgresql" \
+        -DLIBPQ_LIBRARY="/usr/local/lib/libpq.a;/usr/local/lib/libpgcommon.a;/usr/local/lib/libpgport.a;/usr/local/lib/libssl.a;/usr/local/lib/libcrypto.a;m;z;dl" \
         . && \
     cmake --build build && \
     ctest --test-dir build --output-on-failure
 
 # -------- Package Archive --------
-FROM ubuntu:latest AS packager
+FROM ubuntu:24.04 AS packager
 
 RUN apt-get update && apt-get install -y --no-install-recommends tar gzip && \
     rm -rf /var/lib/apt/lists/*
@@ -117,108 +107,31 @@ COPY --from=builder /tmp/LICENSE-cJSON licenses/LICENSE-cJSON
 COPY --from=builder /tmp/LICENSE-OpenSSL licenses/LICENSE-OpenSSL
 COPY --from=builder /tmp/LICENSE-PostgreSQL licenses/LICENSE-PostgreSQL
 COPY --from=builder /tmp/LICENSE-zlib licenses/LICENSE-zlib
+COPY LICENSE LICENSE
+COPY docker/ubuntu/package/static-third-party-notices.txt THIRD-PARTY-NOTICES
+COPY docker/ubuntu/package/static-readme.txt README
 
-RUN <<'EOF' cat > LICENSE
-MIT License
-
-Copyright (c) 2025 krylosov-aa
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-EOF
-
-RUN <<'EOF' cat > THIRD-PARTY-NOTICES
-Third-Party Software Notices
-============================
-
-This binary statically links the following libraries.
-Full license texts are included in the "licenses" directory.
-
---------------------------------------------------------------------------------
-libpq (PostgreSQL Client Library) - v18.1
---------------------------------------------------------------------------------
-License: PostgreSQL License
-License File: licenses/LICENSE-PostgreSQL
-Website: https://www.postgresql.org/
-
---------------------------------------------------------------------------------
-libevent
---------------------------------------------------------------------------------
-License: BSD 3-Clause License
-License File: licenses/LICENSE-libevent
-Website: https://libevent.org/
-
---------------------------------------------------------------------------------
-cJSON - v1.7.19
---------------------------------------------------------------------------------
-License: MIT License
-License File: licenses/LICENSE-cJSON
-Website: https://github.com/DaveGamble/cJSON
-
---------------------------------------------------------------------------------
-OpenSSL - v3.3.1
---------------------------------------------------------------------------------
-License: Apache License 2.0
-License File: licenses/LICENSE-OpenSSL
-Website: https://www.openssl.org/
-
---------------------------------------------------------------------------------
-zlib - v1.3.1
---------------------------------------------------------------------------------
-License: zlib License
-License File: licenses/LICENSE-zlib
-Website: https://zlib.net/
-EOF
-
-# README
-RUN <<'EOF' cat > README
-pg-status v2.1.1 (static build)
-===============================
-
-A microservice (sidecar) that helps instantly determine the status of your
-PostgreSQL hosts including whether they are alive, which one is the master,
-which ones are replicas, and how far each replica is lagging behind the master.
-
-This is a statically linked binary with no external dependencies.
-
-Licenses
---------
-See LICENSE for the pg-status license.
-See THIRD-PARTY-NOTICES and the licenses/ directory for third-party licenses.
-
-Source Code
------------
-https://github.com/krylosov-aa/pg-status
-EOF
-
-RUN tar -czvf /pg-status_2.1.1_linux_amd64_static.tar.gz \
-    pg-status \
-    LICENSE \
-    THIRD-PARTY-NOTICES \
-    README \
-    licenses/
+RUN architecture="$(dpkg --print-architecture)" && \
+    tar -czvf "/pg-status_2.1.1_linux_${architecture}_static.tar.gz" \
+        pg-status \
+        LICENSE \
+        THIRD-PARTY-NOTICES \
+        README \
+        licenses/
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=packager /pg-status_2.1.1_linux_amd64_static.tar.gz /
+COPY --from=packager /pg-status_2.1.1_linux_*_static.tar.gz /
 
 # -------- Run --------
-FROM ubuntu:latest AS runner
+FROM ubuntu:24.04 AS runner
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=builder /app/build/src/pg-status /app/pg-status

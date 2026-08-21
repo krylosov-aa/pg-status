@@ -248,7 +248,7 @@ static void test_str_to_uint16_overflow(void) {
   (void)str_to_uint16("65536");
 }
 
-static constexpr char ENV_NAME[] = "PG_STATUS_UTILS_TEST_VALUE";
+static const char ENV_NAME[] = "PG_STATUS_UTILS_TEST_VALUE";
 
 static void test_replace_from_env(void) {
   // Arrange

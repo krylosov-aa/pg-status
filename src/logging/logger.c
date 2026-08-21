@@ -17,15 +17,17 @@
 #include <time.h>
 #include <unistd.h>
 
-static constexpr size_t LOG_MESSAGE_CAPACITY = 2048;
-static constexpr size_t LOG_LINE_CAPACITY = 4096;
-static constexpr size_t LOG_TIMESTAMP_CAPACITY = 32;
-static constexpr size_t LOG_QUEUE_CAPACITY = 256;
-static constexpr size_t LOG_ERROR_RESERVE = 16;
-static constexpr size_t LOG_WRITE_BATCH_SIZE = 64;
-static constexpr int LOG_OUTPUT_WAIT_TIMEOUT_MS = 10;
-static constexpr int LOG_OUTPUT_RETRY_INTERVAL_MS = 250;
-static constexpr char TRUNCATION_MARKER[] = "...[truncated]";
+enum {
+  LOG_MESSAGE_CAPACITY = 2048,
+  LOG_LINE_CAPACITY = 4096,
+  LOG_TIMESTAMP_CAPACITY = 32,
+  LOG_QUEUE_CAPACITY = 256,
+  LOG_ERROR_RESERVE = 16,
+  LOG_WRITE_BATCH_SIZE = 64,
+  LOG_OUTPUT_WAIT_TIMEOUT_MS = 10,
+  LOG_OUTPUT_RETRY_INTERVAL_MS = 250,
+};
+static const char TRUNCATION_MARKER[] = "...[truncated]";
 
 typedef struct {
   _Atomic size_t sequence;
@@ -158,13 +160,16 @@ static void format_timestamp(char *buffer, const size_t capacity) {
     (void)snprintf(buffer, capacity, "unknown-time");
     return;
   }
-  (void)snprintf(
-    buffer, capacity, "%s.%03ldZ", seconds, now.tv_nsec / 1000000L
-  );
+  if (now.tv_nsec < 0 || now.tv_nsec >= 1000000000L) {
+    (void)snprintf(buffer, capacity, "unknown-time");
+    return;
+  }
+  const unsigned int milliseconds = (unsigned int)(now.tv_nsec / 1000000L);
+  (void)snprintf(buffer, capacity, "%s.%03uZ", seconds, milliseconds);
 }
 
 static void mark_truncated(char *buffer, const size_t capacity) {
-  constexpr size_t marker_length = sizeof(TRUNCATION_MARKER) - 1;
+  const size_t marker_length = sizeof(TRUNCATION_MARKER) - 1;
   if (capacity <= marker_length) {
     return;
   }
@@ -182,7 +187,7 @@ static void sanitize_log_line(char *line, const size_t length) {
 }
 
 static size_t mark_line_truncated(char *line, const size_t capacity) {
-  constexpr size_t marker_length = sizeof(TRUNCATION_MARKER) - 1;
+  const size_t marker_length = sizeof(TRUNCATION_MARKER) - 1;
   if (capacity <= marker_length + 1) {
     return 0;
   }

@@ -73,9 +73,30 @@ then run:
 
 ## Build with CMake
 
-You can compile the project from source for any platform using CMake.
-You can refer to the [Dockerfiles](../docker) for examples of how to install dependencies and configure the build,
-depending on whether you prefer a dynamically linked or static binary.
+The source build supports POSIX systems with CMake 3.22 or newer and a GCC,
+Clang, or AppleClang compiler. Install the development packages for libevent,
+libpq, cJSON, pthreads, and pkg-config, then run:
+
+```shell
+cmake --preset release
+cmake --build --preset release
+cmake --install cmake-builds/release --prefix /usr/local
+```
+
+For a custom build directory, the equivalent commands are:
+
+```shell
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+cmake --install build --prefix /usr/local
+```
+
+Set `PG_STATUS_STATIC_DEPENDENCIES=ON` when all third-party static archives are
+available and must be selected. The static [Dockerfiles](../docker) contain
+complete Linux examples, including libpq's private link dependencies. The
+Ubuntu/glibc static build also sets `PG_STATUS_LINK_WARNINGS_AS_ERRORS=OFF`
+because glibc emits unavoidable NSS/DNS static-link warnings; other builds
+keep linker warnings fatal by default.
 
 
 ## Dependencies

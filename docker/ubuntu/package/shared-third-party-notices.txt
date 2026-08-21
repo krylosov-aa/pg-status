@@ -1,0 +1,32 @@
+Third-Party Software Notices
+============================
+
+This software dynamically links against the following libraries.
+These libraries are NOT included in this distribution and must be
+installed separately on your system.
+
+--------------------------------------------------------------------------------
+libpq (PostgreSQL Client Library)
+--------------------------------------------------------------------------------
+License: PostgreSQL License
+Website: https://www.postgresql.org/
+License URL: https://www.postgresql.org/about/licence/
+
+PostgreSQL is released under the PostgreSQL License, a liberal Open Source
+license, similar to the BSD or MIT licenses.
+
+--------------------------------------------------------------------------------
+libevent
+--------------------------------------------------------------------------------
+License: BSD 3-Clause License
+Website: https://libevent.org/
+License URL: https://github.com/libevent/libevent/blob/master/LICENSE
+
+--------------------------------------------------------------------------------
+cJSON
+--------------------------------------------------------------------------------
+License: MIT License
+Website: https://github.com/DaveGamble/cJSON
+License URL: https://github.com/DaveGamble/cJSON/blob/master/LICENSE
+
+Copyright (c) 2009-2017 Dave Gamble and cJSON contributors

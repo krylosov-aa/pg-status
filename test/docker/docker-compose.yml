@@ -75,7 +75,7 @@ services:
       - postgres_master
       - postgres_replica
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy-master.sock || exit 1"]
+      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy.sock || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -92,7 +92,7 @@ services:
       - postgres_master
       - postgres_replica
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy-master.sock || exit 1"]
+      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy.sock || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -109,7 +109,7 @@ services:
       - postgres_master
       - postgres_replica
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy-master.sock || exit 1"]
+      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy.sock || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 5

@@ -7,18 +7,24 @@ Run the commands in this document from the repository root.
 Configure and build the project, then run the CTest suite:
 
 ```sh
-cmake -S . -B cmake-builds/debug -DCMAKE_BUILD_TYPE=Debug
-cmake --build cmake-builds/debug
-ctest --test-dir cmake-builds/debug --output-on-failure
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug
 ```
 
-Debug builds enable AddressSanitizer and UndefinedBehaviorSanitizer. The
-functional HTTP API tests are deterministic and do not require PostgreSQL or
-Docker.
+The `debug` and `release` presets are ordinary builds. The `asan` and `tsan`
+presets explicitly enable their respective sanitizer and clang-tidy profiles.
+The functional HTTP API tests are deterministic and do not require PostgreSQL
+or Docker.
 
 All local Make targets place their CMake build trees under `cmake-builds/` by
 default. Override the common root with `CMAKE_BUILDS_DIR=<path>` or override
 an individual build directory with its corresponding variable.
+
+`make pre-release` invokes this target before analysis and tests, so a local
+pre-release run may update files in the working tree. The containerized
+`pre-release-docker` and `full-audit` variants format only their isolated
+source copies.
 
 ### AddressSanitizer and UndefinedBehaviorSanitizer
 
@@ -28,6 +34,9 @@ UndefinedBehaviorSanitizer configuration with:
 ```sh
 make test_asan
 ```
+
+The equivalent direct CMake workflow is `cmake --preset asan`, followed by
+`cmake --build --preset asan` and `ctest --preset asan`.
 
 This configuration uses the separate `cmake-builds/asan` directory. Override
 it when needed with `ASAN_BUILD_DIR=<path> make test_asan`. On macOS, the
@@ -43,6 +52,8 @@ Run the test suite under ThreadSanitizer in a separate build directory:
 ```sh
 make test_tsan
 ```
+
+The equivalent CMake preset is `tsan`.
 
 The separate `cmake-builds/tsan` directory prevents ThreadSanitizer from being
 combined with the incompatible AddressSanitizer configuration. Override the
@@ -119,13 +130,7 @@ Run the complete local pre-release verification with:
 make pre-release
 ```
 
-The target runs these stages sequentially and stops at the first failure:
-
-1. Clang Static Analyzer for production and test code.
-2. Repeated Debug tests under AddressSanitizer and UndefinedBehaviorSanitizer.
-3. Repeated Debug tests under ThreadSanitizer.
-4. Repeated tests in an optimized Release build.
-5. On Linux, one complete CTest pass under Valgrind Memcheck.
+The target runs these stages sequentially and stops at the first failure.
 
 Every repeated stage uses `REPEAT_COUNT`, which defaults to 100. Override it
 for a shorter or longer run:
@@ -133,11 +138,6 @@ for a shorter or longer run:
 ```sh
 REPEAT_COUNT=20 make pre-release
 ```
-
-The target assumes that source formatting has already been applied and does
-not run a separate format check.
-
-### Linux release gate and artifact builds
 
 Run the same complete pre-release verification inside an Ubuntu/glibc
 `linux/amd64` container with:
@@ -151,6 +151,14 @@ distributable artifact, use:
 
 ```sh
 make release-builds
+```
+
+Full audit. Use this procedure before a release or after changing CMake, tests, toolchain
+settings, dependencies, Dockerfiles, or packaging. It is intentionally more
+thorough than the normal development loop.
+
+```sh
+make full-audit
 ```
 
 ## Docker environments

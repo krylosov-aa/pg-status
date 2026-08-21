@@ -2,19 +2,15 @@
  * Utilities for checking the status of a host
  */
 
+#include <libpq-fe.h>
 #include <poll.h>
 #include <stdatomic.h>
 #include <stdint.h>
 
 #include "logger.h"
 #include "pg_monitor.h"
+#include "streaming_replication_query.h"
 #include "utils.h"
-
-#ifdef __APPLE__
-#include <libpq-fe.h>
-#else
-#include <postgresql/libpq-fe.h>
-#endif
 
 /**
  * Converts pg true to bool true
@@ -22,14 +18,6 @@
 static bool is_t(const char *pg_val) {
   return is_equal_strings(pg_val, "t");
 }
-
-/**
- * sql query to get host status
- */
-static const char streaming_replication_query[] = {
-#embed "streaming_replication_query.sql"
-  , '\0'
-};
 
 /**
  * Converts pg lsn to bytes; malformed/missing input yields 0.

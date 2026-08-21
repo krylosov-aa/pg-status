@@ -19,7 +19,8 @@ if("${EXIT_CODE}" STREQUAL "0")
 endif()
 
 set(OUTPUT "${STDOUT}${STDERR}")
-if(NOT OUTPUT MATCHES "${EXPECTED_OUTPUT}")
+string(FIND "${OUTPUT}" "${EXPECTED_OUTPUT}" EXPECTED_OUTPUT_OFFSET)
+if(EXPECTED_OUTPUT_OFFSET EQUAL -1)
     message(FATAL_ERROR
             "Expected output '${EXPECTED_OUTPUT}', got:\n${OUTPUT}"
     )

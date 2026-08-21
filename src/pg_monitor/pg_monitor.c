@@ -287,7 +287,7 @@ void start_pg_monitor(void) {
  * Stops a host monitoring thread
  */
 void stop_pg_monitor(void) {
-  constexpr char b = 1;
+  const char b = 1;
   ssize_t w;
   do {
     w = write(stop_pipe[1], &b, 1);

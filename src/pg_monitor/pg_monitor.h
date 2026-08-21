@@ -12,7 +12,7 @@
 /**
  * The maximum number of hosts monitored by pg-status
  */
-constexpr unsigned int MAX_HOSTS = 10;
+enum { MAX_HOSTS = 10 };
 
 /**
  * List of all monitoring parameters

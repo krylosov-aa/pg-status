@@ -8,10 +8,19 @@ SCAN_BUILD_DIR ?= $(CMAKE_BUILDS_DIR)/scan
 VALGRIND_BUILD_DIR ?= $(CMAKE_BUILDS_DIR)/valgrind
 SCAN_REPORT_DIR ?= scan_reports
 REPEAT_COUNT ?= 100
+PRE_RELEASE_TSAN ?= 1
 PRE_RELEASE_DOCKERFILE ?= test/pre-release/Dockerfile
 PRE_RELEASE_IMAGE ?= pg-status-pre-release
 PRE_RELEASE_PLATFORM ?= linux/amd64
 PRE_RELEASE_CONTAINER_LABEL ?= com.pg-status.role=pre-release
+ARTIFACT_DIR ?= out
+RELEASE_PLATFORM ?= linux/amd64
+RELEASE_ARCH ?= amd64
+RELEASE_DOCKER_BUILD_FLAGS ?=
+FULL_AUDIT_SCRIPT ?= test/full-audit.sh
+FULL_AUDIT_PULL ?= 1
+FULL_AUDIT_NO_CACHE ?= 1
+FULL_AUDIT_EMULATED_REPEAT_COUNT ?= 1
 
 HOST_OS := $(shell uname -s)
 SYSTEM_CC := $(shell command -v clang 2>/dev/null || command -v cc 2>/dev/null)
@@ -67,6 +76,7 @@ VALGRIND_OPTIONS ?= --tool=memcheck --leak-check=full --show-leak-kinds=all --er
 	build_shared_executable \
 	build_static_executable \
 	build_deb \
+	check_publish_args \
 	build_push \
 	build \
 	up \
@@ -90,7 +100,10 @@ VALGRIND_OPTIONS ?= --tool=memcheck --leak-check=full --show-leak-kinds=all --er
 	test_valgrind \
 	colima_start \
 	build_push_amd_64 \
+	format \
 	format-warn \
+	check_repeat_args \
+	check_pre_release_args \
 	build_asan \
 	test_asan \
 	build_tsan \
@@ -101,42 +114,87 @@ VALGRIND_OPTIONS ?= --tool=memcheck --leak-check=full --show-leak-kinds=all --er
 	test_repeat_tsan \
 	pre-release \
 	pre-release-docker \
+	full-audit \
 	release-builds \
 	benchmark_rps
 
 build_static_alpine:
-	docker build -f docker/alpine/Dockerfile_static -t pg-status-static-alpine .
+	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+		--platform $(RELEASE_PLATFORM) \
+		-f docker/alpine/Dockerfile_static -t pg-status-static-alpine .
 
 build_shared_alpine:
-	docker build -f docker/alpine/Dockerfile_shared -t pg-status-shared-alpine .
+	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+		--platform $(RELEASE_PLATFORM) \
+		-f docker/alpine/Dockerfile_shared -t pg-status-shared-alpine .
 
 build_shared_ubuntu:
-	docker build -f docker/ubuntu/Dockerfile_shared -t pg-status-shared-ubuntu .
+	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+		--platform $(RELEASE_PLATFORM) \
+		-f docker/ubuntu/Dockerfile_shared -t pg-status-shared-ubuntu .
 
 build_static_ubuntu:
-	docker build -f docker/ubuntu/Dockerfile_static -t pg-status-static-ubuntu .
+	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+		--platform $(RELEASE_PLATFORM) \
+		-f docker/ubuntu/Dockerfile_static -t pg-status-static-ubuntu .
 
 build_shared_executable:
-	sudo docker build -f docker/ubuntu/Dockerfile_shared --target export -o out/shared .
-	sudo chown -R $$(id -u):$$(id -g) out/shared
+	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+		--platform $(RELEASE_PLATFORM) \
+		-f docker/ubuntu/Dockerfile_shared --target packager \
+		-t pg-status-shared-packager .
+	mkdir -p "$(ARTIFACT_DIR)/shared"
+	@container_id="$$(docker create \
+		--platform "$(RELEASE_PLATFORM)" pg-status-shared-packager true)" && \
+		trap 'docker rm "$$container_id" >/dev/null' EXIT && \
+		docker cp \
+		"$$container_id:/pg-status_2.1.1_linux_$(RELEASE_ARCH)_shared.tar.gz" \
+		"$(ARTIFACT_DIR)/shared/"
 
 build_static_executable:
-	sudo docker build -f docker/ubuntu/Dockerfile_static --target export -o out/static .
-	sudo chown -R $$(id -u):$$(id -g) out/static
+	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+		--platform $(RELEASE_PLATFORM) \
+		-f docker/ubuntu/Dockerfile_static --target packager \
+		-t pg-status-static-packager .
+	mkdir -p "$(ARTIFACT_DIR)/static"
+	@container_id="$$(docker create \
+		--platform "$(RELEASE_PLATFORM)" pg-status-static-packager true)" && \
+		trap 'docker rm "$$container_id" >/dev/null' EXIT && \
+		docker cp \
+		"$$container_id:/pg-status_2.1.1_linux_$(RELEASE_ARCH)_static.tar.gz" \
+		"$(ARTIFACT_DIR)/static/"
 
 build_deb:
-	sudo docker build -f docker/ubuntu/Dockerfile_deb --target export -o out/deb .
-	sudo chown -R $$(id -u):$$(id -g) out/deb
+	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+		--platform $(RELEASE_PLATFORM) \
+		-f docker/ubuntu/Dockerfile_deb --target packager \
+		-t pg-status-deb-packager .
+	mkdir -p "$(ARTIFACT_DIR)/deb"
+	@container_id="$$(docker create \
+		--platform "$(RELEASE_PLATFORM)" pg-status-deb-packager true)" && \
+		trap 'docker rm "$$container_id" >/dev/null' EXIT && \
+		docker cp "$$container_id:/pg-status_2.1.1_$(RELEASE_ARCH).deb" \
+		"$(ARTIFACT_DIR)/deb/"
 
-build_push:
-	sudo docker buildx build \
-		--platform linux/amd64 \
-		--provenance=false \
-		--sbom=false \
+check_publish_args:
+	@test -n "$(strip $(r))" || { \
+		printf 'Registry/repository prefix is required: make build_push r=<registry-or-user> v=<version>\n' >&2; \
+		exit 2; \
+	}
+	@test -n "$(strip $(v))" || { \
+		printf 'Image version is required: make build_push r=<registry-or-user> v=<version>\n' >&2; \
+		exit 2; \
+	}
+
+build_push: check_publish_args
+	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+		--platform $(RELEASE_PLATFORM) \
 		-f docker/alpine/Dockerfile_shared \
-		-t ${r}/pg-status:${v} \
-		-t ${r}/pg-status:latest \
-		--push .
+		-t $(r)/pg-status:$(v) \
+		-t $(r)/pg-status:latest \
+		.
+	docker push $(r)/pg-status:$(v)
+	docker push $(r)/pg-status:latest
 
 build:
 	docker build -f docker/alpine/Dockerfile_shared -t pg-status .
@@ -164,17 +222,17 @@ down_all:
 	exit "$$exit_code"
 
 build_up:
-	make down
-	make build
-	make up
+	$(MAKE) down
+	$(MAKE) build
+	$(MAKE) up
 
 build_up_test:
-	make down_test
-	make build
+	$(MAKE) down_test
+	$(MAKE) build
 	$(test-docker-compose) --profile pg-status up -d
 
 build_up_test_only_pg:
-	make down_test
+	$(MAKE) down_test
 	$(test-docker-compose) up -d
 
 down_test:
@@ -230,10 +288,18 @@ scan-build: configure_scan_build
 		cmake --build $(SCAN_BUILD_DIR) --clean-first --parallel
 
 clean:
-	 cmake --build $(DEBUG_BUILD_DIR) --verbose --target clean
+	@if [ -f "$(DEBUG_BUILD_DIR)/CMakeCache.txt" ]; then \
+		cmake --build "$(DEBUG_BUILD_DIR)" --verbose --target clean; \
+	else \
+		printf 'Nothing to clean: %s is not configured\n' "$(DEBUG_BUILD_DIR)"; \
+	fi
 
 clean_release:
-	 cmake --build $(RELEASE_BUILD_DIR) --verbose --target clean
+	@if [ -f "$(RELEASE_BUILD_DIR)/CMakeCache.txt" ]; then \
+		cmake --build "$(RELEASE_BUILD_DIR)" --verbose --target clean; \
+	else \
+		printf 'Nothing to clean: %s is not configured\n' "$(RELEASE_BUILD_DIR)"; \
+	fi
 
 check_valgrind:
 	@if [ -z "$(VALGRIND_TOOL)" ] || ! command -v "$(VALGRIND_TOOL)" >/dev/null 2>&1; then \
@@ -266,17 +332,45 @@ docker-compose := $(docker-compose-command) -f docker-compose.yml
 test-docker-compose := $(docker-compose-command) -p test -f test/docker/docker-compose.yml
 
 colima_start:
+	@command -v colima >/dev/null 2>&1 || { \
+		printf 'colima is required for this macOS-only target\n' >&2; \
+		exit 1; \
+	}
 	colima start --arch aarch64 --vm-type=vz --vz-rosetta --cpu 6 --memory 8
 
 build_push_amd_64:
-	sudo docker build --platform linux/amd64 -f docker/alpine/Dockerfile_shared -t pg-status:${v} .
-	sudo docker tag pg-status:${v} ${r}/pg-status:${v}
-	sudo docker tag pg-status:${v} ${r}/pg-status:latest
-	sudo docker push ${r}/pg-status:${v}
-	sudo docker push ${r}/pg-status:latest
+	$(MAKE) RELEASE_PLATFORM=linux/amd64 build_push r="$(r)" v="$(v)"
+
+format:
+	cmake -S . -B "$(DEBUG_BUILD_DIR)" \
+		-DCMAKE_BUILD_TYPE=Debug \
+		-DBUILD_TESTING=ON
+	cmake --build "$(DEBUG_BUILD_DIR)" --target format
 
 format-warn:
-	cmake --build $(DEBUG_BUILD_DIR) --target format-warn
+	cmake -S . -B "$(DEBUG_BUILD_DIR)" \
+		-DCMAKE_BUILD_TYPE=Debug \
+		-DBUILD_TESTING=ON
+	cmake --build "$(DEBUG_BUILD_DIR)" --target format-warn
+
+check_repeat_args:
+	@case "$(REPEAT_COUNT)" in \
+		'' | *[!0-9]* | 0) \
+			printf 'REPEAT_COUNT must be a positive integer, got: %s\n' \
+				"$(REPEAT_COUNT)" >&2; \
+			exit 2; \
+			;; \
+	esac
+
+check_pre_release_args:
+	@case "$(PRE_RELEASE_TSAN)" in \
+		0 | 1) ;; \
+		*) \
+			printf 'PRE_RELEASE_TSAN must be 0 or 1, got: %s\n' \
+				"$(PRE_RELEASE_TSAN)" >&2; \
+			exit 2; \
+			;; \
+	esac
 
 # CMake clears its cache when the compiler changes, so select it separately
 # before applying the sanitizer profile options.
@@ -321,26 +415,32 @@ build_repeat: check_compiler
 		-DPG_STATUS_ENABLE_CLANG_TIDY=ON
 	cmake --build $(REPEAT_BUILD_DIR) --parallel
 
-test_repeat: build_repeat
+test_repeat: check_repeat_args build_repeat
 	ctest --test-dir $(REPEAT_BUILD_DIR) --output-on-failure \
 		--no-tests=error \
 		--repeat until-fail:$(REPEAT_COUNT)
 
 
-test_repeat_asan: build_asan
+test_repeat_asan: check_repeat_args build_asan
 	ctest --test-dir $(ASAN_BUILD_DIR) --output-on-failure \
 		--no-tests=error \
 		--repeat until-fail:$(REPEAT_COUNT)
 
-test_repeat_tsan: build_tsan
+test_repeat_tsan: check_repeat_args build_tsan
 	ctest --test-dir $(TSAN_BUILD_DIR) --output-on-failure \
 		--no-tests=error \
 		--repeat until-fail:$(REPEAT_COUNT)
 
-pre-release:
+pre-release: check_repeat_args check_pre_release_args
+	$(MAKE) format
 	$(MAKE) scan-build
+	cmake --build $(SCAN_BUILD_DIR) --target format-check
 	$(MAKE) REPEAT_COUNT=$(REPEAT_COUNT) test_repeat_asan
+ifeq ($(PRE_RELEASE_TSAN),1)
 	$(MAKE) REPEAT_COUNT=$(REPEAT_COUNT) test_repeat_tsan
+else
+	@printf 'Skipping TSan in this container; it is run in a native-architecture audit container\n'
+endif
 	$(MAKE) REPEAT_COUNT=$(REPEAT_COUNT) test_repeat
 ifeq ($(HOST_OS),Linux)
 	$(MAKE) test_valgrind
@@ -348,7 +448,7 @@ else
 	@printf 'Skipping Valgrind: supported by the Linux pre-release gate\n'
 endif
 
-pre-release-docker:
+pre-release-docker: check_repeat_args check_pre_release_args
 	docker build \
 		--platform $(PRE_RELEASE_PLATFORM) \
 		-f $(PRE_RELEASE_DOCKERFILE) \
@@ -359,7 +459,19 @@ pre-release-docker:
 		--security-opt seccomp=unconfined \
 		--label $(PRE_RELEASE_CONTAINER_LABEL) \
 		$(PRE_RELEASE_IMAGE) \
-		make REPEAT_COUNT=$(REPEAT_COUNT) pre-release
+		make \
+			REPEAT_COUNT=$(REPEAT_COUNT) \
+			PRE_RELEASE_TSAN=$(PRE_RELEASE_TSAN) \
+			pre-release
+
+full-audit:
+	AUDIT_PLATFORM="$(RELEASE_PLATFORM)" \
+	AUDIT_REPEAT_COUNT="$(REPEAT_COUNT)" \
+	AUDIT_ARTIFACT_ROOT="$(ARTIFACT_DIR)" \
+	AUDIT_PULL="$(FULL_AUDIT_PULL)" \
+	AUDIT_NO_CACHE="$(FULL_AUDIT_NO_CACHE)" \
+	AUDIT_EMULATED_REPEAT_COUNT="$(FULL_AUDIT_EMULATED_REPEAT_COUNT)" \
+		bash "$(FULL_AUDIT_SCRIPT)"
 
 release-builds: pre-release-docker
 	$(MAKE) build_shared_alpine
@@ -369,7 +481,6 @@ release-builds: pre-release-docker
 	$(MAKE) build_deb
 	$(MAKE) build_shared_executable
 	$(MAKE) build_static_executable
-	$(MAKE) build_push r=krylosovaa v=2.1.1
 
 benchmark_rps:
 	./test/rps/run.sh

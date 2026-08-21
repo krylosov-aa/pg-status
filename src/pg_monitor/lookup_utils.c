@@ -190,7 +190,7 @@ static unsigned int next_replica_round_robin(void) {
   unsigned int new_cursor;
   do {
     cursor = atomic_load_explicit(&round_robin_cursor, memory_order_relaxed);
-    new_cursor = (cursor + 1) % host_count;
+    new_cursor = (unsigned int)((cursor + 1) % host_count);
     const int master_i = get_master_index();
     if (master_i != -1 && new_cursor == (unsigned int)master_i) {
       new_cursor = next_cursor_in_circle(new_cursor);

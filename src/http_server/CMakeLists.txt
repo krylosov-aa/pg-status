@@ -1,16 +1,11 @@
 add_library(http_server http_server.c)
 
-pkg_check_modules(
-        LIBEVENT REQUIRED IMPORTED_TARGET
-        libevent
-)
 target_link_libraries(
         http_server
-        PUBLIC
+        PRIVATE
         common_warnings
         utils
-        PkgConfig::LIBEVENT
-        PRIVATE
+        pg_status_libevent
         logging
         Threads::Threads
 )

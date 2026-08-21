@@ -7,6 +7,9 @@
 # Clang Static Analyzer reports
 /scan_reports/
 
+# Release and full-audit artifacts
+/out/
+
 # Prerequisites
 *.d
 

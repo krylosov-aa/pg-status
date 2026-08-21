@@ -1,0 +1,40 @@
+Third-Party Software Notices
+============================
+
+This binary statically links the following libraries.
+Full license texts are included in the "licenses" directory.
+
+--------------------------------------------------------------------------------
+libpq (PostgreSQL Client Library) - v18.6
+--------------------------------------------------------------------------------
+License: PostgreSQL License
+License File: licenses/LICENSE-PostgreSQL
+Website: https://www.postgresql.org/
+
+--------------------------------------------------------------------------------
+libevent
+--------------------------------------------------------------------------------
+License: BSD 3-Clause License
+License File: licenses/LICENSE-libevent
+Website: https://libevent.org/
+
+--------------------------------------------------------------------------------
+cJSON - v1.7.19
+--------------------------------------------------------------------------------
+License: MIT License
+License File: licenses/LICENSE-cJSON
+Website: https://github.com/DaveGamble/cJSON
+
+--------------------------------------------------------------------------------
+OpenSSL - v3.5.7
+--------------------------------------------------------------------------------
+License: Apache License 2.0
+License File: licenses/LICENSE-OpenSSL
+Website: https://www.openssl.org/
+
+--------------------------------------------------------------------------------
+zlib - v1.3.1
+--------------------------------------------------------------------------------
+License: zlib License
+License File: licenses/LICENSE-zlib
+Website: https://zlib.net/

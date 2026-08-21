@@ -12,8 +12,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-static constexpr size_t RESPONSE_CAPACITY = (size_t)64 * 1024;
-static constexpr size_t REQUEST_CAPACITY = (size_t)2 * 1024;
+enum {
+  RESPONSE_CAPACITY = 64 * 1024,
+  REQUEST_CAPACITY = 2 * 1024,
+};
 
 [[noreturn]] void http_test_fail(const char *message) {
   fprintf(stderr, "FAIL: %s\n", message);
