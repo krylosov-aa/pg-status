@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
+#include "logger.h"
 #include "pg_monitor.h"
 #include "utils.h"
 
@@ -34,7 +35,8 @@ static void set_sleep(void) {
 
   env_val = getenv("pg_status__sleep");
   if (env_val && *env_val) {
-    raise_error(
+    pg_status_log_fatal(
+      "config",
       "pg_status__sleep is deprecated! Use pg_status__sleep_ms instead!"
     );
   }
@@ -43,7 +45,7 @@ static void set_sleep(void) {
 static void set_hosts(void) {
   replace_from_env("pg_status__hosts", &parameters.hosts);
   if (!parameters.hosts || !*parameters.hosts) {
-    raise_error("pg_status__hosts not set");
+    pg_status_log_fatal("config", "pg_status__hosts is not set");
   }
 }
 

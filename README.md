@@ -274,6 +274,8 @@ Configure pg-status using the following environment variables:
   listens. Accepts an IPv4 address, an IPv6 address, or `*` for best-effort
   IPv4/IPv6 wildcard listeners. Default: `0.0.0.0`.
 - `pg_status__http_port` — HTTP server port. Default: `8000`.
+- `pg_status__log_level` — Minimum logging level. Accepts `debug`, `info`,
+  `warning` (or `warn`), `error`, or `fatal`. Default: `info`.
 
 ## Installation
 
@@ -412,30 +414,24 @@ With client-side master detection, pg-status cannot determine which host
 
 ## Logging
 
-The service writes informational messages to stdout and errors, including
-PostgreSQL connection errors, to stderr.
-
-Startup, shutdown, and host-status changes are logged to stdout. The following
-messages describe host-role and availability changes:
-
-- A host fails a status check but has not yet reached
-  `pg_status__max_fails`: `<host-name>: possible dead`.
-- A host is confirmed dead after `pg_status__max_fails` consecutive failures:
-  `<host-name>: dead`.
-- A host recovers or becomes the master after failover:
-  `<host-name>: master`.
-- A host recovers or becomes a replica after failover:
-  `<host-name>: replica`.
-
-For replicas, pg-status also logs changes relative to the global
-`pg_status__sync_max_lag_*` thresholds:
+The service writes thread-safe, single-line logs to stderr. Calls from the HTTP
+and monitor threads enqueue records in a bounded in-memory queue; a dedicated
+logging thread writes them in queue order. Every line contains an RFC 3339 UTC
+timestamp, severity, component, and message:
 
 ```text
-<host-name>: synchronous in time
-<host-name>: out of sync in time
-<host-name>: synchronous in bytes
-<host-name>: out of sync in bytes
+2026-08-21T12:34:56.123Z INFO http: server started address=0.0.0.0 port=8000
+2026-08-21T12:35:01.245Z WARNING monitor: host state changed host=pg-2 state=possible_dead
 ```
+
+The default `info` level reports startup, shutdown, role changes, availability
+changes, and transitions across the global `pg_status__sync_max_lag_*`
+thresholds. PostgreSQL operation failures are logged at `error`. Detailed polling
+progress and replica-to-master fallback decisions are available at `debug`.
+
+pg-status never logs PostgreSQL passwords or complete connection strings. Log
+collection, storage, and rotation are delegated to the process supervisor,
+Docker, or the operating system.
 
 ## Third-party components
 

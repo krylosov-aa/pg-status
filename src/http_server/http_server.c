@@ -13,13 +13,13 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/queue.h>
 #include <unistd.h>
 
+#include "logger.h"
 #include "utils.h"
 
 static constexpr int HTTP_LISTEN_BACKLOG = 512;
@@ -70,7 +70,10 @@ static HTTPServer *init_http_server(
 ) {
   HTTPServer *server = malloc(sizeof(*server));
   if (!server) {
-    raise_error("Failed to allocate HTTP server");
+    const int error_number = errno != 0 ? errno : ENOMEM;
+    pg_status_log_system_fatal(
+      "http", error_number, "failed to allocate HTTP server"
+    );
   }
 
   *server = (HTTPServer){
@@ -87,16 +90,18 @@ static HTTPServer *init_http_server(
   int result = pthread_mutex_init(&server->start_mutex, nullptr);
   if (result != 0) {
     free(server);
-    errno = result;
-    raise_error("Failed to initialize HTTP server mutex");
+    pg_status_log_system_fatal(
+      "http", result, "failed to initialize HTTP server mutex"
+    );
   }
 
   result = pthread_cond_init(&server->start_cond, nullptr);
   if (result != 0) {
     pthread_mutex_destroy(&server->start_mutex);
     free(server);
-    errno = result;
-    raise_error("Failed to initialize HTTP server condition variable");
+    pg_status_log_system_fatal(
+      "http", result, "failed to initialize HTTP server condition variable"
+    );
   }
 
   return server;
@@ -234,7 +239,7 @@ static void release_response_body(HTTPResponse *response) {
       response->body_cleanup(response->body.owned);
       break;
     default:
-      raise_error("Invalid HTTP response body kind");
+      pg_status_log_fatal("http", "invalid HTTP response body kind");
   }
   response->body.borrowed = nullptr;
   response->body_kind = HTTP_BODY_NONE;
@@ -250,7 +255,7 @@ static const char *get_response_body(const HTTPResponse *response) {
     case HTTP_BODY_OWNED:
       return response->body.owned;
     default:
-      raise_error("Invalid HTTP response body kind");
+      pg_status_log_fatal("http", "invalid HTTP response body kind");
   }
 }
 
@@ -268,7 +273,9 @@ void http_response_set_owned_body(
   const response_body_cleanup_t cleanup
 ) {
   if (!cleanup) {
-    raise_error("Owned HTTP response body cleanup must not be null");
+    pg_status_log_fatal(
+      "http", "owned HTTP response body cleanup must not be null"
+    );
   }
   release_response_body(response);
   response->body.owned = body;
@@ -429,7 +436,7 @@ static void *run_event_loop(void *arg) {
 
   const int result = event_base_dispatch(server->event_base);
   if (result == -1) {
-    printf_error("HTTP event loop failed");
+    pg_status_log(PG_STATUS_LOG_ERROR, "http", "event loop failed");
   }
   return nullptr;
 }
@@ -446,25 +453,28 @@ static void stop_event_callback(
     read_result = read(fd, &byte, 1);
   } while (read_result < 0 && errno == EINTR);
   if (read_result != 1) {
-    printf_error("Failed to read HTTP stop pipe");
+    const int error_number = read_result < 0 ? errno : EPIPE;
+    pg_status_log_system_error(
+      PG_STATUS_LOG_ERROR, "http", error_number, "failed to read stop pipe"
+    );
   }
 
   if (event_base_loopbreak(server->event_base) != 0) {
-    printf_error("Failed to stop HTTP event loop");
+    pg_status_log(PG_STATUS_LOG_ERROR, "http", "failed to stop event loop");
   }
 }
 
 static void init_event_base(HTTPServer *server) {
   server->event_base = event_base_new();
   if (!server->event_base) {
-    raise_error("Failed to create HTTP event base");
+    pg_status_log_fatal("http", "failed to create event base");
   }
 }
 
 static void init_evhttp(HTTPServer *server) {
   server->http = evhttp_new(server->event_base);
   if (!server->http) {
-    raise_error("Failed to create evhttp server");
+    pg_status_log_fatal("http", "failed to create evhttp server");
   }
 
   evhttp_set_allowed_methods(
@@ -481,21 +491,30 @@ static void init_evhttp(HTTPServer *server) {
 
 static void init_stop_event(HTTPServer *server) {
   if (pipe(server->stop_pipe) != 0) {
-    raise_error("Failed to create HTTP stop pipe");
+    const int error_number = errno;
+    pg_status_log_system_fatal(
+      "http", error_number, "failed to create stop pipe"
+    );
   }
   if (
     fcntl(server->stop_pipe[0], F_SETFD, FD_CLOEXEC) != 0 ||
     fcntl(server->stop_pipe[1], F_SETFD, FD_CLOEXEC) != 0
   ) {
-    raise_error("Failed to set FD_CLOEXEC on HTTP stop pipe");
+    const int error_number = errno;
+    pg_status_log_system_fatal(
+      "http", error_number, "failed to set FD_CLOEXEC on stop pipe"
+    );
   }
 
   server->stop_event = event_new(
     server->event_base, server->stop_pipe[0], EV_READ, stop_event_callback,
     server
   );
-  if (!server->stop_event || event_add(server->stop_event, nullptr) != 0) {
-    raise_error("Failed to register HTTP stop event");
+  if (!server->stop_event) {
+    pg_status_log_fatal("http", "failed to create stop event");
+  }
+  if (event_add(server->stop_event, nullptr) != 0) {
+    pg_status_log_fatal("http", "failed to register stop event");
   }
 }
 
@@ -561,7 +580,10 @@ static uint16_t get_listener_port(struct evconnlistener *listener) {
       &address_length
     ) != 0
   ) {
-    raise_error("Failed to determine bound HTTP port");
+    const int error_number = errno;
+    pg_status_log_system_fatal(
+      "http", error_number, "failed to determine bound port"
+    );
   }
 
   if (address.ss_family == AF_INET) {
@@ -575,8 +597,9 @@ static uint16_t get_listener_port(struct evconnlistener *listener) {
     return ntohs(ipv6_address->sin6_port);
   }
 
-  errno = EAFNOSUPPORT;
-  raise_error("HTTP listener has an unsupported address family");
+  pg_status_log_system_fatal(
+    "http", EAFNOSUPPORT, "listener has an unsupported address family"
+  );
 }
 
 static void raise_listener_error(
@@ -586,9 +609,9 @@ static void raise_listener_error(
   if (other_listener) {
     evconnlistener_free(other_listener);
   }
-  errno = error_code != 0 ? error_code : EIO;
-  raise_error(
-    "Failed to bind %s HTTP listener on port %u", address_family,
+  const int actual_error = error_code != 0 ? error_code : EIO;
+  pg_status_log_system_fatal(
+    "http", actual_error, "failed to bind %s listener port=%u", address_family,
     (unsigned int)port
   );
 }
@@ -603,8 +626,10 @@ static void attach_listener(
   if (!evhttp_bind_listener(server->http, listener)) {
     const int error_code = errno;
     evconnlistener_free(listener);
-    errno = error_code != 0 ? error_code : EIO;
-    raise_error("Failed to attach %s HTTP listener", address_family);
+    const int actual_error = error_code != 0 ? error_code : EIO;
+    pg_status_log_system_fatal(
+      "http", actual_error, "failed to attach %s listener", address_family
+    );
   }
 }
 
@@ -632,17 +657,23 @@ static void init_best_effort_http_listeners(
     raise_listener_error("IPv6", shared_port, ipv6_error, ipv4_listener);
   }
   if (!ipv4_listener && !ipv6_listener) {
-    errno = ipv6_error != 0 ? ipv6_error : ipv4_error;
-    raise_error("Neither IPv4 nor IPv6 is available for the HTTP server");
+    const int error_number = ipv6_error != 0 ? ipv6_error : ipv4_error;
+    pg_status_log_system_fatal(
+      "http", error_number, "neither IPv4 nor IPv6 listener is available"
+    );
   }
 
   if (!ipv4_listener) {
-    errno = ipv4_error;
-    printf_error("IPv4 HTTP listener is unavailable; continuing with IPv6");
+    pg_status_log_system_error(
+      PG_STATUS_LOG_WARNING, "http", ipv4_error,
+      "IPv4 listener is unavailable; continuing with IPv6"
+    );
   }
   if (!ipv6_listener) {
-    errno = ipv6_error;
-    printf_error("IPv6 HTTP listener is unavailable; continuing with IPv4");
+    pg_status_log_system_error(
+      PG_STATUS_LOG_WARNING, "http", ipv6_error,
+      "IPv6 listener is unavailable; continuing with IPv4"
+    );
   }
 
   server->port = ipv4_listener ? shared_port : get_listener_port(ipv6_listener);
@@ -667,9 +698,9 @@ static void init_configured_http_listener(
       address_family = "IPv6";
       listener = create_ipv6_listener(server, &ipv6_address, port, &error_code);
     } else {
-      errno = EINVAL;
-      raise_error(
-        "Invalid HTTP listen address '%s'; expected an IPv4 address, an IPv6 "
+      pg_status_log_fatal(
+        "config",
+        "invalid HTTP listen address '%s'; expected an IPv4 address, an IPv6 "
         "address, or '*'",
         listen_address
       );
@@ -687,8 +718,7 @@ static void init_http_listeners(
   HTTPServer *server, const char *listen_address, const uint16_t port
 ) {
   if (!listen_address || *listen_address == '\0') {
-    errno = EINVAL;
-    raise_error("HTTP listen address must not be empty");
+    pg_status_log_fatal("config", "HTTP listen address must not be empty");
   }
   if (strcmp(listen_address, "*") == 0) {
     init_best_effort_http_listeners(server, port);
@@ -705,7 +735,9 @@ static void start_event_loop_thread(HTTPServer *server) {
 
   if (started != 0) {
     pthread_mutex_unlock(&server->start_mutex);
-    raise_error("Failed to start HTTP event loop");
+    pg_status_log_system_fatal(
+      "http", started, "failed to start event loop thread"
+    );
   }
 
   while (!server->event_loop_started) {
@@ -726,9 +758,9 @@ HTTPServer *start_http_server(
 
   start_event_loop_thread(server);
 
-  printf(
-    "http server started on %s, port %u\n", listen_address,
-    (unsigned int)server->port
+  pg_status_log(
+    PG_STATUS_LOG_INFO, "http", "server started address=%s port=%u",
+    listen_address, (unsigned int)server->port
   );
   return server;
 }
@@ -748,9 +780,17 @@ void stop_http_server(HTTPServer *server) {
     write_result = write(server->stop_pipe[1], &byte, 1);
   } while (write_result < 0 && errno == EINTR);
   if (write_result != 1) {
-    raise_error("Failed to write HTTP stop pipe");
+    const int error_number = write_result < 0 ? errno : EIO;
+    pg_status_log_system_fatal(
+      "http", error_number, "failed to write stop pipe"
+    );
   }
-  pthread_join(server->thread, nullptr);
+  const int joined = pthread_join(server->thread, nullptr);
+  if (joined != 0) {
+    pg_status_log_system_fatal(
+      "http", joined, "failed to join event loop thread"
+    );
+  }
 
   event_free(server->stop_event);
   close(server->stop_pipe[0]);
@@ -760,7 +800,7 @@ void stop_http_server(HTTPServer *server) {
   pthread_cond_destroy(&server->start_cond);
   pthread_mutex_destroy(&server->start_mutex);
   free(server);
-  printf("http server stopped\n");
+  pg_status_log(PG_STATUS_LOG_INFO, "http", "server stopped");
 }
 
 bool parse_get_param_uint(

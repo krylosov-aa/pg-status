@@ -1,3 +1,4 @@
+add_subdirectory(logging)
 add_subdirectory(utils)
 add_subdirectory(http_server)
 add_subdirectory(pg_monitor)
@@ -26,6 +27,7 @@ target_link_libraries(pg-status
         common_warnings
         pg_status_api
         http_server
+        logging
         pg_monitor
         PkgConfig::CJSON
         Threads::Threads

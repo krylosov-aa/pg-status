@@ -4,14 +4,113 @@ target_include_directories(
         http_test_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/support
 )
 
+add_library(common_support support/common_support.c)
+target_link_libraries(common_support PRIVATE common_warnings)
+target_include_directories(
+        common_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/support
+)
+
 add_library(utils_test_support support/utils_test_support.c)
 target_link_libraries(
         utils_test_support
-        PUBLIC utils
+        PUBLIC common_support utils
         PRIVATE common_warnings
 )
 target_include_directories(
         utils_test_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/support
+)
+
+add_executable(logger_test test_logger.c)
+target_link_libraries(
+        logger_test PRIVATE
+        common_warnings
+        logging
+        common_support
+        Threads::Threads
+)
+
+set(LOGGER_TEST_CASES
+        message_format
+        level_filtering
+        init_from_environment
+        system_error
+        errno_preserved
+        multiline_sanitized
+        long_message_truncated
+        long_component_truncated
+        concurrent_messages
+        ordered_messages
+        shutdown_flushes
+        concurrent_lifecycle
+        closed_output
+        missing_standard_error
+        output_configuration_restored
+        output_backpressure_recovery
+        output_backpressure_periodic_recovery
+        output_partial_write_recovery
+        fatal_shutdown_race
+)
+
+foreach(TEST_CASE IN LISTS LOGGER_TEST_CASES)
+    set(TEST_NAME "logger.${TEST_CASE}")
+    add_test(NAME ${TEST_NAME} COMMAND logger_test ${TEST_CASE})
+    set_tests_properties(
+            ${TEST_NAME}
+            PROPERTIES
+            TIMEOUT 15
+            ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}"
+    )
+endforeach()
+
+add_test(
+        NAME logger.invalid_level
+        COMMAND ${CMAKE_COMMAND}
+        "-DPROGRAM=$<TARGET_FILE:logger_test>"
+        "-DARGUMENT=invalid_level"
+        "-DEXPECTED_OUTPUT=invalid pg_status__log_level='verbose'"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
+)
+add_test(
+        NAME logger.fatal
+        COMMAND ${CMAKE_COMMAND}
+        "-DPROGRAM=$<TARGET_FILE:logger_test>"
+        "-DARGUMENT=fatal"
+        "-DEXPECTED_OUTPUT=FATAL test: fatal message value=42"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
+)
+add_test(
+        NAME logger.fatal_flushes_queue
+        COMMAND ${CMAKE_COMMAND}
+        "-DPROGRAM=$<TARGET_FILE:logger_test>"
+        "-DARGUMENT=fatal_flushes_queue"
+        "-DEXPECTED_OUTPUT=INFO fatal: queued before fatal"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
+)
+add_test(
+        NAME logger.invalid_enum_log
+        COMMAND ${CMAKE_COMMAND}
+        "-DPROGRAM=$<TARGET_FILE:logger_test>"
+        "-DARGUMENT=invalid_enum_log"
+        "-DEXPECTED_OUTPUT=invalid log level value=100"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
+)
+add_test(
+        NAME logger.invalid_enum_set
+        COMMAND ${CMAKE_COMMAND}
+        "-DPROGRAM=$<TARGET_FILE:logger_test>"
+        "-DARGUMENT=invalid_enum_set"
+        "-DEXPECTED_OUTPUT=invalid log level value=100"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
+)
+set_tests_properties(
+        logger.invalid_level
+        logger.fatal
+        logger.fatal_flushes_queue
+        logger.invalid_enum_log
+        logger.invalid_enum_set
+        PROPERTIES
+        TIMEOUT 15
+        ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}"
 )
 
 add_executable(utils_test test_utils.c)
@@ -86,30 +185,30 @@ function(add_utils_failure_test TEST_CASE EXPECTED_OUTPUT)
 endfunction()
 
 add_utils_failure_test(raise_error "Cannot open file")
-add_utils_failure_test(str_to_long_null "Failed to convert null to long")
-add_utils_failure_test(str_to_long_invalid "Failed to convert '42x' to long")
-add_utils_failure_test(str_to_ulong_null "Failed to convert null to ulong")
-add_utils_failure_test(str_to_ulong_negative "Failed to convert '-1' to ulong")
-add_utils_failure_test(str_to_ull_null "Failed to convert null to ull")
+add_utils_failure_test(str_to_long_null "failed to convert null to long")
+add_utils_failure_test(str_to_long_invalid "failed to convert '42x' to long")
+add_utils_failure_test(str_to_ulong_null "failed to convert null to ulong")
+add_utils_failure_test(str_to_ulong_negative "failed to convert '-1' to ulong")
+add_utils_failure_test(str_to_ull_null "failed to convert null to ull")
 add_utils_failure_test(
         str_to_ull_overflow
-        "Failed to convert '18446744073709551616' to ull"
+        "failed to convert '18446744073709551616' to ull"
 )
 add_utils_failure_test(
         str_to_int_overflow
-        "Failed to convert '2147483648' to int"
+        "failed to convert '2147483648' to int"
 )
 add_utils_failure_test(
         str_to_int_greater_or_equal_zero_negative
-        "Failed to convert '-1' to int greater or equal zero"
+        "failed to convert '-1' to int greater or equal zero"
 )
 add_utils_failure_test(
         str_to_uint_overflow
-        "Failed to convert '4294967296' to uint"
+        "failed to convert '4294967296' to uint"
 )
 add_utils_failure_test(
         str_to_uint16_overflow
-        "Failed to convert '65536' to uint16"
+        "failed to convert '65536' to uint16"
 )
 
 add_test(

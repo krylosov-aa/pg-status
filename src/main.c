@@ -1,10 +1,10 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "http_server.h"
+#include "logger.h"
 #include "pg_monitor.h"
 #include "pg_status_api.h"
 #include "utils.h"
@@ -14,25 +14,33 @@ static void block_termination_signals(sigset_t *sigset) {
   sigaddset(sigset, SIGINT);
   sigaddset(sigset, SIGTERM);
 
-  if (pthread_sigmask(SIG_BLOCK, sigset, NULL) != 0) {
-    raise_error("pthread_sigmask");
+  const int result = pthread_sigmask(SIG_BLOCK, sigset, NULL);
+  if (result != 0) {
+    pg_status_log_system_fatal(
+      "main", result, "failed to block termination signals"
+    );
   }
 }
 
 static void wait_for_termination_signal(const sigset_t *sigset) {
   int sig;
 
-  if (sigwait(sigset, &sig) == 0) {
-    switch (sig) {
-      case SIGINT:
-        printf("Received SIGINT\n");
-        break;
-      case SIGTERM:
-        printf("Received SIGTERM\n");
-        break;
-      default:
-        printf("Received signal %d\n", sig);
-    }
+  const int result = sigwait(sigset, &sig);
+  if (result != 0) {
+    pg_status_log_system_fatal(
+      "main", result, "failed to wait for termination signal"
+    );
+  }
+
+  switch (sig) {
+    case SIGINT:
+      pg_status_log(PG_STATUS_LOG_INFO, "main", "received signal=SIGINT");
+      break;
+    case SIGTERM:
+      pg_status_log(PG_STATUS_LOG_INFO, "main", "received signal=SIGTERM");
+      break;
+    default:
+      pg_status_log(PG_STATUS_LOG_INFO, "main", "received signal=%d", sig);
   }
 }
 
@@ -56,6 +64,8 @@ int main(void) {
   sigset_t sigset;
   block_termination_signals(&sigset);
 
+  pg_status_log_init();
+
   start_pg_monitor();
   HTTPServer *server = start_pg_status_api(
     get_http_listen_address(), get_port()
@@ -65,5 +75,6 @@ int main(void) {
 
   stop_http_server(server);
   stop_pg_monitor();
+  pg_status_log_shutdown();
   return 0;
 }

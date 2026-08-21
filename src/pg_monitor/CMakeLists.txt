@@ -12,6 +12,7 @@ target_link_libraries(
         common_warnings
         utils
         PRIVATE
+        logging
         Threads::Threads
 )
 

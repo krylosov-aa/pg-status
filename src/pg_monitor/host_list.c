@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "logger.h"
 #include "pg_monitor.h"
 #include "utils.h"
 
@@ -94,13 +95,14 @@ void init_monitor_host_list(void) {
   if (!port) {
     free(hosts);
     free(ports);
-    errno = EINVAL;
-    raise_error("pg_status__pg_port must contain at least one port");
+    pg_status_log_fatal(
+      "config", "pg_status__pg_port must contain at least one port"
+    );
   }
 
   while (host) {
     if (host_count == MAX_HOSTS) {
-      raise_error("Too many hosts. Maximum value = %d", MAX_HOSTS);
+      pg_status_log_fatal("config", "too many hosts; maximum=%d", MAX_HOSTS);
     }
     init_monitor_host(&monitor_host_list[host_count], host, port);
 
@@ -112,7 +114,7 @@ void init_monitor_host_list(void) {
     host_count++;
   }
   if (host_count == 0) {
-    raise_error("host count must be greater then 0");
+    pg_status_log_fatal("config", "host count must be greater than 0");
   }
   free(hosts);
   free(ports);

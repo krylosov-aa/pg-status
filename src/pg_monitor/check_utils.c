@@ -5,8 +5,8 @@
 #include <poll.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <stdio.h>
 
+#include "logger.h"
 #include "pg_monitor.h"
 #include "utils.h"
 
@@ -48,24 +48,36 @@ static uint64_t max_lsn(const uint64_t a, const uint64_t b) {
 }
 
 /**
- * Logs changes to stdout if there have been changes in the lag in time
+ * Logs changes in the lag-in-time classification.
  */
 static void log_time_lag_changes(
   const MonitorHost *host, const uint64_t new_lag_ms, const uint64_t lag_ms
 ) {
   if (new_lag_ms > parameters.sync_max_lag_ms) {
     if (lag_ms <= parameters.sync_max_lag_ms) {
-      printf("%s: out of sync in time\n", host->host);
+      pg_status_log(
+        PG_STATUS_LOG_INFO, "monitor",
+        "replica synchronization changed host=%s dimension=time "
+        "synchronous=false lag_ms=%llu threshold_ms=%llu",
+        host->host, (unsigned long long)new_lag_ms,
+        (unsigned long long)parameters.sync_max_lag_ms
+      );
     }
   } else {
     if (lag_ms > parameters.sync_max_lag_ms) {
-      printf("%s: synchronous in time\n", host->host);
+      pg_status_log(
+        PG_STATUS_LOG_INFO, "monitor",
+        "replica synchronization changed host=%s dimension=time "
+        "synchronous=true lag_ms=%llu threshold_ms=%llu",
+        host->host, (unsigned long long)new_lag_ms,
+        (unsigned long long)parameters.sync_max_lag_ms
+      );
     }
   }
 }
 
 /**
- * Logs changes to stdout if there have been changes in the lag in bytes
+ * Logs changes in the lag-in-bytes classification.
  */
 static void log_bytes_lag_changes(
   const MonitorHost *host, const uint64_t new_lag_bytes,
@@ -73,54 +85,101 @@ static void log_bytes_lag_changes(
 ) {
   if (new_lag_bytes > parameters.sync_max_lag_bytes) {
     if (lag_bytes <= parameters.sync_max_lag_bytes) {
-      printf("%s: out of sync in bytes\n", host->host);
+      pg_status_log(
+        PG_STATUS_LOG_INFO, "monitor",
+        "replica synchronization changed host=%s dimension=bytes "
+        "synchronous=false lag_bytes=%llu threshold_bytes=%llu",
+        host->host, (unsigned long long)new_lag_bytes,
+        (unsigned long long)parameters.sync_max_lag_bytes
+      );
     }
   } else {
     if (lag_bytes > parameters.sync_max_lag_bytes) {
-      printf("%s: synchronous in bytes\n", host->host);
+      pg_status_log(
+        PG_STATUS_LOG_INFO, "monitor",
+        "replica synchronization changed host=%s dimension=bytes "
+        "synchronous=true lag_bytes=%llu threshold_bytes=%llu",
+        host->host, (unsigned long long)new_lag_bytes,
+        (unsigned long long)parameters.sync_max_lag_bytes
+      );
     }
   }
 }
 
 /**
- * Logs changes to stdout if there have been changes in the status
+ * Logs role, availability, and synchronization transitions.
  */
 static void log_changes(
   const MonitorHost *host, const MonitorStatus new_status,
   const MonitorStatus status, const uint64_t new_lag_ms, const uint64_t lag_ms,
-  const uint64_t new_lag_bytes, const uint64_t lag_bytes
+  const uint64_t new_lag_bytes, const uint64_t lag_bytes,
+  const bool reached_dead_threshold
 ) {
-  if (
-    new_status.possible_dead != status.possible_dead && new_status.possible_dead
-  ) {
-    printf("%s: possible dead\n", host->host);
+  if (reached_dead_threshold) {
+    pg_status_log(
+      PG_STATUS_LOG_WARNING, "monitor", "host state changed host=%s state=dead",
+      host->host
+    );
     return;
   }
 
   if (new_status.alive != status.alive) {
     if (!new_status.alive) {
-      printf("%s: dead\n", host->host);
+      pg_status_log(
+        PG_STATUS_LOG_WARNING, "monitor",
+        "host state changed host=%s state=dead", host->host
+      );
       return;
     }
-    if (new_status.master) {
-      printf("%s: master\n", host->host);
-      return;
+    pg_status_log(
+      PG_STATUS_LOG_INFO, "monitor",
+      "host state changed host=%s state=alive role=%s", host->host,
+      new_status.master ? "master" : "replica"
+    );
+    if (!new_status.master) {
+      log_time_lag_changes(host, new_lag_ms, lag_ms);
+      log_bytes_lag_changes(host, new_lag_bytes, lag_bytes);
     }
-    printf("%s: replica\n", host->host);
-    log_time_lag_changes(host, new_lag_ms, lag_ms);
-    log_bytes_lag_changes(host, new_lag_bytes, lag_bytes);
     return;
   }
 
-  if (new_status.master != status.master) {
-    if (new_status.master) {
-      printf("%s: master\n", host->host);
+  bool recovered = false;
+  if (new_status.possible_dead != status.possible_dead) {
+    if (new_status.possible_dead) {
+      pg_status_log(
+        PG_STATUS_LOG_WARNING, "monitor",
+        "host state changed host=%s state=possible_dead", host->host
+      );
       return;
     }
-    printf("%s: replica\n", host->host);
+    pg_status_log(
+      PG_STATUS_LOG_INFO, "monitor",
+      "host state changed host=%s state=alive role=%s", host->host,
+      new_status.master ? "master" : "replica"
+    );
+    recovered = true;
+  }
+
+  if (!recovered && new_status.master != status.master) {
+    pg_status_log(
+      PG_STATUS_LOG_INFO, "monitor", "host role changed host=%s role=%s",
+      host->host, new_status.master ? "master" : "replica"
+    );
+  }
+
+  if (new_status.alive && !new_status.master) {
     log_time_lag_changes(host, new_lag_ms, lag_ms);
     log_bytes_lag_changes(host, new_lag_bytes, lag_bytes);
   }
+}
+
+static void log_postgres_error(const MonitorHost *host, const char *operation) {
+  const char *error = host->conn ? PQerrorMessage(host->conn) : "out of memory";
+  pg_status_log(
+    PG_STATUS_LOG_ERROR, "monitor",
+    "PostgreSQL operation failed operation=%s host=%s error=%s", operation,
+    host->host, error
+  );
 }
 
 static MonitorStatus dead_status(void) {
@@ -135,15 +194,13 @@ static MonitorStatus master_status(void) {
 
 static MonitorStatus replica_status() {
   return (MonitorStatus){
-    .alive = true, .master = false, .possible_dead = false
+    .alive = true, .master = false, .possible_dead = false,
   };
 }
 
 static bool send_query(const MonitorHost *host) {
   if (PQsendQuery(host->conn, streaming_replication_query) == 0) {
-    printf_error(
-      "send query failed for %s: %s", host->host, PQerrorMessage(host->conn)
-    );
+    log_postgres_error(host, "send_query");
     return false;
   }
   return true;
@@ -207,12 +264,14 @@ static void close_conn_if_need(MonitorHost *host, const uint64_t now_ms) {
 static bool validate_sql_result(const MonitorHost *host, const PGresult *res) {
   const ExecStatusType st = PQresultStatus(res);
   if (st != PGRES_TUPLES_OK && st != PGRES_COMMAND_OK) {
-    printf_error("execute sql error: %s", PQerrorMessage(host->conn));
+    log_postgres_error(host, "validate_result");
     return false;
   }
   if (PQntuples(res) != 1) {
-    printf_error(
-      "unexpected result rows from %s: %d", host->host, PQntuples(res)
+    pg_status_log(
+      PG_STATUS_LOG_ERROR, "monitor",
+      "unexpected PostgreSQL result row count host=%s rows=%d", host->host,
+      PQntuples(res)
     );
     return false;
   }
@@ -274,6 +333,7 @@ static void finish_iteration(
   uint64_t new_lag_ms;
   uint64_t new_lag_bytes;
   uint64_t new_lsn;
+  bool reached_dead_threshold = false;
 
   if (success && host->iter_data_ready) {
     host->failed_connections = 0;
@@ -285,8 +345,12 @@ static void finish_iteration(
     host->failed_connections++;
     new_status = old_status;
     new_status.possible_dead = true;
-    if (host->failed_connections >= parameters.max_fails) {
+    const unsigned int failure_limit = parameters.max_fails == 0
+                                         ? 1
+                                         : parameters.max_fails;
+    if (host->failed_connections >= failure_limit) {
       new_status = dead_status();
+      reached_dead_threshold = host->failed_connections == failure_limit;
     }
     new_lag_ms = 0;
     new_lag_bytes = 0;
@@ -304,7 +368,7 @@ static void finish_iteration(
   );
   log_changes(
     host, new_status, old_status, new_lag_ms, old_lag_ms, new_lag_bytes,
-    old_lag_bytes
+    old_lag_bytes, reached_dead_threshold
   );
 
   if (
@@ -319,9 +383,7 @@ static void finish_iteration(
 
 static bool consume_input(const MonitorHost *host) {
   if (PQconsumeInput(host->conn) == 0) {
-    printf_error(
-      "consume input failed for %s: %s", host->host, PQerrorMessage(host->conn)
-    );
+    log_postgres_error(host, "consume_input");
     return false;
   }
   return true;
@@ -374,9 +436,7 @@ static void flush_step(MonitorHost *host, const uint64_t now_ms) {
       host->poll_events = POLLOUT;
       return;
     case FLUSH_ERROR:
-      printf_error(
-        "flush failed for %s: %s", host->host, PQerrorMessage(host->conn)
-      );
+      log_postgres_error(host, "flush");
       finish_iteration(host, false, now_ms);
       return;
   }
@@ -384,10 +444,7 @@ static void flush_step(MonitorHost *host, const uint64_t now_ms) {
 
 static bool pq_set_non_blocking(MonitorHost *host) {
   if (PQsetnonblocking(host->conn, 1) != 0) {
-    printf_error(
-      "set non-blocking failed for %s: %s", host->host,
-      PQerrorMessage(host->conn)
-    );
+    log_postgres_error(host, "set_non_blocking");
     return false;
   }
   return true;
@@ -427,7 +484,7 @@ static void advance_connecting(MonitorHost *host, const uint64_t now_ms) {
     case PGRES_POLLING_ACTIVE:
     case PGRES_POLLING_FAILED:
     default:
-      printf_error("connect error: %s", PQerrorMessage(host->conn));
+      log_postgres_error(host, "connect");
       finish_iteration(host, false, now_ms);
       return;
   }
@@ -436,10 +493,7 @@ static void advance_connecting(MonitorHost *host, const uint64_t now_ms) {
 static bool start_connect(MonitorHost *host) {
   host->conn = PQconnectStart(host->connection_str);
   if (host->conn == nullptr || PQstatus(host->conn) == CONNECTION_BAD) {
-    printf_error(
-      "connect start failed for %s: %s", host->host,
-      host->conn ? PQerrorMessage(host->conn) : "out of memory"
-    );
+    log_postgres_error(host, "connect_start");
     return false;
   }
   return true;
@@ -496,8 +550,9 @@ void advance_host_poll(MonitorHost *host, const uint64_t now_ms) {
 }
 
 void timeout_host_poll(MonitorHost *host, const uint64_t now_ms) {
-  printf_error(
-    "host %s: poll iteration timed out after %llums", host->host,
+  pg_status_log(
+    PG_STATUS_LOG_ERROR, "monitor",
+    "PostgreSQL poll timed out host=%s timeout_ms=%llu", host->host,
     (unsigned long long)parameters.query_timeout_ms
   );
   close_conn(host);

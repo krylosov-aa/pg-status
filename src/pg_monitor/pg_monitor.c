@@ -9,10 +9,10 @@
 #include <limits.h>
 #include <poll.h>
 #include <pthread.h>
-#include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "logger.h"
 #include "utils.h"
 
 static pthread_t monitor_tid;
@@ -187,7 +187,10 @@ static bool pump_one_iteration(void) {
     if (errno == EINTR) {
       return true;
     }
-    printf_error("poll failed");
+    const int error_number = errno;
+    pg_status_log_system_error(
+      PG_STATUS_LOG_ERROR, "monitor", error_number, "poll failed"
+    );
     return true;
   }
 
@@ -198,7 +201,6 @@ static bool pump_one_iteration(void) {
   process_poll_result(pfds);
 
   recompute_master_index();
-  (void)fflush(stdout);
   return true;
 }
 
@@ -216,10 +218,8 @@ static void warmup(void) {
   }
 
   recompute_master_index();
-  (void)fflush(stdout);
-
   if (!keep_running) {
-    raise_error("warmup interrupted");
+    pg_status_log_fatal("monitor", "warmup interrupted");
   }
 }
 
@@ -249,13 +249,19 @@ static void *pg_monitor_thread(void *arg) {
  */
 void start_pg_monitor(void) {
   if (pipe(stop_pipe) != 0) {
-    raise_error("Failed to create stop pipe");
+    const int error_number = errno;
+    pg_status_log_system_fatal(
+      "monitor", error_number, "failed to create stop pipe"
+    );
   }
   if (
     fcntl(stop_pipe[0], F_SETFD, FD_CLOEXEC) != 0 ||
     fcntl(stop_pipe[1], F_SETFD, FD_CLOEXEC) != 0
   ) {
-    raise_error("Failed to set FD_CLOEXEC on stop pipe");
+    const int error_number = errno;
+    pg_status_log_system_fatal(
+      "monitor", error_number, "failed to set FD_CLOEXEC on stop pipe"
+    );
   }
 
   pthread_mutex_lock(&start_mutex);
@@ -265,14 +271,16 @@ void start_pg_monitor(void) {
 
   if (started != 0) {
     pthread_mutex_unlock(&start_mutex);
-    raise_error("Failed to start pg_monitor");
+    pg_status_log_system_fatal(
+      "monitor", started, "failed to start monitor thread"
+    );
   }
 
   while (!pg_monitor_ready) {
     pthread_cond_wait(&start_cond, &start_mutex);
   }
   pthread_mutex_unlock(&start_mutex);
-  printf("pg_monitor started\n");
+  pg_status_log(PG_STATUS_LOG_INFO, "monitor", "started hosts=%u", host_count);
 }
 
 /**
@@ -284,13 +292,24 @@ void stop_pg_monitor(void) {
   do {
     w = write(stop_pipe[1], &b, 1);
   } while (w < 0 && errno == EINTR);
+  if (w != 1) {
+    const int error_number = w < 0 ? errno : EIO;
+    pg_status_log_system_fatal(
+      "monitor", error_number, "failed to write stop pipe"
+    );
+  }
 
-  pthread_join(monitor_tid, nullptr);
+  const int joined = pthread_join(monitor_tid, nullptr);
+  if (joined != 0) {
+    pg_status_log_system_fatal(
+      "monitor", joined, "failed to join monitor thread"
+    );
+  }
 
   close(stop_pipe[0]);
   close(stop_pipe[1]);
   stop_pipe[0] = -1;
   stop_pipe[1] = -1;
 
-  printf("pg_monitor stopped\n");
+  pg_status_log(PG_STATUS_LOG_INFO, "monitor", "stopped");
 }

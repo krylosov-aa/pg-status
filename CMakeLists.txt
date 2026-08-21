@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.12)
 project(pg-status VERSION 2.1.1 LANGUAGES C)
 
+if(POLICY CMP0156)
+    cmake_policy(SET CMP0156 NEW)
+endif()
+if(POLICY CMP0179)
+    cmake_policy(SET CMP0179 NEW)
+endif()
+
 configure_file(
         src/pg_status_version.h.in
         ${CMAKE_CURRENT_BINARY_DIR}/pg_status_version.h

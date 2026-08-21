@@ -7,18 +7,19 @@
 #include <string.h>
 #include <time.h>
 
+#include "common_support.h"
 #include "utils.h"
 #include "utils_test_support.h"
 
 static void test_printf_error(void) {
   // Arrange
-  char expected[512];
+  char expected_error[512];
   const int length = snprintf(
-    expected, sizeof(expected), "Cannot open file. strerror: %s\n",
-    strerror(ENOENT)
+    expected_error, sizeof(expected_error), "%s (errno=%d)\n", strerror(ENOENT),
+    ENOENT
   );
   support_assert_true(
-    length > 0 && (size_t)length < sizeof(expected),
+    length > 0 && (size_t)length < sizeof(expected_error),
     "printf_error expected output is too large"
   );
 
@@ -26,7 +27,10 @@ static void test_printf_error(void) {
   char *actual = support_capture_standard_error(support_emit_printf_error);
 
   // Assert
-  support_assert_string_equal(actual, expected, "printf_error output");
+  support_assert_contains(
+    actual, " ERROR utils: Cannot open file:", "printf_error output"
+  );
+  support_assert_contains(actual, expected_error, "printf_error errno");
 
   // Cleanup
   free(actual);

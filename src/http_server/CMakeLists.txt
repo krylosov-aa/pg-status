@@ -11,6 +11,7 @@ target_link_libraries(
         utils
         PkgConfig::LIBEVENT
         PRIVATE
+        logging
         Threads::Threads
 )
 

@@ -14,13 +14,9 @@
 #include <time.h>
 #include <unistd.h>
 
-static int fputs_error(void) {
-  char buf[256];
-  if (strerror_r(errno, buf, sizeof(buf)) == 0) {
-    return fputs(buf, stderr);
-  }
-  return fputs("Unknown error", stderr);
-}
+#include "logger.h"
+
+static constexpr size_t LEGACY_ERROR_CAPACITY = 2048;
 
 /**
  * Copies a string. The result must be freed by the caller.
@@ -29,7 +25,8 @@ char *copy_string(const char *str) {
   assert(str);
   char *result = strdup(str);
   if (!result) {
-    raise_error("Error when trying to copy a string");
+    const int error_number = errno != 0 ? errno : ENOMEM;
+    pg_status_log_system_fatal("utils", error_number, "failed to copy string");
   }
   return result;
 }
@@ -38,15 +35,20 @@ char *copy_string(const char *str) {
  * Prints the message to stderr with \n and also adds the error text from errno
  */
 void printf_error(const char *format, ...) {
+  const int error_number = errno;
+  char message[LEGACY_ERROR_CAPACITY];
   va_list args;
   va_start(args, format);
   // Clang 21 does not model C23's __builtin_c23_va_start correctly.
   // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
-  (void)vfprintf(stderr, format, args);
+  const int length = vsnprintf(message, sizeof(message), format, args);
   va_end(args);
-  (void)fputs(". strerror: ", stderr);
-  (void)fputs_error();
-  (void)fputc('\n', stderr);
+  if (length < 0) {
+    (void)snprintf(message, sizeof(message), "unable to format error");
+  }
+  pg_status_log_system_error(
+    PG_STATUS_LOG_ERROR, "utils", error_number, "%s", message
+  );
 }
 
 /**
@@ -54,16 +56,18 @@ void printf_error(const char *format, ...) {
  * error text from errno and abort
  */
 void raise_error(const char *format, ...) {
+  const int error_number = errno;
+  char message[LEGACY_ERROR_CAPACITY];
   va_list args;
   va_start(args, format);
   // Clang 21 does not model C23's __builtin_c23_va_start correctly.
   // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
-  (void)vfprintf(stderr, format, args);
+  const int length = vsnprintf(message, sizeof(message), format, args);
   va_end(args);
-  (void)fputs(". strerror: ", stderr);
-  (void)fputs_error();
-  (void)fputc('\n', stderr);
-  exit(EXIT_FAILURE);
+  if (length < 0) {
+    (void)snprintf(message, sizeof(message), "unable to format fatal error");
+  }
+  pg_status_log_system_fatal("utils", error_number, "%s", message);
 }
 
 /**
@@ -77,8 +81,10 @@ char *concatenate_strings(const char *first, const char *second) {
   const size_t len2 = strlen(second);
   char *new = malloc(len1 + len2 + 1);
   if (!new) {
-    raise_error(
-      "Can't allocate memory for concatenate strings %s and %s", first, second
+    const int error_number = errno != 0 ? errno : ENOMEM;
+    pg_status_log_system_fatal(
+      "utils", error_number, "failed to concatenate strings '%s' and '%s'",
+      first, second
     );
   }
   strlcpy(new, first, len1 + len2 + 1);
@@ -108,7 +114,10 @@ char *format_string(const char *format, ...) {
   va_end(args);
 
   if (len < 0) {
-    raise_error("Unable to format_string %s", format);
+    const int error_number = errno != 0 ? errno : ENOMEM;
+    pg_status_log_system_fatal(
+      "utils", error_number, "failed to format string format='%s'", format
+    );
   }
   return string;
 }
@@ -121,7 +130,10 @@ char *ulong_to_str(const unsigned long value) {
   const size_t size = (size_t)len + 1;
   char *str = malloc(size);
   if (!str) {
-    raise_error("Can't allocate memory for ulong_to_str %lu", value);
+    const int error_number = errno != 0 ? errno : ENOMEM;
+    pg_status_log_system_fatal(
+      "utils", error_number, "failed to format unsigned long value=%lu", value
+    );
   }
   (void)snprintf(str, size, "%lu", value);
   return str;
@@ -135,7 +147,10 @@ char *long_to_str(const long value) {
   const size_t size = (size_t)len + 1;
   char *str = malloc(size);
   if (!str) {
-    raise_error("Can't allocate memory for long_to_str %ld", value);
+    const int error_number = errno != 0 ? errno : ENOMEM;
+    pg_status_log_system_fatal(
+      "utils", error_number, "failed to format long value=%ld", value
+    );
   }
   (void)snprintf(str, size, "%ld", value);
   return str;
@@ -149,7 +164,10 @@ char *int_to_str(const int value) {
   const size_t size = (size_t)len + 1;
   char *str = malloc(size);
   if (!str) {
-    raise_error("Can't allocate memory for int_to_str %d", value);
+    const int error_number = errno != 0 ? errno : ENOMEM;
+    pg_status_log_system_fatal(
+      "utils", error_number, "failed to format int value=%d", value
+    );
   }
   (void)snprintf(str, size, "%d", value);
   return str;
@@ -163,7 +181,10 @@ char *uint_to_str(const unsigned int value) {
   const size_t size = (size_t)len + 1;
   char *str = malloc(size);
   if (!str) {
-    raise_error("Can't allocate memory for uint_to_str %u", value);
+    const int error_number = errno != 0 ? errno : ENOMEM;
+    pg_status_log_system_fatal(
+      "utils", error_number, "failed to format unsigned int value=%u", value
+    );
   }
   (void)snprintf(str, size, "%u", value);
   return str;
@@ -174,7 +195,7 @@ char *uint_to_str(const unsigned int value) {
  */
 long str_to_long(const char *value) {
   if (!value) {
-    raise_error("Failed to convert null to long");
+    pg_status_log_fatal("utils", "failed to convert null to long");
   }
 
   char *end_ptr = nullptr;
@@ -183,7 +204,7 @@ long str_to_long(const char *value) {
   const long result = strtol(value, &end_ptr, 10);
 
   if (end_ptr == value || *end_ptr != '\0' || errno == ERANGE) {
-    raise_error("Failed to convert '%s' to long", value);
+    pg_status_log_fatal("utils", "failed to convert '%s' to long", value);
   }
 
   return result;
@@ -194,10 +215,10 @@ long str_to_long(const char *value) {
  */
 unsigned long str_to_ulong(const char *value) {
   if (!value) {
-    raise_error("Failed to convert null to ulong");
+    pg_status_log_fatal("utils", "failed to convert null to ulong");
   }
   if (*value == '\0' || *value == '-') {
-    raise_error("Failed to convert '%s' to ulong", value);
+    pg_status_log_fatal("utils", "failed to convert '%s' to ulong", value);
   }
 
   char *end_ptr = nullptr;
@@ -206,7 +227,7 @@ unsigned long str_to_ulong(const char *value) {
   const unsigned long result = strtoul(value, &end_ptr, 10);
 
   if (end_ptr == value || *end_ptr != '\0' || errno == ERANGE) {
-    raise_error("Failed to convert '%s' to ulong", value);
+    pg_status_log_fatal("utils", "failed to convert '%s' to ulong", value);
   }
 
   return result;
@@ -217,10 +238,10 @@ unsigned long str_to_ulong(const char *value) {
  */
 uint64_t str_to_ull(const char *value) {
   if (!value) {
-    raise_error("Failed to convert null to ull");
+    pg_status_log_fatal("utils", "failed to convert null to ull");
   }
   if (*value == '\0' || *value == '-') {
-    raise_error("Failed to convert '%s' to ull", value);
+    pg_status_log_fatal("utils", "failed to convert '%s' to ull", value);
   }
 
   char *end_ptr = nullptr;
@@ -229,7 +250,7 @@ uint64_t str_to_ull(const char *value) {
   const uint64_t result = strtoull(value, &end_ptr, 10);
 
   if (end_ptr == value || *end_ptr != '\0' || errno == ERANGE) {
-    raise_error("Failed to convert '%s' to ull", value);
+    pg_status_log_fatal("utils", "failed to convert '%s' to ull", value);
   }
 
   return result;
@@ -320,7 +341,7 @@ char *format_lsn(const uint64_t lsn) {
 int str_to_int(const char *value) {
   const long result = str_to_long(value);
   if (result < INT_MIN || result > INT_MAX) {
-    raise_error("Failed to convert '%s' to int", value);
+    pg_status_log_fatal("utils", "failed to convert '%s' to int", value);
   }
   return (int)result;
 }
@@ -331,7 +352,9 @@ int str_to_int(const char *value) {
 int str_to_int_greater_or_equal_zero(const char *value) {
   const int result = str_to_int(value);
   if (result < 0) {
-    raise_error("Failed to convert '%s' to int greater or equal zero", value);
+    pg_status_log_fatal(
+      "utils", "failed to convert '%s' to int greater or equal zero", value
+    );
   }
   return result;
 }
@@ -342,7 +365,7 @@ int str_to_int_greater_or_equal_zero(const char *value) {
 unsigned int str_to_uint(const char *value) {
   const unsigned long result = str_to_ulong(value);
   if (result > UINT_MAX) {
-    raise_error("Failed to convert '%s' to uint", value);
+    pg_status_log_fatal("utils", "failed to convert '%s' to uint", value);
   }
   return (unsigned int)result;
 }
@@ -353,7 +376,7 @@ unsigned int str_to_uint(const char *value) {
 uint16_t str_to_uint16(const char *value) {
   const unsigned long result = str_to_ulong(value);
   if (result > UINT16_MAX) {
-    raise_error("Failed to convert '%s' to uint16", value);
+    pg_status_log_fatal("utils", "failed to convert '%s' to uint16", value);
   }
   return (uint16_t)result;
 }
@@ -414,7 +437,7 @@ void replace_from_env_copy(const char *env_name, char **result) {
 cJSON *json_array(void) {
   cJSON *arr = cJSON_CreateArray();
   if (!arr) {
-    raise_error("Can't create json array");
+    pg_status_log_fatal("utils", "failed to create JSON array");
   }
   return arr;
 }
@@ -425,7 +448,7 @@ cJSON *json_array(void) {
 cJSON *json_object(void) {
   cJSON *arr = cJSON_CreateObject();
   if (!arr) {
-    raise_error("Can't create json object");
+    pg_status_log_fatal("utils", "failed to create JSON object");
   }
   return arr;
 }
@@ -438,7 +461,7 @@ void add_str_to_json_object(cJSON *obj, const char *key, const char *val) {
   assert(key);
   assert(val);
   if (!cJSON_AddStringToObject(obj, key, val)) {
-    raise_error("Can't add str to object");
+    pg_status_log_fatal("utils", "failed to add string to JSON object");
   }
 }
 
@@ -449,7 +472,7 @@ void add_null_to_json_object(cJSON *obj, const char *key) {
   assert(obj);
   assert(key);
   if (!cJSON_AddNullToObject(obj, key)) {
-    raise_error("Can't add null to object");
+    pg_status_log_fatal("utils", "failed to add null to JSON object");
   }
 }
 
@@ -460,7 +483,7 @@ void add_bool_to_json_object(cJSON *obj, const char *key, const bool val) {
   assert(obj);
   assert(key);
   if (!cJSON_AddBoolToObject(obj, key, val)) {
-    raise_error("Can't add bool to object");
+    pg_status_log_fatal("utils", "failed to add bool to JSON object");
   }
 }
 
@@ -473,7 +496,7 @@ void add_uint64_to_json_object(
   assert(obj);
   assert(key);
   if (!cJSON_AddNumberToObject(obj, key, (double)val)) {
-    raise_error("Can't add number to object");
+    pg_status_log_fatal("utils", "failed to add number to JSON object");
   }
 }
 
@@ -486,7 +509,7 @@ char *json_to_str(cJSON *json) {
   char *result = cJSON_PrintUnformatted(json);
   cJSON_Delete(json);
   if (!result) {
-    raise_error("Can't convert json to string");
+    pg_status_log_fatal("utils", "failed to convert JSON to string");
   }
   return result;
 }

@@ -5,8 +5,8 @@
 #include <assert.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <stdio.h>
 
+#include "logger.h"
 #include "pg_monitor.h"
 #include "utils.h"
 
@@ -247,8 +247,9 @@ const char *find_replica_round_robin(
 
   const char *master = get_master_host();
   if (master) {
-    printf(
-      "Master was returned instead of replica. Context: %s \n", log_context
+    pg_status_log(
+      PG_STATUS_LOG_DEBUG, "selection",
+      "master returned instead of replica context=%s", log_context
     );
   }
   return master;
@@ -303,8 +304,9 @@ const char *find_most_sync_replica_by_bytes(
 
   const char *master = get_master_host();
   if (master) {
-    printf(
-      "Master was returned instead of replica. Context: %s \n", log_context
+    pg_status_log(
+      PG_STATUS_LOG_DEBUG, "selection",
+      "master returned instead of replica context=%s", log_context
     );
   }
   return master;
