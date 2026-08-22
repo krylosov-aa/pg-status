@@ -299,9 +299,10 @@ To build pg-status and start a ready-to-use PostgreSQL topology, run:
 make build_up_test
 ```
 
-This starts pg-status, one PostgreSQL master, one replica, and proxy services
-used to simulate role changes. After the containers become healthy and the
-initial host checks complete, query the API at `http://127.0.0.1:8000`:
+This starts pg-status, one PostgreSQL primary, two physical streaming
+replicas, and proxy services used to simulate role changes. After the
+containers become healthy and the initial host checks complete, query the API
+at `http://127.0.0.1:8000`:
 
 ```sh
 curl http://127.0.0.1:8000/master

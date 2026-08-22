@@ -5,7 +5,8 @@ FROM haproxy:2.9
 USER root
 RUN apt-get update \
  && apt-get install -y --no-install-recommends socat \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && install -d -o haproxy -g haproxy /run/haproxy
 
 USER haproxy
 

@@ -280,7 +280,9 @@ async def get_master_host() -> str:
 
 async def get_replica_host() -> str:
     async with aiohttp.ClientSession() as client:
-        async with client.get(f"{PG_STATUS_URL}/most_sync_by_bytes") as response:
+        async with client.get(
+            f"{PG_STATUS_URL}/most_sync_by_bytes"
+        ) as response:
             response.raise_for_status()
             return await response.text()
 
@@ -300,7 +302,11 @@ async def get_all_hosts() -> list[str]:
 
 ```python
 # database.py
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    create_async_engine,
+    async_sessionmaker,
+)
 from context_async_sqlalchemy import DBConnect, db_session
 
 
@@ -312,7 +318,9 @@ def create_engine(host: str):
 
 
 def create_session_maker(engine):
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    return async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
 
 
 # Dictionary of connections to all hosts — both master and replicas
@@ -426,15 +434,22 @@ Wire up both middlewares in the application:
 
 ```python
 # setup_app.py
-from context_async_sqlalchemy.fastapi_utils import add_fastapi_http_db_session_middleware
+from context_async_sqlalchemy.fastapi_utils import (
+    add_fastapi_http_db_session_middleware,
+)
 from starlette.middleware.base import BaseHTTPMiddleware
-from read_own_writes import lsn_cookie_middleware, save_current_lsn_if_there_writes
+from read_own_writes import (
+    lsn_cookie_middleware,
+    save_current_lsn_if_there_writes,
+)
 
 add_fastapi_http_db_session_middleware(
     app,
     before_commit=save_current_lsn_if_there_writes,  # captures LSN before commit
 )
-app.add_middleware(BaseHTTPMiddleware, dispatch=lsn_cookie_middleware)  # sends LSN in cookie
+app.add_middleware(
+    BaseHTTPMiddleware, dispatch=lsn_cookie_middleware
+)  # sends LSN in cookie
 ```
 
 On the read side — extract the LSN from the cookie and pass it to pg-status:
@@ -450,7 +465,9 @@ async def replica_session_ryow(request: Request) -> AsyncSession:
 async def get_replica_host(min_lsn: str | None = None) -> str:
     params = {"min_lsn": min_lsn} if min_lsn else {}
     async with aiohttp.ClientSession() as client:
-        async with client.get(f"{PG_STATUS_URL}/most_sync_by_bytes", params=params) as response:
+        async with client.get(
+            f"{PG_STATUS_URL}/most_sync_by_bytes", params=params
+        ) as response:
             response.raise_for_status()
             return await response.text()
 ```

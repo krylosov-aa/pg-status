@@ -21,6 +21,11 @@ FULL_AUDIT_SCRIPT ?= test/full-audit.sh
 FULL_AUDIT_PULL ?= 1
 FULL_AUDIT_NO_CACHE ?= 1
 FULL_AUDIT_EMULATED_REPEAT_COUNT ?= 1
+UV ?= uv
+PYTHON_E2E_DIR ?= $(CURDIR)/test/e2e
+UV_CACHE_DIR ?= $(PYTHON_E2E_DIR)/.uv-cache
+UV_RUN = UV_CACHE_DIR="$(UV_CACHE_DIR)" $(UV) run \
+	--directory "$(PYTHON_E2E_DIR)" --frozen
 
 HOST_OS := $(shell uname -s)
 SYSTEM_CC := $(shell command -v clang 2>/dev/null || command -v cc 2>/dev/null)
@@ -88,6 +93,14 @@ VALGRIND_OPTIONS ?= --tool=memcheck --leak-check=full --show-leak-kinds=all --er
 	down_test \
 	1-master \
 	2-master \
+	test_e2e \
+	test_e2e_asan \
+	test_e2e_tsan \
+	test_e2e_valgrind \
+	test_e2e_all \
+	test_e2e_cleanup \
+	python_sync \
+	python_lint \
 	check_compiler \
 	check_scan_build_tools \
 	check_valgrind \
@@ -208,7 +221,7 @@ down:
 down_all:
 	@exit_code=0; \
 	$(docker-compose) down --remove-orphans || exit_code=$$?; \
-	$(test-docker-compose) --profile pg-status down --remove-orphans \
+	$(test-docker-compose) --profile pg-status down --volumes --remove-orphans \
 		|| exit_code=$$?; \
 	pre_release_containers="$$( \
 		docker ps -q --filter "label=$(PRE_RELEASE_CONTAINER_LABEL)" \
@@ -228,21 +241,110 @@ build_up:
 
 build_up_test:
 	$(MAKE) down_test
-	$(MAKE) build
-	$(test-docker-compose) --profile pg-status up -d
+	PG_STATUS_E2E_PROFILE=release \
+		PG_STATUS_E2E_BUILD_TYPE=Release \
+		PG_STATUS_E2E_SANITIZER=none \
+		PG_STATUS_E2E_MODE=release \
+		PG_STATUS_E2E_HTTP_PORT=8000 \
+		PG_STATUS_E2E_PROXY_1_PORT=5435 \
+		PG_STATUS_E2E_PROXY_2_PORT=5436 \
+		PG_STATUS_E2E_PROXY_3_PORT=5437 \
+		$(test-docker-compose) --profile pg-status up -d --build
 
 build_up_test_only_pg:
 	$(MAKE) down_test
-	$(test-docker-compose) up -d
+	PG_STATUS_E2E_PROXY_1_PORT=5435 \
+		PG_STATUS_E2E_PROXY_2_PORT=5436 \
+		PG_STATUS_E2E_PROXY_3_PORT=5437 \
+		$(test-docker-compose) up -d --build
+
+test_e2e_cleanup:
+	@exit_code=0; \
+	projects="$$(docker ps -a --format '{{.Label "com.docker.compose.project"}}' --filter name=$(E2E_COMPOSE_PROJECT_PREFIX))"; \
+	for project in $$projects; do \
+		case "$$project" in \
+			"") \
+				;; \
+			$(E2E_COMPOSE_PROJECT_PREFIX)* ) \
+				$(docker-compose-command) --project-name "$$project" \
+					-f test/docker/docker-compose.yml \
+					--profile pg-status down --volumes --remove-orphans \
+					|| exit_code=$$?; \
+				;; \
+			*) \
+				;; \
+		esac; \
+	done; \
+	exit $$exit_code
 
 down_test:
-	$(test-docker-compose) --profile pg-status down --remove-orphans
+	$(test-docker-compose) --profile pg-status down --volumes --remove-orphans
 
 1-master:
 	./test/docker/pg-proxy-1_is_master.sh
 
 2-master:
 	./test/docker/pg-proxy-2_is_master.sh
+
+test_e2e:
+	@status=0; \
+	$(UV_RUN) pytest tests --e2e-profile release || status=$$?; \
+	cleanup_status=0; \
+	$(MAKE) test_e2e_cleanup || cleanup_status=$$?; \
+	if [ $$status -eq 0 ] && [ $$cleanup_status -ne 0 ]; then \
+		status=$$cleanup_status; \
+	fi; \
+	exit $$status
+
+test_e2e_asan:
+	@status=0; \
+	$(UV_RUN) pytest tests --e2e-profile asan || status=$$?; \
+	cleanup_status=0; \
+	$(MAKE) test_e2e_cleanup || cleanup_status=$$?; \
+	if [ $$status -eq 0 ] && [ $$cleanup_status -ne 0 ]; then \
+		status=$$cleanup_status; \
+	fi; \
+	exit $$status
+
+test_e2e_tsan:
+	@status=0; \
+	$(UV_RUN) pytest tests --e2e-profile tsan || status=$$?; \
+	cleanup_status=0; \
+	$(MAKE) test_e2e_cleanup || cleanup_status=$$?; \
+	if [ $$status -eq 0 ] && [ $$cleanup_status -ne 0 ]; then \
+		status=$$cleanup_status; \
+	fi; \
+	exit $$status
+
+test_e2e_valgrind:
+	@status=0; \
+	$(UV_RUN) pytest tests --e2e-profile valgrind || status=$$?; \
+	cleanup_status=0; \
+	$(MAKE) test_e2e_cleanup || cleanup_status=$$?; \
+	if [ $$status -eq 0 ] && [ $$cleanup_status -ne 0 ]; then \
+		status=$$cleanup_status; \
+	fi; \
+	exit $$status
+
+test_e2e_all:
+	@status=0; \
+	$(MAKE) test_e2e || status=$$?; \
+	$(MAKE) test_e2e_asan || status=$$?; \
+	$(MAKE) test_e2e_tsan || status=$$?; \
+	$(MAKE) test_e2e_valgrind || status=$$?; \
+	exit $$status
+
+python_sync:
+	UV_CACHE_DIR="$(UV_CACHE_DIR)" $(UV) sync \
+		--directory "$(PYTHON_E2E_DIR)" --frozen
+
+python_lint:
+	$(UV_RUN) ruff format .
+	$(UV_RUN) mypy .
+	$(UV_RUN) ruff check --fix .
+	$(UV_RUN) flake8 .
+	$(UV_RUN) complexipy . --failed
+	$(UV_RUN) radon cc .
 
 check_compiler:
 	@command -v "$(SANITIZER_CC)" >/dev/null 2>&1 || { \
@@ -328,6 +430,7 @@ test_valgrind: build_valgrind
 		--no-tests=error
 
 docker-compose-command := $(shell docker compose version >/dev/null 2>&1 && echo docker compose || echo docker-compose)
+E2E_COMPOSE_PROJECT_PREFIX ?= pg-status-e2e-
 docker-compose := $(docker-compose-command) -f docker-compose.yml
 test-docker-compose := $(docker-compose-command) -p test -f test/docker/docker-compose.yml
 

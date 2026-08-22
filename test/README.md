@@ -163,6 +163,26 @@ make full-audit
 
 ## Docker environments
 
+### Automated PostgreSQL e2e tests
+
+The e2e suite starts a real PostgreSQL primary, two physical streaming
+replicas, three HAProxy endpoints, and an instrumented pg-status container.
+
+Tests live only in [`e2e/tests`](e2e/tests); Docker, PostgreSQL, HAProxy,
+and HTTP support code lives separately in [`e2e/support`](e2e/support). Test
+dependencies are provided through pytest fixtures.
+
+The suite is separate from CTest:
+
+```sh
+make test_e2e
+make test_e2e_asan
+make test_e2e_tsan
+make test_e2e_valgrind
+```
+
+Run every profile sequentially with `make test_e2e_all`.
+
 ### Run pg-status with your own PostgreSQL setup
 
 ```sh
@@ -183,17 +203,18 @@ This allows you to test pg-status with your own database setup.
 make build_up_test
 ```
 
-This builds the
-[lightweight container](../docker/alpine/Dockerfile_shared) and starts the
-full environment defined in [docker/docker-compose.yml](docker/docker-compose.yml).
+This builds the e2e Release image and starts the full environment defined in
+[docker/docker-compose.yml](docker/docker-compose.yml).
 
-The environment contains pg-status, two PostgreSQL instances (one master and
-one replica), and three proxy services. Switching a proxy's target simulates a
-role change or disconnection without stopping PostgreSQL.
+The environment contains pg-status, one PostgreSQL primary, two physical
+replicas, and three proxy services. Switching a proxy's target simulates a
+role change or disconnection without stopping PostgreSQL. The manual target
+publishes pg-status on port 8000 and the proxies on ports 5435 through 5437.
 
 ### Run only the PostgreSQL topology
 
-To start the master, replica, and three proxy services without pg-status, use:
+To start the primary, two replicas, and three proxy services without pg-status,
+use:
 
 ```sh
 make build_up_test_only_pg
@@ -206,6 +227,13 @@ Use these helper scripts to change the proxy configuration:
 
 - [docker/pg-proxy-1_is_master.sh](docker/pg-proxy-1_is_master.sh)
 - [docker/pg-proxy-2_is_master.sh](docker/pg-proxy-2_is_master.sh)
+
+For individual proxy operations, use the routing helper directly, for example:
+
+```sh
+test/docker/proxy-route.sh pg-proxy-3 none
+test/docker/proxy-route.sh pg-proxy-3 replica_2
+```
 
 Stop either test topology with:
 

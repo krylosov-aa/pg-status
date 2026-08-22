@@ -2,10 +2,7 @@
 
 set -Eeuo pipefail
 
-docker exec -i pg-proxy-2 socat stdio /tmp/haproxy.sock <<< "enable server pg_backends/master"
-docker exec -i pg-proxy-2 socat stdio /tmp/haproxy.sock <<< "disable server pg_backends/replica"
-docker exec -i pg-proxy-2 socat stdio /tmp/haproxy.sock <<< "shutdown sessions server pg_backends/replica"
+script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-docker exec -i pg-proxy-1 socat stdio /tmp/haproxy.sock <<< "enable server pg_backends/replica"
-docker exec -i pg-proxy-1 socat stdio /tmp/haproxy.sock <<< "disable server pg_backends/master"
-docker exec -i pg-proxy-1 socat stdio /tmp/haproxy.sock <<< "shutdown sessions server pg_backends/master"
+"$script_directory/proxy-route.sh" pg-proxy-1 replica_1
+"$script_directory/proxy-route.sh" pg-proxy-2 primary

@@ -66,6 +66,15 @@ dkms.conf
 # debug information files
 *.dwo
 
+# Python test tooling
+__pycache__/
+*.py[cod]
+.venv/
+.uv-cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
 
 /.idea/*
 

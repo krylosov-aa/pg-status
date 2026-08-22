@@ -1,4 +1,4 @@
-# HAProxy image initially routing traffic to the replica.
+# HAProxy image initially routing traffic to the second replica.
 
 FROM haproxy:2.9
 

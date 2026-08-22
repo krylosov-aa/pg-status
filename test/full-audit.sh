@@ -75,7 +75,18 @@ import sys
 
 root = sys.argv[1]
 artifact_path = os.path.realpath(sys.argv[2])
-excluded = {'.git', '.idea', 'cmake-builds', 'scan_reports', 'out'}
+excluded = {
+    '.git',
+    '.idea',
+    '.mypy_cache',
+    '.pytest_cache',
+    '.ruff_cache',
+    '.uv-cache',
+    '.venv',
+    'cmake-builds',
+    'scan_reports',
+    'out',
+}
 
 for base, directories, files in os.walk(root):
     directories[:] = sorted(
@@ -174,7 +185,7 @@ smoke_runtime_image() {
 
 # Stage 0: Validate host prerequisites, requested settings, and Docker
 # capabilities before creating any audit resources.
-for required_command in bash curl diff docker find make python3 sed; do
+for required_command in bash curl diff docker find make python3 sed uv; do
   require_command "$required_command"
 done
 
@@ -357,6 +368,13 @@ while IFS= read -r shell_script; do
 done < <(find test -type f -name '*.sh' -print)
 make --dry-run pre-release-docker >/dev/null
 make --dry-run release-builds >/dev/null
+make --dry-run test_e2e_all >/dev/null
+
+# Stage 4a: Exercise the production monitor against real PostgreSQL under
+# every supported runtime instrumentation profile. These remain separate from
+# CTest so the normal development loop does not require Docker.
+print_stage "PostgreSQL e2e matrix (Release, ASan/UBSan, TSan, Valgrind)"
+make test_e2e_all
 
 # Stage 5: Build every supported production runtime image for Linux amd64.
 print_stage "Production runtime images"

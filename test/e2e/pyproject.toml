@@ -1,0 +1,85 @@
+[project]
+name = "pg-status-e2e"
+version = "0.1.0"
+description = "End-to-end test tooling for pg-status"
+requires-python = "==3.13.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "complexipy>=6.0.1",
+    "flake8>=7.3.0",
+    "mypy>=1.18.2",
+    "pytest>=8.4.2",
+    "radon>=6.0.1",
+    "ruff>=0.13.2",
+    "wemake-python-styleguide>=1.4.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+
+[tool.ruff]
+line-length = 79
+target-version = "py313"
+exclude = [
+    ".venv",
+    "__pycache__",
+    "build",
+]
+
+[tool.ruff.lint]
+select = [
+    "ASYNC",
+    "B",
+    "C4",
+    "C901",
+    "DTZ",
+    "E",
+    "F",
+    "I",
+    "PERF",
+    "RUF",
+    "S",
+    "SIM",
+    "T10",
+    "T20",
+    "TCH",
+    "UP",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.complexipy]
+max-complexity-allowed = 10
+exclude = [
+    ".venv",
+    ".venv/**",
+    "__pycache__",
+    "__pycache__/**",
+    "build",
+    "build/**",
+]
+
+[tool.radon]
+exclude = ".venv/*,.venv/**,build/*,build/**"
+cc_min = "C"
+show_complexity = true
+average = true

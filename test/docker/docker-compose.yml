@@ -1,118 +1,185 @@
-# Complete Docker environment used for manual topology tests.
+# Docker topology shared by manual tests and the automated e2e suite.
 
 services:
   pg-status:
     profiles:
       - pg-status
-    image: pg-status:latest
+    image: "pg-status-e2e:${PG_STATUS_E2E_PROFILE:-release}"
+    build:
+      context: ../..
+      dockerfile: test/e2e/Dockerfile
+      args:
+        PG_STATUS_E2E_BUILD_TYPE: "${PG_STATUS_E2E_BUILD_TYPE:-Release}"
+        PG_STATUS_E2E_SANITIZER: "${PG_STATUS_E2E_SANITIZER:-none}"
     ports:
-      - 8000:8000
-    mem_limit: 9m
-    mem_reservation: 9m
-    cpus: 0.1
+      - "127.0.0.1:${PG_STATUS_E2E_HTTP_PORT:-0}:8000"
     networks:
       - net
-    restart: unless-stopped
+    security_opt:
+      - seccomp=unconfined
     environment:
-      - pg_status__connect_timeout=2
-      - pg_status__hosts=pg-proxy-1,pg-proxy-2,pg-proxy-3
-      - pg_status__pg_database=postgres
-      - pg_status__pg_password=postgres
-      - pg_status__pg_user=postgres
-      - pg_status__pg_port=5432
-      - pg_status__sleep_ms=5000
+      PG_STATUS_E2E_MODE: "${PG_STATUS_E2E_MODE:-release}"
+      ASAN_OPTIONS: "abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1"
+      UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+      TSAN_OPTIONS: "halt_on_error=1"
+      pg_status__connect_timeout: "1"
+      pg_status__hosts: "pg-proxy-1,pg-proxy-2,pg-proxy-3"
+      pg_status__pg_database: postgres
+      pg_status__pg_password: postgres
+      pg_status__pg_user: postgres
+      pg_status__pg_port: "5432"
+      pg_status__sleep_ms: "200"
+      pg_status__max_fails: "2"
+      pg_status__query_timeout_ms: "1000"
+      pg_status__conn_max_age_ms: "1000"
+      pg_status__sync_max_lag_ms: "500"
+      pg_status__sync_max_lag_bytes: "1048576"
+    depends_on:
+      pg-proxy-1:
+        condition: service_healthy
+      pg-proxy-2:
+        condition: service_healthy
+      pg-proxy-3:
+        condition: service_healthy
 
-  postgres_master:
+  postgres-primary:
     build:
       context: ./master
-    ports:
-      - 5433:5432
-    container_name: postgres_master
     networks:
       - net
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=postgres
-      - REPLICATION_ROLE=master
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      REPLICATION_ROLE: master
+    volumes:
+      - primary-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      retries: 10
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -U postgres -d postgres &&
+          test "$(psql -U postgres -d postgres -Atc 'select pg_is_in_recovery()')" = f
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
-  postgres_replica:
+  postgres-replica-1:
     build:
       context: ./replica
-    ports:
-      - 5434:5432
-    container_name: postgres_replica
-    depends_on:
-      - postgres_master
     networks:
-        - net
+      - net
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=postgres
-      - REPLICATION_ROLE=replica
-      - MASTER_HOST=postgres_master
-      - MASTER_USER=replicator
-      - MASTER_PASSWORD=postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      REPLICATION_ROLE: replica
+      MASTER_HOST: postgres-primary
+      MASTER_USER: replicator
+      MASTER_PASSWORD: postgres
+    volumes:
+      - replica-1-data:/var/lib/postgresql/data
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      retries: 10
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -U postgres -d postgres &&
+          test "$(psql -U postgres -d postgres -Atc 'select pg_is_in_recovery()')" = t
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  postgres-replica-2:
+    build:
+      context: ./replica
+    networks:
+      - net
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      REPLICATION_ROLE: replica
+      MASTER_HOST: postgres-primary
+      MASTER_USER: replicator
+      MASTER_PASSWORD: postgres
+    volumes:
+      - replica-2-data:/var/lib/postgresql/data
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -U postgres -d postgres &&
+          test "$(psql -U postgres -d postgres -Atc 'select pg_is_in_recovery()')" = t
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   pg-proxy-1:
     build:
       context: ./haproxy-master
-    container_name: pg-proxy-1
-    ports:
-      - "5435:5432"
     networks:
       - net
+    ports:
+      - "127.0.0.1:${PG_STATUS_E2E_PROXY_1_PORT:-0}:5432"
     depends_on:
-      - postgres_master
-      - postgres_replica
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy.sock || exit 1"]
-      interval: 5s
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
+        condition: service_healthy
+    healthcheck: &proxy-healthcheck
+      test:
+        - CMD
+        - bash
+        - -c
+        - "echo 'show info' | socat stdio /tmp/haproxy.sock"
+      interval: 2s
       timeout: 3s
-      retries: 5
+      retries: 15
 
   pg-proxy-2:
     build:
       context: ./haproxy-replica
-    container_name: pg-proxy-2
-    ports:
-      - "5436:5432"
     networks:
       - net
+    ports:
+      - "127.0.0.1:${PG_STATUS_E2E_PROXY_2_PORT:-0}:5432"
     depends_on:
-      - postgres_master
-      - postgres_replica
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy.sock || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
+        condition: service_healthy
+    healthcheck: *proxy-healthcheck
 
   pg-proxy-3:
     build:
-      context: ./haproxy-replica
-    container_name: pg-proxy-3
-    ports:
-      - "5437:5432"
+      context: ./haproxy-replica-2
     networks:
       - net
+    ports:
+      - "127.0.0.1:${PG_STATUS_E2E_PROXY_3_PORT:-0}:5432"
     depends_on:
-      - postgres_master
-      - postgres_replica
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo 'show info' | socat stdio /tmp/haproxy.sock || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
+        condition: service_healthy
+    healthcheck: *proxy-healthcheck
 
 networks:
   net:
+
+volumes:
+  primary-data:
+  replica-1-data:
+  replica-2-data:
