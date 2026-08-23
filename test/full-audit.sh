@@ -185,7 +185,7 @@ smoke_runtime_image() {
 
 # Stage 0: Validate host prerequisites, requested settings, and Docker
 # capabilities before creating any audit resources.
-for required_command in bash curl diff docker find make python3 sed; do
+for required_command in bash curl diff docker find make python3 sed uv; do
   require_command "$required_command"
 done
 
