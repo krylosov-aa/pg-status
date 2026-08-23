@@ -281,11 +281,11 @@ Configure pg-status using the following environment variables:
 
 Available installation options:
 
-- [Debian package](https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_amd64.deb)
+- [Debian package](https://github.com/krylosov-aa/pg-status/releases/download/2.2.0/pg-status_2.2.0_amd64.deb)
 - [Docker Hub image](https://hub.docker.com/r/krylosovaa/pg-status)
 - [Docker build configurations](docker)
-- [Statically linked binary](https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_linux_amd64_static.tar.gz)
-- [Dynamically linked binary](https://github.com/krylosov-aa/pg-status/releases/download/2.1.1/pg-status_2.1.1_linux_amd64_shared.tar.gz)
+- [Statically linked binary](https://github.com/krylosov-aa/pg-status/releases/download/2.2.0/pg-status_2.2.0_linux_amd64_static.tar.gz)
+- [Dynamically linked binary](https://github.com/krylosov-aa/pg-status/releases/download/2.2.0/pg-status_2.2.0_linux_amd64_shared.tar.gz)
 
 For more information, see the [installation guide](docs/installation.md).
 

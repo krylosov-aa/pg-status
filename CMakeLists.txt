@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(pg-status VERSION 2.1.1 LANGUAGES C)
+project(pg-status VERSION 2.2.0 LANGUAGES C)
 
 if(NOT UNIX)
     message(FATAL_ERROR "pg-status currently supports POSIX systems only")

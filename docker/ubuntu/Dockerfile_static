@@ -112,7 +112,7 @@ COPY docker/ubuntu/package/static-third-party-notices.txt THIRD-PARTY-NOTICES
 COPY docker/ubuntu/package/static-readme.txt README
 
 RUN architecture="$(dpkg --print-architecture)" && \
-    tar -czvf "/pg-status_2.1.1_linux_${architecture}_static.tar.gz" \
+    tar -czvf "/pg-status_2.2.0_linux_${architecture}_static.tar.gz" \
         pg-status \
         LICENSE \
         THIRD-PARTY-NOTICES \
@@ -121,7 +121,7 @@ RUN architecture="$(dpkg --print-architecture)" && \
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=packager /pg-status_2.1.1_linux_*_static.tar.gz /
+COPY --from=packager /pg-status_2.2.0_linux_*_static.tar.gz /
 
 # -------- Run --------
 FROM ubuntu:24.04 AS runner

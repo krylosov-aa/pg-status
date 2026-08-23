@@ -1,4 +1,4 @@
-pg-status v2.1.1 (static build)
+pg-status v2.2.0 (static build)
 ===============================
 
 A microservice (sidecar) that helps instantly determine the status of your

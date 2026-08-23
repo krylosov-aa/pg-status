@@ -161,7 +161,7 @@ build_shared_executable:
 		--platform "$(RELEASE_PLATFORM)" pg-status-shared-packager true)" && \
 		trap 'docker rm "$$container_id" >/dev/null' EXIT && \
 		docker cp \
-		"$$container_id:/pg-status_2.1.1_linux_$(RELEASE_ARCH)_shared.tar.gz" \
+		"$$container_id:/pg-status_2.2.0_linux_$(RELEASE_ARCH)_shared.tar.gz" \
 		"$(ARTIFACT_DIR)/shared/"
 
 build_static_executable:
@@ -174,7 +174,7 @@ build_static_executable:
 		--platform "$(RELEASE_PLATFORM)" pg-status-static-packager true)" && \
 		trap 'docker rm "$$container_id" >/dev/null' EXIT && \
 		docker cp \
-		"$$container_id:/pg-status_2.1.1_linux_$(RELEASE_ARCH)_static.tar.gz" \
+		"$$container_id:/pg-status_2.2.0_linux_$(RELEASE_ARCH)_static.tar.gz" \
 		"$(ARTIFACT_DIR)/static/"
 
 build_deb:
@@ -186,7 +186,7 @@ build_deb:
 	@container_id="$$(docker create \
 		--platform "$(RELEASE_PLATFORM)" pg-status-deb-packager true)" && \
 		trap 'docker rm "$$container_id" >/dev/null' EXIT && \
-		docker cp "$$container_id:/pg-status_2.1.1_$(RELEASE_ARCH).deb" \
+		docker cp "$$container_id:/pg-status_2.2.0_$(RELEASE_ARCH).deb" \
 		"$(ARTIFACT_DIR)/deb/"
 
 check_publish_args:
@@ -576,7 +576,7 @@ full-audit:
 	AUDIT_EMULATED_REPEAT_COUNT="$(FULL_AUDIT_EMULATED_REPEAT_COUNT)" \
 		bash "$(FULL_AUDIT_SCRIPT)"
 
-release-builds: pre-release-docker
+release-builds:
 	$(MAKE) build_shared_alpine
 	$(MAKE) build_static_alpine
 	$(MAKE) build_shared_ubuntu

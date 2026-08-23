@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tar gzip && \
     rm -rf /var/lib/apt/lists/*
 
 RUN architecture="$(dpkg --print-architecture)" && \
-    tar -czvf "/pg-status_2.1.1_linux_${architecture}_shared.tar.gz" \
+    tar -czvf "/pg-status_2.2.0_linux_${architecture}_shared.tar.gz" \
         pg-status \
         LICENSE \
         THIRD-PARTY-NOTICES \
@@ -51,7 +51,7 @@ RUN architecture="$(dpkg --print-architecture)" && \
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=packager /pg-status_2.1.1_linux_*_shared.tar.gz /
+COPY --from=packager /pg-status_2.2.0_linux_*_shared.tar.gz /
 
 # -------- Run --------
 FROM ubuntu:24.04 AS runtime

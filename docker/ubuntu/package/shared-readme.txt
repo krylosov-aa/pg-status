@@ -1,4 +1,4 @@
-pg-status v2.1.1
+pg-status v2.2.0
 ================
 
 A microservice (sidecar) that helps instantly determine the status of your

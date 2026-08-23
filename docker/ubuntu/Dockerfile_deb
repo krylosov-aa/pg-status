@@ -45,8 +45,8 @@ RUN architecture="$(dpkg --print-architecture)" && \
 RUN chmod 755 usr/bin/pg-status && chmod 755 DEBIAN
 
 RUN architecture="$(dpkg --print-architecture)" && \
-    dpkg-deb --build . "/pg-status_2.1.1_${architecture}.deb"
+    dpkg-deb --build . "/pg-status_2.2.0_${architecture}.deb"
 
 # -------- Export --------
 FROM scratch AS export
-COPY --from=packager /pg-status_2.1.1_*.deb /
+COPY --from=packager /pg-status_2.2.0_*.deb /
