@@ -387,6 +387,7 @@ if(CLANG_FORMAT_EXE)
             "${PROJECT_SOURCE_DIR}/test/*.c"
             "${PROJECT_SOURCE_DIR}/test/*.h"
     )
+    list(FILTER FORMAT_SOURCES EXCLUDE REGEX "/\\.venv/")
 
     add_custom_target(format
             COMMAND "${CLANG_FORMAT_EXE}" -i ${FORMAT_SOURCES}
