@@ -8,8 +8,10 @@ pg_status_url="${PG_STATUS_URL:-http://127.0.0.1:8000}"
 target_rps="${TARGET_RPS:-5000}"
 duration="${DURATION:-5m}"
 warmup_duration="${WARMUP_DURATION:-30s}"
-connections="${CONNECTIONS:-128}"
-request_timeout="${REQUEST_TIMEOUT:-5s}"
+connections="${CONNECTIONS:-512}"
+attack_workers="${ATTACK_WORKERS:-512}"
+request_timeout="${REQUEST_TIMEOUT:-2s}"
+server_http_workers="${SERVER_HTTP_WORKERS:-1}"
 max_p99_ms="${MAX_P99_MS:-5}"
 min_success_ratio="${MIN_SUCCESS_RATIO:-1.0}"
 min_throughput_ratio="${MIN_THROUGHPUT_RATIO:-0.99}"
@@ -28,7 +30,18 @@ done
 
 [[ "${target_rps}" =~ ^[1-9][0-9]*$ ]] || fail "TARGET_RPS must be a positive integer"
 [[ "${connections}" =~ ^[1-9][0-9]*$ ]] || fail "CONNECTIONS must be a positive integer"
+[[ "${attack_workers}" =~ ^[1-9][0-9]*$ ]] || \
+  fail "ATTACK_WORKERS must be a positive integer"
+[[ "${server_http_workers}" =~ ^[1-9][0-9]*$ ]] || \
+  fail "SERVER_HTTP_WORKERS must be a positive integer"
 [[ -r "${profile_file}" ]] || fail "profile is not readable: ${profile_file}"
+
+soft_nofile="$(ulimit -Sn)"
+required_nofile=$((connections + 128))
+if [[ "${soft_nofile}" =~ ^[0-9]+$ ]] &&
+   ((soft_nofile < required_nofile)); then
+  fail "open-file limit ${soft_nofile} is too low; run: ulimit -n 4096"
+fi
 
 if ! jq -en \
   --arg max_p99_ms "${max_p99_ms}" \
@@ -94,14 +107,22 @@ cp "${profile_file}" "${run_dir}/profile.txt"
   uname -a
 } >"${run_dir}/metadata.txt"
 
+attack_options=(
+  "-targets=${vegeta_targets}"
+  "-rate=${target_rps}/s"
+  "-connections=${connections}"
+  "-max-connections=${connections}"
+  "-workers=${attack_workers}"
+  "-max-workers=${attack_workers}"
+  "-timeout=${request_timeout}"
+  "-max-body=0"
+)
+
 printf 'Warming up %s at %s RPS over %s targets...\n' \
   "${pg_status_url}" "${target_rps}" "${target_count}"
 vegeta attack \
-  -targets="${vegeta_targets}" \
-  -rate="${target_rps}/s" \
-  -duration="${warmup_duration}" \
-  -connections="${connections}" \
-  -timeout="${request_timeout}" \
+  "${attack_options[@]}" \
+  "-duration=${warmup_duration}" \
   >/dev/null
 
 attack_file="${run_dir}/attack.bin"
@@ -110,11 +131,8 @@ json_report="${run_dir}/report.json"
 
 printf 'Measuring for %s...\n' "${duration}"
 vegeta attack \
-  -targets="${vegeta_targets}" \
-  -rate="${target_rps}/s" \
-  -duration="${duration}" \
-  -connections="${connections}" \
-  -timeout="${request_timeout}" \
+  "${attack_options[@]}" \
+  "-duration=${duration}" \
   >"${attack_file}"
 
 vegeta report "${attack_file}" | tee "${text_report}"

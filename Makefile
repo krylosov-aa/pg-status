@@ -200,14 +200,15 @@ check_publish_args:
 	}
 
 build_push: check_publish_args
-	docker build $(RELEASE_DOCKER_BUILD_FLAGS) \
+	docker buildx build $(RELEASE_DOCKER_BUILD_FLAGS) \
 		--platform $(RELEASE_PLATFORM) \
+		--provenance=false \
+		--sbom=false \
 		-f docker/alpine/Dockerfile_shared \
 		-t $(r)/pg-status:$(v) \
 		-t $(r)/pg-status:latest \
+		--output type=image,push=true,oci-mediatypes=false \
 		.
-	docker push $(r)/pg-status:$(v)
-	docker push $(r)/pg-status:latest
 
 build:
 	docker build -f docker/alpine/Dockerfile_shared -t pg-status .
