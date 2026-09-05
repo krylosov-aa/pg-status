@@ -7,6 +7,7 @@
 #include <stdatomic.h>
 #include <stdint.h>
 
+#include "connection.h"
 #include "logger.h"
 #include "pg_monitor.h"
 #include "streaming_replication_query.h"
@@ -481,7 +482,7 @@ static void advance_connecting(MonitorHost *host, const uint64_t now_ms) {
 }
 
 static bool start_connect(MonitorHost *host) {
-  host->conn = PQconnectStart(host->connection_str);
+  host->conn = pg_connection_start(host);
   if (host->conn == nullptr || PQstatus(host->conn) == CONNECTION_BAD) {
     log_postgres_error(host, "connect_start");
     return false;

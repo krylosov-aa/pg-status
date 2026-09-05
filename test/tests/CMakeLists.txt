@@ -10,6 +10,34 @@ target_include_directories(
         common_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/support
 )
 
+add_executable(connection_test test_connection.c)
+target_link_libraries(
+        connection_test PRIVATE
+        common_warnings
+        common_support
+        logging
+        pg_monitor
+        pg_status_libpq
+)
+
+set(CONNECTION_TEST_CASES
+        separate_values
+        dbname_not_expanded
+        tls_environment
+        secret_marker_not_logged
+)
+
+foreach(TEST_CASE IN LISTS CONNECTION_TEST_CASES)
+    set(TEST_NAME "connection.${TEST_CASE}")
+    add_test(NAME ${TEST_NAME} COMMAND connection_test ${TEST_CASE})
+    set_tests_properties(
+            ${TEST_NAME}
+            PROPERTIES
+            TIMEOUT 15
+            ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}"
+    )
+endforeach()
+
 add_executable(logger_test test_logger.c)
 target_link_libraries(
         logger_test PRIVATE

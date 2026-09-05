@@ -277,6 +277,19 @@ Configure pg-status using the following environment variables:
 - `pg_status__log_level` — Minimum logging level. Accepts `debug`, `info`,
   `warning` (or `warn`), `error`, or `fatal`. Default: `info`.
 
+### PostgreSQL TLS
+
+TLS is configured by libpq's standard environment variables. pg-status does
+not add its own certificate store or TLS configuration format:
+
+- `PGSSLMODE` — libpq TLS mode, such as `disable`, `require`, or
+  `verify-full`.
+- `PGSSLROOTCERT` — path to the trusted CA certificate bundle.
+- `PGSSLCRL` — path to a certificate revocation list.
+- `PGSSLCERT` — path to the client certificate when the server requires mTLS.
+- `PGSSLKEY` — path to the corresponding client private key. Its filesystem
+  permissions must satisfy libpq's requirements.
+
 ## Installation
 
 Available installation options:

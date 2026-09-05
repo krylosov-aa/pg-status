@@ -8,6 +8,7 @@ pytest_plugins = (
     "support.fixtures_infrastructure",
     "support.fixtures_isolated",
     "support.fixtures_operations",
+    "support.fixtures_security",
 )
 
 

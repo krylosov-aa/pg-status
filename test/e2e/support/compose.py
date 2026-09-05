@@ -45,6 +45,8 @@ class ComposeProject:
             str(compose_file),
             "--profile",
             "pg-status",
+            "--profile",
+            "security",
         )
 
     def invoke(

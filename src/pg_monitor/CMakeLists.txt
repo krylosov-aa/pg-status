@@ -1,5 +1,6 @@
 add_library(pg_monitor
         check_utils.c
+        connection.c
         pg_monitor.c
         lookup_utils.c
         host_list.c

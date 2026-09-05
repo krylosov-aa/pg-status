@@ -34,25 +34,13 @@ int get_master_index(void) {
 }
 
 /**
- * Returns the string to connect to pg
- */
-static char *get_connection_string(char *host, char *port) {
-  return format_string(
-    "user=%s password=%s host=%s port=%s "
-    "dbname=%s connect_timeout=%s",
-    parameters.user, parameters.password, host, port, parameters.database,
-    parameters.connect_timeout
-  );
-}
-
-/**
  * Initializes MonitorHost to its initial value.
  */
 static void init_monitor_host(
   MonitorHost *monitor_host, char *host, char *port
 ) {
   monitor_host->host = copy_string(host);
-  monitor_host->connection_str = get_connection_string(host, port);
+  monitor_host->port = copy_string(port);
   monitor_host->failed_connections = 0;
 
   monitor_host->conn = nullptr;

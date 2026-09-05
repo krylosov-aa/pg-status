@@ -1,5 +1,39 @@
 # Docker topology shared by manual tests and the automated e2e suite.
 
+x-security-monitor: &security-monitor
+  profiles:
+    - security
+  image: "pg-status-e2e:${PG_STATUS_E2E_PROFILE:-release}"
+  ports:
+    - "127.0.0.1:0:8000"
+  networks:
+    - net
+  security_opt:
+    - seccomp=unconfined
+  volumes:
+    - security-certs:/tls:ro
+  depends_on:
+    postgres-security:
+      condition: service_healthy
+
+x-security-environment: &security-environment
+  PG_STATUS_E2E_MODE: "${PG_STATUS_E2E_MODE:-release}"
+  ASAN_OPTIONS: "abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1"
+  UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+  TSAN_OPTIONS: "halt_on_error=1"
+  pg_status__connect_timeout: "1"
+  pg_status__hosts: postgres-security
+  pg_status__pg_database: postgres
+  pg_status__pg_password: "space 'quote' \\backslash password"
+  pg_status__pg_user: password_monitor
+  pg_status__pg_port: "5432"
+  pg_status__sleep_ms: "200"
+  pg_status__max_fails: "1"
+  pg_status__query_timeout_ms: "1000"
+  pg_status__conn_max_age_ms: "1000"
+  pg_status__sync_max_lag_ms: "500"
+  pg_status__sync_max_lag_bytes: "1048576"
+
 services:
   pg-status:
     profiles:
@@ -120,6 +154,95 @@ services:
       timeout: 3s
       retries: 30
 
+  postgres-security:
+    profiles:
+      - security
+    build:
+      context: ./security
+    networks:
+      net:
+        aliases:
+          - postgres-wrong-name
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - security-data:/var/lib/postgresql/data
+      - security-certs:/tls:ro
+    depends_on:
+      security-certs:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -U postgres -d postgres &&
+          test "$(psql -U postgres -d postgres -Atc 'select 1')" = 1
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  security-certs:
+    profiles:
+      - security
+    build:
+      context: ./security
+      target: cert-generator
+    volumes:
+      - security-certs:/tls
+
+  pg-status-security-disable:
+    <<: *security-monitor
+    environment:
+      <<: *security-environment
+      PGSSLMODE: disable
+
+  pg-status-security-require:
+    <<: *security-monitor
+    environment:
+      <<: *security-environment
+      PGSSLMODE: require
+
+  pg-status-security-verify-full:
+    <<: *security-monitor
+    environment:
+      <<: *security-environment
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
+
+  pg-status-security-wrong-host:
+    <<: *security-monitor
+    environment:
+      <<: *security-environment
+      pg_status__hosts: postgres-wrong-name
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
+
+  pg-status-security-unknown-ca:
+    <<: *security-monitor
+    environment:
+      <<: *security-environment
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/unknown-ca.crt
+
+  pg-status-security-mtls:
+    <<: *security-monitor
+    environment:
+      <<: *security-environment
+      pg_status__pg_user: mtls_monitor
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
+      PGSSLCERT: /tls/client.crt
+      PGSSLKEY: /tls/client.key
+
+  pg-status-security-bad-password:
+    <<: *security-monitor
+    environment:
+      <<: *security-environment
+      pg_status__pg_password: "PG_STATUS_E2E_SECRET_MARKER_'_\\_Юникод"
+      PGSSLMODE: require
+
   pg-proxy-1:
     build:
       context: ./haproxy-master
@@ -183,3 +306,5 @@ volumes:
   primary-data:
   replica-1-data:
   replica-2-data:
+  security-data:
+  security-certs:

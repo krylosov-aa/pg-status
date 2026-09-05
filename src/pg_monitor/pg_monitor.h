@@ -140,7 +140,7 @@ typedef enum {
  */
 typedef struct {
   const char *host;                 // immutable after init
-  char *connection_str;             // immutable after init
+  const char *port;                 // immutable after init
   _Atomic uint64_t seq;             // seqlock: odd = writing, even = stable
   _Atomic uint64_t lag_ms;          // protected by seq
   _Atomic uint64_t lag_bytes;       // protected by seq

@@ -222,7 +222,8 @@ down:
 down_all:
 	@exit_code=0; \
 	$(docker-compose) down --remove-orphans || exit_code=$$?; \
-	$(test-docker-compose) --profile pg-status down --volumes --remove-orphans \
+	$(test-docker-compose) --profile pg-status --profile security \
+		down --volumes --remove-orphans \
 		|| exit_code=$$?; \
 	pre_release_containers="$$( \
 		docker ps -q --filter "label=$(PRE_RELEASE_CONTAINER_LABEL)" \
@@ -269,7 +270,8 @@ test_e2e_cleanup:
 			$(E2E_COMPOSE_PROJECT_PREFIX)* ) \
 				$(docker-compose-command) --project-name "$$project" \
 					-f test/docker/docker-compose.yml \
-					--profile pg-status down --volumes --remove-orphans \
+					--profile pg-status --profile security \
+					down --volumes --remove-orphans \
 					|| exit_code=$$?; \
 				;; \
 			*) \
@@ -279,7 +281,8 @@ test_e2e_cleanup:
 	exit $$exit_code
 
 down_test:
-	$(test-docker-compose) --profile pg-status down --volumes --remove-orphans
+	$(test-docker-compose) --profile pg-status --profile security \
+		down --volumes --remove-orphans
 
 1-master:
 	./test/docker/pg-proxy-1_is_master.sh
