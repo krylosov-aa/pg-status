@@ -12,7 +12,7 @@
 /**
  * The maximum number of hosts monitored by pg-status
  */
-enum { MAX_HOSTS = 10 };
+enum { MAX_HOSTS = 64 };
 
 /**
  * List of all monitoring parameters
