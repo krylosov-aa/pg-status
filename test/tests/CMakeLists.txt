@@ -264,6 +264,7 @@ set(PG_STATUS_API_TEST_CASES
         status_ignores_accept
         snapshot_consistency
         status_dead
+        status_possible_dead
         missing_master_text
         missing_master_json
         missing_replica

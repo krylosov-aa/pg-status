@@ -173,17 +173,17 @@ static void test_hosts(void) {
   );
   char *expected_json = format_string(
     "["
-    "{\"host\":\"%s\",\"master\":true,\"alive\":true,"
+    "{\"host\":\"%s\",\"master\":true,\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true,"
     "\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"},"
-    "{\"host\":\"%s\",\"master\":false,\"alive\":true,"
+    "{\"host\":\"%s\",\"master\":false,\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true,"
     "\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"},"
-    "{\"host\":\"%s\",\"master\":false,\"alive\":false,"
+    "{\"host\":\"%s\",\"master\":false,\"possible_dead\":true,\"alive\":false,"
     "\"lag_ms\":null,\"sync_by_time\":false,\"lag_bytes\":null,"
     "\"sync_by_bytes\":false,\"lsn\":null}"
     "]",
@@ -218,7 +218,7 @@ static void test_hosts_ignores_accept(void) {
   );
   char *master_lsn = fixture_pg_status_format_expected_lsn(master.snapshot.lsn);
   char *expected_json = format_string(
-    "[{\"host\":\"%s\",\"master\":true,\"alive\":true,"
+    "[{\"host\":\"%s\",\"master\":true,\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}]",
     master.host, master.snapshot.lag_ms, master.snapshot.lag_bytes, master_lsn
@@ -258,7 +258,8 @@ static void test_status_alive(void) {
   char *path = format_string("/status?host=%s", replica.host);
   char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
   char *expected_json = format_string(
-    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
+    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "%" PRIu64
     ","
     "\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ","
@@ -299,8 +300,8 @@ static void test_status_mixed_sync(void) {
   char *path = format_string("/status?host=%s", replica.host);
   char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
   char *expected_json = format_string(
-    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
-    ",\"sync_by_time\":false,\"lag_bytes\":%" PRIu64
+    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "%" PRIu64 ",\"sync_by_time\":false,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
     replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
   );
@@ -337,8 +338,8 @@ static void test_status_max_lsn(void) {
   char *path = format_string("/status?host=%s", replica.host);
   char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
   char *expected_json = format_string(
-    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
-    ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
+    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
     replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
   );
@@ -375,8 +376,8 @@ static void test_status_ignores_accept(void) {
   char *path = format_string("/status?host=%s", replica.host);
   char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
   char *expected_json = format_string(
-    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
-    ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
+    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
     replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
   );
@@ -417,14 +418,14 @@ static void test_snapshot_consistency(void) {
   char *first_lsn = fixture_pg_status_format_expected_lsn(first.snapshot.lsn);
   char *second_lsn = fixture_pg_status_format_expected_lsn(second.snapshot.lsn);
   char *first_json = format_string(
-    "{\"master\":false,\"alive\":true,\"lag_ms\":%" PRIu64
-    ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
+    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
     first.snapshot.lag_ms, first.snapshot.lag_bytes, first_lsn
   );
   char *second_json = format_string(
-    "{\"master\":true,\"alive\":true,\"lag_ms\":%" PRIu64
-    ",\"sync_by_time\":false,\"lag_bytes\":%" PRIu64
+    "{\"master\":true,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "%" PRIu64 ",\"sync_by_time\":false,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":false,\"lsn\":\"%s\"}",
     second.snapshot.lag_ms, second.snapshot.lag_bytes, second_lsn
   );
@@ -488,10 +489,49 @@ static void test_status_dead(void) {
   // Assert
   fixture_pg_status_expect_json(
     &response, 200,
-    "{\"master\":false,\"alive\":false,\"lag_ms\":null,"
+    "{\"master\":false,\"possible_dead\":true,\"alive\":false,\"lag_ms\":null,"
     "\"sync_by_time\":false,\"lag_bytes\":null,"
     "\"sync_by_bytes\":false,\"lsn\":null}"
   );
+
+  // Cleanup
+  free(path);
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_status_possible_dead(void) {
+  // Arrange
+  parameters.sync_max_lag_ms = 100;
+  parameters.sync_max_lag_bytes = 1000;
+  TestHost possible_dead_replica = fixture_pg_status_possible_dead_replica_host(
+    "replica", 50, 500, 0x450
+  );
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    possible_dead_replica,
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  char *path = format_string("/status?host=%s", possible_dead_replica.host);
+  const char *expected_json = format_string(
+    "{\"master\":false,\"alive\":true,\"possible_dead\":true,"
+    "\"lag_ms\":%" PRIu64
+    ",\"sync_by_time\":true"
+    ",\"lag_bytes\":%" PRIu64
+    ",\"sync_by_bytes\":true"
+    ",\"lsn\":\"%s\"}",
+    possible_dead_replica.snapshot.lag_ms,
+    possible_dead_replica.snapshot.lag_bytes,
+    fixture_pg_status_format_expected_lsn(possible_dead_replica.snapshot.lsn)
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, path, nullptr);
+
+  // Assert
+  fixture_pg_status_expect_json(&response, 200, expected_json);
 
   // Cleanup
   free(path);
@@ -1811,12 +1851,12 @@ static void test_master_switch_hosts(void) {
   );
   char *expected_json = format_string(
     "["
-    "{\"host\":\"%s\",\"master\":false,\"alive\":true,"
+    "{\"host\":\"%s\",\"master\":false,\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true,"
     "\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"},"
-    "{\"host\":\"%s\",\"master\":true,\"alive\":true,"
+    "{\"host\":\"%s\",\"master\":true,\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true,"
     "\"lag_bytes\":%" PRIu64
@@ -1906,6 +1946,7 @@ static const struct {
   {"status_ignores_accept", test_status_ignores_accept},
   {"snapshot_consistency", test_snapshot_consistency},
   {"status_dead", test_status_dead},
+  {"status_possible_dead", test_status_possible_dead},
   {"missing_master_text", test_missing_master_text},
   {"missing_master_json", test_missing_master_json},
   {"missing_replica", test_missing_replica},

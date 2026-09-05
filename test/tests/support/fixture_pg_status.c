@@ -54,7 +54,7 @@ TestHost fixture_pg_status_dead_host(const char *name) {
   return (TestHost){
     .host = name,
     .snapshot = {
-      .status = {.master = false, .alive = false, .possible_dead = false},
+      .status = {.master = false, .alive = false, .possible_dead = true},
       .lag_ms = 0,
       .lag_bytes = 0,
       .lsn = 0,

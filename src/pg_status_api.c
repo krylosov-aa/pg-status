@@ -25,6 +25,7 @@ static void add_host_status_to_json(
 ) {
   add_bool_to_json_object(json_obj, "master", snap.status.master);
   add_bool_to_json_object(json_obj, "alive", snap.status.alive);
+  add_bool_to_json_object(json_obj, "possible_dead", snap.status.possible_dead);
   if (snap.status.alive) {
     add_uint64_to_json_object(json_obj, "lag_ms", snap.lag_ms);
     add_bool_to_json_object(

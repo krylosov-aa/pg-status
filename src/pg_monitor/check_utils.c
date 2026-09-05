@@ -492,7 +492,7 @@ static bool start_connect(MonitorHost *host) {
 static void reset_iter_state(MonitorHost *host, const uint64_t now_ms) {
   host->iter_data_ready = false;
   host->iter_new_status = (MonitorStatus){
-    .alive = false, .master = false, .possible_dead = false
+    .alive = false, .master = false, .possible_dead = true
   };
   host->iter_new_lag_ms = 0;
   host->iter_new_lag_bytes = 0;
