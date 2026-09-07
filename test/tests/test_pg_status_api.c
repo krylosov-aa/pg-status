@@ -571,6 +571,103 @@ static void test_status_possible_dead(void) {
   fixture_pg_status_stop(&api);
 }
 
+static void test_poll_failure_preserves_measurements(void) {
+  // Arrange
+  parameters.max_fails = 3;
+  parameters.sync_max_lag_ms = 1000;
+  parameters.sync_max_lag_bytes = 1000;
+  const TestHost replica = fixture_pg_status_replica_host(
+    "replica", 5000, 2000, UINT64_C(0x103000060)
+  );
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    replica,
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  MonitorHost *host = &monitor_host_list[1];
+
+  for (unsigned int failures = 1; failures <= parameters.max_fails + 1;
+       failures++) {
+    // Act: exercise the real failed-iteration path, including the dead state.
+    timeout_host_poll(host, monotonic_ms());
+
+    // Assert
+    const bool alive = failures < parameters.max_fails;
+    const MonitorSnapshot actual = atomic_get_snapshot(host);
+    http_test_assert_true(
+      actual.lag_ms == replica.snapshot.lag_ms &&
+        actual.lag_bytes == replica.snapshot.lag_bytes &&
+        actual.lsn == replica.snapshot.lsn,
+      "failed poll discarded the last successful measurements"
+    );
+    http_test_assert_true(
+      actual.status.alive == alive && actual.status.possible_dead &&
+        !actual.status.master && host->failed_connections == failures,
+      "failed poll did not preserve the failure threshold behavior"
+    );
+
+    TestHTTPResponse status = http_test_get(
+      api.port, "/status?host=replica", nullptr
+    );
+    fixture_pg_status_expect_json(
+      &status, 200,
+      alive ? "{\"dc\":null,\"geo\":null,\"master\":false,\"alive\":true,"
+              "\"possible_dead\":true,\"lag_ms\":5000,\"lag_bytes\":2000,"
+              "\"sync_by_time\":false,\"sync_by_bytes\":false,\"lsn\":\"1/"
+              "3000060\"}"
+            : "{\"dc\":null,\"geo\":null,\"master\":false,\"alive\":false,"
+              "\"possible_dead\":true,\"lag_ms\":null,\"lag_bytes\":null,"
+              "\"sync_by_time\":false,\"sync_by_bytes\":false,\"lsn\":null}"
+    );
+    http_test_response_free(&status);
+
+    TestHTTPResponse selection = http_test_get(
+      api.port, "/replica?min_lsn=1/3000060", nullptr
+    );
+    fixture_pg_status_expect_text(
+      &selection, 200, alive ? "replica" : "master"
+    );
+    http_test_response_free(&selection);
+  }
+
+  // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
+static void test_poll_failure_does_not_promote_lagging_replica(void) {
+  // Arrange
+  parameters.max_fails = 3;
+  parameters.sync_max_lag_ms = 1000;
+  parameters.sync_max_lag_bytes = 1000;
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host("replica", 5000, 2000, 0x450),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  const char *paths[] = {
+    "/sync_by_time",          "/sync_by_bytes",
+    "/sync_by_time_or_bytes", "/sync_by_time_and_bytes",
+    "/most_sync_by_bytes",    "/replica?lag_ms=1000&lag_bytes=1000",
+  };
+
+  // Act
+  timeout_host_poll(&monitor_host_list[1], monotonic_ms());
+
+  // Assert: a failed measurement must not make the replica eligible.
+  for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+    TestHTTPResponse response = http_test_get(api.port, paths[i], nullptr);
+    fixture_pg_status_expect_text(&response, 200, "master");
+    http_test_response_free(&response);
+  }
+
+  // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
 static void test_missing_master_text(void) {
   // Arrange
   const TestHost hosts[] = {fixture_pg_status_dead_host("dead")};
@@ -2199,6 +2296,10 @@ static const struct {
   {"snapshot_consistency", test_snapshot_consistency},
   {"status_dead", test_status_dead},
   {"status_possible_dead", test_status_possible_dead},
+  {"poll_failure_preserves_measurements",
+   test_poll_failure_preserves_measurements},
+  {"poll_failure_does_not_promote_lagging_replica",
+   test_poll_failure_does_not_promote_lagging_replica},
   {"missing_master_text", test_missing_master_text},
   {"missing_master_json", test_missing_master_json},
   {"missing_replica", test_missing_replica},

@@ -517,6 +517,13 @@ host selection:
   Consequently, load-balancing fairness may be temporarily reduced while a
   host remains in this state.
 
+Failed checks preserve the last successfully measured `lag_ms`, `lag_bytes`,
+and `lsn`. While the host is possibly dead, lag and LSN filters use these
+last known values. A failed check does not make a lagging replica appear
+synchronous. Once the host is marked dead, it is excluded from selection,
+and the HTTP API returns `null` for its lag and LSN fields. A successful check
+updates the measurements and clears the failure counter and possibly dead state.
+
 ### Split-brain
 
 With client-side master detection, pg-status cannot determine which host

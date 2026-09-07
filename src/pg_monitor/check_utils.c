@@ -309,16 +309,18 @@ static bool parse_result(MonitorHost *host, const PGresult *res) {
 /**
  * Closes out one poll iteration. On success, publishes the staged data;
  * on failure, bumps failed_connections, marks possible_dead (or dead),
- * and closes the connection so the next iteration will reconnect.
+ * preserves the last successful measurements, and closes the connection
+ * so the next iteration will reconnect.
  * Always returns the host to IDLE and schedules the next iteration
  * `sleep_ms` into the future.
  */
 static void finish_iteration(
   MonitorHost *host, const bool success, const uint64_t now_ms
 ) {
-  const MonitorStatus old_status = atomic_get_status(host);
-  const uint64_t old_lag_ms = atomic_get_lag_ms(host);
-  const uint64_t old_lag_bytes = atomic_get_lag_bytes(host);
+  const MonitorSnapshot old_snapshot = atomic_get_snapshot(host);
+  const MonitorStatus old_status = old_snapshot.status;
+  const uint64_t old_lag_ms = old_snapshot.lag_ms;
+  const uint64_t old_lag_bytes = old_snapshot.lag_bytes;
 
   MonitorStatus new_status;
   uint64_t new_lag_ms;
@@ -343,9 +345,9 @@ static void finish_iteration(
       new_status = dead_status();
       reached_dead_threshold = host->failed_connections == failure_limit;
     }
-    new_lag_ms = 0;
-    new_lag_bytes = 0;
-    new_lsn = 0;
+    new_lag_ms = old_lag_ms;
+    new_lag_bytes = old_lag_bytes;
+    new_lsn = old_snapshot.lsn;
     close_conn(host);
   }
 

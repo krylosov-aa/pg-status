@@ -158,12 +158,14 @@ typedef enum {
  *  Concurrency model: one writer (the poll thread) and many readers
  *  (HTTP handlers). The fields {status, lag_ms, lag_bytes, lsn}
  *  together describe a host and must be read as a consistent snapshot —
- *  otherwise routing endpoints could see, e.g., the old (alive) status
- *  with the new (zeroed) lags and return a dead host as a "sync replica".
+ *  otherwise routing endpoints could combine an old role with measurements
+ *  from a newer poll and select a host using inconsistent data.
  *
  *  `lsn` is the latest WAL position known to this host as of the
  *  last successful poll: `pg_last_wal_replay_lsn()` on a replica,
  *  `pg_current_wal_lsn()` on a master.
+ *  Failed polls preserve the last successful lags and LSN, including when
+ *  the host is marked dead. The HTTP API hides these values for dead hosts.
  *
  *  A seqlock protects the snapshot:
  *  - Writer increments `seq` to odd, writes the four fields, then

@@ -347,6 +347,8 @@ set(PG_STATUS_API_TEST_CASES
         snapshot_consistency
         status_dead
         status_possible_dead
+        poll_failure_preserves_measurements
+        poll_failure_does_not_promote_lagging_replica
         missing_master_text
         missing_master_json
         missing_replica
