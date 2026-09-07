@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "common_support.h"
 #include "connection.h"
@@ -146,6 +147,11 @@ static void test_tls_environment(void) {
 static void run_monitor_with_secret(void) {
   pg_status_log_init();
   start_pg_monitor();
+  const struct timespec delay = {.tv_sec = 0, .tv_nsec = 1000000};
+  for (unsigned int i = 0; i < 5000 && !is_pg_monitor_ready(); i++) {
+    (void)nanosleep(&delay, nullptr);
+  }
+  support_assert_true(is_pg_monitor_ready(), "monitor did not finish warmup");
   stop_pg_monitor();
   pg_status_log_shutdown();
 }

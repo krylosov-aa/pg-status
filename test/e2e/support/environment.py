@@ -96,9 +96,9 @@ class E2EEnvironment:
         )
         self._monitor = MonitorClient(self._readiness.discover_port())
         self.waiter.until(
-            "pg-status HTTP startup",
-            lambda: self.monitor.text("/version"),
-            lambda version: bool(version.strip()),
+            "pg-status monitor readiness",
+            lambda: self.monitor.text("/ready"),
+            lambda body: body == "OK",
         )
 
     def close(self, tests_passed: bool) -> None:

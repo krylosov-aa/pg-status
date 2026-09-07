@@ -21,12 +21,20 @@ To learn why this project exists and what problem it solves, read
 ## Usage
 
 Run pg-status alongside your main service or on any host that can reach the
-PostgreSQL servers. The HTTP API becomes available after the initial status
-check of every configured host has completed.
+PostgreSQL servers. The HTTP server starts immediately, without waiting for
+PostgreSQL checks. `/live` and `/version` are available immediately. `/ready`
+and all host-information endpoints return HTTP 503 until the initial status
+check of every configured host has completed, successfully or with an error
+or timeout. After that, they serve the current monitoring state.
 
 ### API
 
 The service provides several HTTP endpoints for retrieving host information.
+
+While the monitor is not ready, `/ready` and all host-information endpoints
+return HTTP 503 Service Unavailable with
+`{"error_text": "pg_monitor is not ready"}`, regardless of the `Accept` header.
+Readiness is checked before endpoint query-parameter validation.
 
 Host-selection endpoints support two response formats: plain text and JSON.
 These endpoints are `/master`, `/replica`, `/sync_by_*`, and
@@ -272,7 +280,24 @@ Example: `http://127.0.0.1:8000/status?host=host-1`
 
 #### `GET /version`
 
-Returns the pg-status semantic version as plain text.
+Returns the pg-status semantic version as plain text, including during startup.
+
+#### `GET /live`
+
+Returns HTTP 200 with the plain-text body `OK` as soon as the HTTP server is
+running. This endpoint reports that pg-status has started and does not depend
+on monitor readiness or PostgreSQL availability.
+
+#### `GET /ready`
+
+Returns HTTP 503 while the monitor is warming up, and HTTP 200 with the
+plain-text body `OK` once every configured host has completed its first check.
+The rest of the monitoring API becomes available at the same time.
+
+Readiness does not require a live master or any live PostgreSQL host. Failed
+checks and timeouts count as completed checks; subsequent PostgreSQL outages
+are reported through the regular host status and selection endpoints without
+making pg-status unready.
 
 ### Parameters
 

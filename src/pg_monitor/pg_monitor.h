@@ -101,9 +101,15 @@ void set_parameters_from_env(void);
 // ------------------------ Start/Stop monitoring ------------------------
 
 /**
- * Starts a host monitoring thread
+ * Starts a host monitoring thread without waiting for its initial polls.
  */
 void start_pg_monitor(void);
+
+/**
+ * True after every host has completed its first poll (success or failure).
+ * An acquire load publishes initialized parameters and hosts to API readers.
+ */
+bool is_pg_monitor_ready(void);
 
 /**
  * Stops a host monitoring thread

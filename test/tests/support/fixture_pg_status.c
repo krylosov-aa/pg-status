@@ -14,6 +14,12 @@
 
 enum { FORMATTED_LSN_CAPACITY = sizeof("FFFFFFFF/FFFFFFFF") };
 
+// These fixtures publish complete snapshots without running the monitor.
+// Lifecycle tests link the real readiness implementation in pg_monitor.c.
+bool is_pg_monitor_ready(void) {
+  return true;
+}
+
 TestHost fixture_pg_status_master_host(const char *name) {
   return (TestHost){
     .host = name,

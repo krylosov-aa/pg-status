@@ -11,6 +11,8 @@
 
 /**
  * Starts the pg-status HTTP API using the current in-memory monitor state.
+ * /live and /version are available immediately; monitor routes return 503
+ * until is_pg_monitor_ready() publishes the initial state.
  */
 HTTPServer *start_pg_status_api(const char *listen_address, uint16_t port);
 

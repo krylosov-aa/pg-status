@@ -66,10 +66,10 @@ int main(void) {
 
   pg_status_log_init();
 
-  start_pg_monitor();
   HTTPServer *server = start_pg_status_api(
     get_http_listen_address(), get_port()
   );
+  start_pg_monitor();
 
   wait_for_termination_signal(&sigset);
 

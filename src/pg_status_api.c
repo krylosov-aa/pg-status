@@ -12,6 +12,18 @@
 #include "pg_status_version.h"
 #include "utils.h"
 
+static bool require_pg_monitor_ready(HTTPResponse *response) {
+  if (is_pg_monitor_ready()) {
+    return true;
+  }
+  http_response_set_status(response, 503);
+  http_response_set_borrowed_body(
+    response, "{\"error_text\": \"pg_monitor is not ready\"}",
+    "application/json"
+  );
+  return false;
+}
+
 static void add_host_to_json(cJSON *json_obj, const MonitorHost *host) {
   if (!host) {
     add_null_to_json_object(json_obj, "host");
@@ -52,7 +64,9 @@ static void add_host_status_to_json(
 }
 
 static void get_all_hosts(const HTTPRequest *request, HTTPResponse *response) {
-  (void)request;
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   cJSON *arr = json_array();
   for (unsigned int i = 0; i < host_count; i++) {
     const MonitorHost *mon_host = &monitor_host_list[i];
@@ -119,6 +133,9 @@ static bool parse_lag_thresholds(
 static void get_random_replica(
   const HTTPRequest *request, HTTPResponse *response
 ) {
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   LagThresholds thresholds = {
     .max_lag_ms = UINT64_MAX,
     .max_lag_bytes = UINT64_MAX,
@@ -135,12 +152,18 @@ static void get_random_replica(
 }
 
 static void get_master(const HTTPRequest *request, HTTPResponse *response) {
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   return_single_host(request, response, get_master_monitor_host());
 }
 
 static void get_sync_host_by_time(
   const HTTPRequest *request, HTTPResponse *response
 ) {
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   LagThresholds thresholds = lag_thresholds_by_parameters();
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
@@ -154,6 +177,9 @@ static void get_sync_host_by_time(
 static void get_sync_host_by_bytes(
   const HTTPRequest *request, HTTPResponse *response
 ) {
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   LagThresholds thresholds = lag_thresholds_by_parameters();
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
@@ -167,6 +193,9 @@ static void get_sync_host_by_bytes(
 static void get_sync_host_by_time_or_bytes(
   const HTTPRequest *request, HTTPResponse *response
 ) {
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   LagThresholds thresholds = lag_thresholds_by_parameters();
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
@@ -180,6 +209,9 @@ static void get_sync_host_by_time_or_bytes(
 static void get_sync_host_by_time_and_bytes(
   const HTTPRequest *request, HTTPResponse *response
 ) {
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   LagThresholds thresholds = lag_thresholds_by_parameters();
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
@@ -193,6 +225,9 @@ static void get_sync_host_by_time_and_bytes(
 static void get_most_sync_host_by_bytes(
   const HTTPRequest *request, HTTPResponse *response
 ) {
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   LagThresholds thresholds = lag_thresholds_by_parameters();
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
@@ -206,6 +241,9 @@ static void get_most_sync_host_by_bytes(
 static void get_host_status(
   const HTTPRequest *request, HTTPResponse *response
 ) {
+  if (!require_pg_monitor_ready(response)) {
+    return;
+  }
   const char *host = http_request_get_query_param(request, "host");
   if (!host) {
     bad_request(
@@ -229,14 +267,25 @@ static void get_host_status(
   );
 }
 
+static void get_live(const HTTPRequest *request, HTTPResponse *response) {
+  http_response_set_borrowed_body(response, "OK", "text/plain; charset=utf-8");
+}
+
+static void get_ready(const HTTPRequest *request, HTTPResponse *response) {
+  if (require_pg_monitor_ready(response)) {
+    get_live(request, response);
+  }
+}
+
 static void get_version(const HTTPRequest *request, HTTPResponse *response) {
-  (void)request;
   http_response_set_borrowed_body(
     response, PG_STATUS_VERSION, "text/plain; charset=utf-8"
   );
 }
 
 static const Route routes[] = {
+  {.path = "/live", .handler = get_live},
+  {.path = "/ready", .handler = get_ready},
   {.path = "/master", .handler = get_master},
   {.path = "/replica", .handler = get_random_replica},
   {.path = "/hosts", .handler = get_all_hosts},

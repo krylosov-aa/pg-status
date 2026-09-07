@@ -267,7 +267,7 @@ set_tests_properties(
         LABELS functional
         TIMEOUT 15
         ENVIRONMENT
-        "pg_status__hosts=localhost;pg_status__pg_port=,;${PG_STATUS_TEST_ENVIRONMENT}"
+        "pg_status__hosts=localhost;pg_status__pg_port=,;pg_status__http_port=0;${PG_STATUS_TEST_ENVIRONMENT}"
 )
 
 add_library(pg_status_test_support support/fixture_pg_status.c)
@@ -310,6 +310,27 @@ target_link_libraries(
         pg_status_test_support
         utils
 )
+
+add_executable(startup_test test_startup.c)
+target_link_libraries(
+        startup_test PRIVATE
+        common_warnings
+        common_support
+        http_test_support
+        pg_status_api
+        pg_monitor
+        utils
+)
+foreach(TEST_CASE readiness shutdown_during_warmup)
+    add_test(NAME startup.${TEST_CASE} COMMAND startup_test ${TEST_CASE})
+    set_tests_properties(
+            startup.${TEST_CASE}
+            PROPERTIES
+            LABELS functional
+            TIMEOUT 15
+            ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}"
+    )
+endforeach()
 
 set(PG_STATUS_API_TEST_CASES
         version

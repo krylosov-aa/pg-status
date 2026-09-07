@@ -252,7 +252,6 @@ static const MonitorHost *find_replica_round_robin_locality_aware(
   return nullptr;
 }
 
-
 const MonitorHost *find_replica(
   const condition_handler handler, const void *ctx, const char *log_context
 ) {

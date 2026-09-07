@@ -48,9 +48,9 @@ class SecurityTopology:
             _discover_port(self._compose, self._waiter, service),
         )
         self._waiter.until(
-            f"{service} HTTP startup",
-            lambda: monitor.text("/version"),
-            lambda version: bool(version.strip()),
+            f"{service} monitor readiness",
+            lambda: monitor.text("/ready"),
+            lambda body: body == "OK",
         )
         try:
             yield monitor

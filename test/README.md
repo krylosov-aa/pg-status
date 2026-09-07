@@ -15,7 +15,9 @@ ctest --preset debug
 The `debug` and `release` presets are ordinary builds. The `asan` and `tsan`
 presets explicitly enable their respective sanitizer and clang-tidy profiles.
 The functional HTTP API tests are deterministic and do not require PostgreSQL
-or Docker.
+or Docker. Startup tests hold real monitor connections on local TCP listeners
+to verify liveness, readiness, HTTP 503 responses during warmup, and shutdown
+before the initial polls finish.
 
 All local Make targets place their CMake build trees under `cmake-builds/` by
 default. Override the common root with `CMAKE_BUILDS_DIR=<path>` or override

@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <poll.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -17,12 +18,11 @@
 
 static pthread_t monitor_tid;
 
-/**
- * Parameters for start a thread
- */
-static pthread_mutex_t start_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t start_cond = PTHREAD_COND_INITIALIZER;
-static bool pg_monitor_ready = false;
+static atomic_bool pg_monitor_ready = false;
+
+bool is_pg_monitor_ready(void) {
+  return atomic_load_explicit(&pg_monitor_ready, memory_order_acquire);
+}
 
 /**
  * Stop signaling via a pipe.
@@ -204,23 +204,14 @@ static bool pump_one_iteration(void) {
   return true;
 }
 
-static void mark_pg_monitor_ready(void) {
-  pthread_mutex_lock(&start_mutex);
-  pg_monitor_ready = true;
-  pthread_cond_broadcast(&start_cond);
-  pthread_mutex_unlock(&start_mutex);
-}
-
-static void warmup(void) {
+static bool warmup(void) {
   bool keep_running = true;
   while (keep_running && !all_hosts_have_polled()) {
     keep_running = pump_one_iteration();
   }
 
   recompute_master_index();
-  if (!keep_running) {
-    pg_status_log_fatal("monitor", "warmup interrupted");
-  }
+  return keep_running;
 }
 
 /**
@@ -231,15 +222,18 @@ static void *pg_monitor_thread(void *arg) {
   set_parameters_from_env();
   init_monitor_host_list();
 
-  warmup();
-
-  mark_pg_monitor_ready();
-
-  bool keep_running = true;
+  bool keep_running = warmup();
+  if (keep_running) {
+    atomic_store_explicit(&pg_monitor_ready, true, memory_order_release);
+    pg_status_log(
+      PG_STATUS_LOG_INFO, "monitor", "started hosts=%u", host_count
+    );
+  }
   while (keep_running) {
     keep_running = pump_one_iteration();
   }
 
+  atomic_store_explicit(&pg_monitor_ready, false, memory_order_release);
   close_all_host_connections();
   return nullptr;
 }
@@ -264,23 +258,16 @@ void start_pg_monitor(void) {
     );
   }
 
-  pthread_mutex_lock(&start_mutex);
+  atomic_store_explicit(&pg_monitor_ready, false, memory_order_release);
   const int started = pthread_create(
     &monitor_tid, nullptr, pg_monitor_thread, nullptr
   );
 
   if (started != 0) {
-    pthread_mutex_unlock(&start_mutex);
     pg_status_log_system_fatal(
       "monitor", started, "failed to start monitor thread"
     );
   }
-
-  while (!pg_monitor_ready) {
-    pthread_cond_wait(&start_cond, &start_mutex);
-  }
-  pthread_mutex_unlock(&start_mutex);
-  pg_status_log(PG_STATUS_LOG_INFO, "monitor", "started hosts=%u", host_count);
 }
 
 /**
