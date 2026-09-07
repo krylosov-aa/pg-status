@@ -58,6 +58,11 @@ services:
       TSAN_OPTIONS: "halt_on_error=1"
       pg_status__connect_timeout: "1"
       pg_status__hosts: "pg-proxy-1,pg-proxy-2,pg-proxy-3"
+      pg_status__hosts_dc: "e2e-dc,e2e-dc,e2e-dc"
+      pg_status__hosts_geo: "e2e-geo,e2e-geo,e2e-geo"
+      PG_STATUS_E2E_CURRENT_DC: "e2e-dc"
+      pg_status__current_dc_env: PG_STATUS_E2E_CURRENT_DC
+      pg_status__current_geo: "e2e-geo"
       pg_status__pg_database: postgres
       pg_status__pg_password: postgres
       pg_status__pg_user: postgres

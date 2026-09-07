@@ -62,6 +62,14 @@ TestHost fixture_pg_status_dead_host(const char *name) {
   };
 }
 
+TestHost fixture_pg_status_host_with_locality(
+  TestHost host, const char *dc, const char *geo
+) {
+  host.dc = dc;
+  host.geo = geo;
+  return host;
+}
+
 char *fixture_pg_status_format_expected_lsn(const uint64_t lsn) {
   char *formatted_lsn = malloc(FORMATTED_LSN_CAPACITY);
   http_test_assert_true(formatted_lsn != nullptr, "expected LSN allocation");
@@ -115,8 +123,18 @@ PgStatusApiFixture fixture_pg_status_start(
     http_test_fail("invalid test host count");
   }
   host_count = (unsigned int)count;
+  parameters.dc_locality_enabled = count > 0 && parameters.current_dc &&
+                                   *parameters.current_dc;
+  parameters.geo_locality_enabled = count > 0 && parameters.current_geo &&
+                                    *parameters.current_geo;
   for (size_t i = 0; i < count; i++) {
     monitor_host_list[i].host = hosts[i].host;
+    monitor_host_list[i].dc = hosts[i].dc;
+    monitor_host_list[i].geo = hosts[i].geo;
+    parameters.dc_locality_enabled = parameters.dc_locality_enabled &&
+                                     hosts[i].dc && *hosts[i].dc;
+    parameters.geo_locality_enabled = parameters.geo_locality_enabled &&
+                                      hosts[i].geo && *hosts[i].geo;
     publish_monitor_snapshot(&monitor_host_list[i], hosts[i].snapshot);
   }
   save_master_index(master_index);

@@ -3,7 +3,7 @@
 from support.config import PROXIES
 from support.monitor import MonitorClient
 
-STABLE_STATUS_FIELDS = ("master", "alive", "lsn")
+STABLE_STATUS_FIELDS = ("master", "alive", "lsn", "dc", "geo")
 
 
 def test_status_matches_hosts_snapshot(monitor: MonitorClient) -> None:

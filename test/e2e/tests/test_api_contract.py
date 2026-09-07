@@ -5,7 +5,7 @@ from types import MappingProxyType
 from typing import cast
 
 from support import api_helpers as helpers
-from support.config import PROXIES
+from support.config import LOCALITY_DC, LOCALITY_GEO, PROXIES
 from support.monitor import MonitorClient, index_hosts
 
 ACCEPT_JSON_HEADER = MappingProxyType({"Accept": "application/json"})
@@ -13,7 +13,7 @@ ACCEPT_TEXT_HEADER = MappingProxyType({"Accept": "text/plain"})
 ALIVE_FIELD = "alive"
 BOOL_FIELDS = ("master", ALIVE_FIELD, "sync_by_time", "sync_by_bytes")
 NULLABLE_NUMERIC_FIELDS = ("lag_ms", "lag_bytes")
-NULLABLE_STRING_FIELDS = ("lsn",)
+NULLABLE_STRING_FIELDS = ("lsn", helpers.DC_FIELD, helpers.GEO_FIELD)
 
 
 def _is_none_of_type(payload_value: object, value_type: type[object]) -> bool:
@@ -68,12 +68,19 @@ def test_hosts_contract(monitor: MonitorClient) -> None:
 
     # Assert
     assert set(hosts) == set(PROXIES)
-    assert all(
-        payload[helpers.HOST_FIELD] == host_name
-        and {"lsn", "lag_ms", "lag_bytes", "host"}.issubset(payload)
-        and _status_payload_is_valid(payload)
-        for host_name, payload in hosts.items()
-    )
+    for host_name, payload in hosts.items():
+        assert payload[helpers.HOST_FIELD] == host_name
+        assert {
+            "lsn",
+            "lag_ms",
+            "lag_bytes",
+            helpers.HOST_FIELD,
+            helpers.DC_FIELD,
+            helpers.GEO_FIELD,
+        }.issubset(payload)
+        assert payload[helpers.DC_FIELD] == LOCALITY_DC
+        assert payload[helpers.GEO_FIELD] == LOCALITY_GEO
+        assert _status_payload_is_valid(payload)
     assert len(text_accept_payload) == expected_count
 
 
@@ -92,16 +99,22 @@ def test_host_selection_routes(monitor: MonitorClient) -> None:
 
     # Act
     text_hosts = tuple(monitor.text(route) for route in host_routes)
-    json_hosts = tuple(
+    json_selections = tuple(
         helpers.parse_json_object(
             monitor.request(route, headers=ACCEPT_JSON_HEADER)[1],
             route,
-        )[helpers.HOST_FIELD]
+        )
         for route in host_routes
     )
 
     # Assert
-    assert all(host in PROXIES for host in (*text_hosts, *json_hosts))
+    assert all(host in PROXIES for host in text_hosts)
+    assert all(
+        selection[helpers.HOST_FIELD] in PROXIES
+        and selection[helpers.DC_FIELD] == LOCALITY_DC
+        and selection[helpers.GEO_FIELD] == LOCALITY_GEO
+        for selection in json_selections
+    )
 
 
 def test_master_is_text_and_json(monitor: MonitorClient) -> None:
@@ -121,7 +134,11 @@ def test_master_is_text_and_json(monitor: MonitorClient) -> None:
 
     # Assert
     assert host in expected_hosts
-    assert payload == {helpers.HOST_FIELD: host}
+    assert payload == {
+        helpers.HOST_FIELD: host,
+        helpers.DC_FIELD: LOCALITY_DC,
+        helpers.GEO_FIELD: LOCALITY_GEO,
+    }
 
 
 def test_status_payload_types_for_all_hosts(monitor: MonitorClient) -> None:

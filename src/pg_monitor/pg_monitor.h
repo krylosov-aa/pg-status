@@ -30,6 +30,36 @@ typedef struct {
   // pg hosts, comma-separated.
   const char *hosts;
 
+  // DC of each pg host, comma-separated and positional to `hosts`.
+  const char *hosts_dc;
+
+  // Geo of each pg host, comma-separated and positional to `hosts`.
+  const char *hosts_geo;
+
+  // Effective DC of this pg-status instance.
+  const char *current_dc;
+
+  // Name of an environment variable containing the current DC.
+  const char *current_dc_env;
+
+  // Whether any DC locality environment parameter was present.
+  bool dc_locality_configured;
+
+  // Whether complete DC locality data was validated during startup.
+  bool dc_locality_enabled;
+
+  // Effective geo of this pg-status instance.
+  const char *current_geo;
+
+  // Name of an environment variable containing the current geo.
+  const char *current_geo_env;
+
+  // Whether any geo locality environment parameter was present.
+  bool geo_locality_configured;
+
+  // Whether complete geo locality data was validated during startup.
+  bool geo_locality_enabled;
+
   // pg port. You can specify multiple ports, comma-separated.
   const char *port;
 
@@ -141,6 +171,8 @@ typedef enum {
 typedef struct {
   const char *host;                 // immutable after init
   const char *port;                 // immutable after init
+  const char *dc;                   // immutable after init, or NULL
+  const char *geo;                  // immutable after init, or NULL
   _Atomic uint64_t seq;             // seqlock: odd = writing, even = stable
   _Atomic uint64_t lag_ms;          // protected by seq
   _Atomic uint64_t lag_bytes;       // protected by seq
@@ -194,9 +226,9 @@ void save_master_index(int i);
 // ------------------------ Lookup utils ------------------------
 
 /**
- * Atomic acquisition of the current master
+ * Returns the current master object, or NULL when no master is known.
  */
-const char *get_master_host(void);
+const MonitorHost *get_master_monitor_host(void);
 
 /**
  * Atomically returns MonitorStatus
@@ -237,19 +269,24 @@ typedef bool (*condition_handler)(
 );
 
 /**
- * Searches for a replica host that matches the given condition using the
- * round-robin algorithm. Prefers a fully alive match; falls back to a
+ * Same selection as find_replica_round_robin(), but returns the selected
+ * host object so callers can access immutable endpoint metadata.
+ */
+/**
+ * Searches for a replica host that matches the given condition. Within each
+ * health class, prefers the current DC, then the current geo, then uses the
+ * existing round-robin order. Prefers a fully alive match; falls back to a
  * `possible_dead` match if no alive replica satisfies the handler. If no
- * replica matches at all, returns the current master as a fallback,
- * or nullptr if there is no master either.
+ * replica matches at all, returns the current master as a fallback, or nullptr
+ * if there is no master either.
  * @param handler A function that determines whether the specified host
  * matches
  * @param ctx Opaque context forwarded to the handler
  * @param log_context The context that will be visible in the logs
- * @return Host name matching the condition, or the master as a fallback, or
+ * @return Host object matching the condition, or the master as a fallback, or
  * nullptr if no host is available
  */
-const char *find_replica_round_robin(
+const MonitorHost *find_replica(
   condition_handler handler, const void *ctx, const char *log_context
 );
 
@@ -321,10 +358,10 @@ typedef struct {
  * the current master, or nullptr if there is no master.
  * @param thresholds Lag thresholds the replica must satisfy
  * @param log_context The context that will be visible in the logs
- * @return Host name of the most byte-synchronous replica, or the master
+ * @return Host object of the most byte-synchronous replica, or the master
  * as a fallback, or nullptr if no host is available
  */
-const char *find_most_sync_replica_by_bytes(
+const MonitorHost *find_most_sync_replica_by_bytes(
   const LagThresholds *thresholds, const char *log_context
 );
 

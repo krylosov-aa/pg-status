@@ -8,6 +8,14 @@ services:
       - pg_status__http_listen_address=${pg_status__http_listen_address}
       - pg_status__connect_timeout=${pg_status__connect_timeout}
       - pg_status__hosts=${pg_status__hosts}
+      - pg_status__hosts_dc
+      - pg_status__current_dc
+      - pg_status__current_dc_env
+      - PLATFORM_DC
+      - pg_status__hosts_geo
+      - pg_status__current_geo
+      - pg_status__current_geo_env
+      - PLATFORM_GEO
       - pg_status__pg_database=${pg_status__pg_database}
       - pg_status__pg_password=${pg_status__pg_password}
       - pg_status__pg_user=${pg_status__pg_user}

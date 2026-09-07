@@ -12,6 +12,8 @@
 
 typedef struct {
   const char *host;
+  const char *dc;
+  const char *geo;
   MonitorSnapshot snapshot;
 } TestHost;
 
@@ -36,6 +38,9 @@ TestHost fixture_pg_status_possible_dead_replica_host(
   const char *name, uint64_t lag_ms, uint64_t lag_bytes, uint64_t lsn
 );
 TestHost fixture_pg_status_dead_host(const char *name);
+TestHost fixture_pg_status_host_with_locality(
+  TestHost host, const char *dc, const char *geo
+);
 char *fixture_pg_status_format_expected_lsn(uint64_t lsn);
 void fixture_pg_status_snapshot_publisher_start(
   PgStatusSnapshotPublisher *publisher, MonitorHost *host,

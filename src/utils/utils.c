@@ -320,6 +320,19 @@ void add_str_to_json_object(cJSON *obj, const char *key, const char *val) {
 }
 
 /**
+ * Adds a new key and nullable string value to json
+ */
+void add_nullable_str_to_json_object(
+  cJSON *json_obj, const char *name, const char *value
+) {
+  if (value) {
+    add_str_to_json_object(json_obj, name, value);
+  } else {
+    add_null_to_json_object(json_obj, name);
+  }
+}
+
+/**
  * Adds a new key with value null to json
  */
 void add_null_to_json_object(cJSON *obj, const char *key) {

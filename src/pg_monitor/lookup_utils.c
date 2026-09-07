@@ -10,33 +10,18 @@
 #include "pg_monitor.h"
 #include "utils.h"
 
-/**
- * Atomically returns MonitorStatus
- */
 MonitorStatus atomic_get_status(const MonitorHost *host) {
   return atomic_load_explicit(&host->status, memory_order_relaxed);
 }
 
-/**
- * Atomically returns the host's replication lag in milliseconds
- */
 uint64_t atomic_get_lag_ms(const MonitorHost *host) {
   return atomic_load_explicit(&host->lag_ms, memory_order_relaxed);
 }
 
-/**
- * Atomically returns the host's replication lag in bytes
- */
 uint64_t atomic_get_lag_bytes(const MonitorHost *host) {
   return atomic_load_explicit(&host->lag_bytes, memory_order_relaxed);
 }
 
-/**
- * Reads {status, lag_ms, lag_bytes, lsn} as a consistent snapshot
- * via the seqlock on host->seq. Spins until two reads of seq match and are
- * even (writer not in progress), so the returned values all come from the
- * same writer epoch.
- */
 MonitorSnapshot atomic_get_snapshot(const MonitorHost *host) {
   MonitorSnapshot snap;
   for (;;) {
@@ -64,20 +49,14 @@ MonitorSnapshot atomic_get_snapshot(const MonitorHost *host) {
   }
 }
 
-/**
- * Atomic acquisition of the current master
- */
-const char *get_master_host(void) {
+const MonitorHost *get_master_monitor_host(void) {
   const int master_i = get_master_index();
   if (master_i == -1) {
     return nullptr;
   }
-  return monitor_host_list[master_i].host;
+  return &monitor_host_list[master_i];
 }
 
-/**
- * A function for searching for a host by name
- */
 const MonitorHost *find_host_by_name(const char *host) {
   for (unsigned int i = 0; i < host_count; i++) {
     const MonitorHost *item = &monitor_host_list[i];
@@ -88,11 +67,6 @@ const MonitorHost *find_host_by_name(const char *host) {
   return nullptr;
 }
 
-/**
- * condition_handler that searches for a live replica. When the caller
- * supplies a LagThresholds ctx with a non-zero min_lsn, the replica must
- * also have replayed at least that LSN.
- */
 bool is_alive_replica(
   const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
@@ -108,10 +82,6 @@ bool is_alive_replica(
   return true;
 }
 
-/**
- * condition_handler that searches for a live replica that is considered
- * time-synchronous
- */
 bool is_sync_replica_by_time(
   const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
@@ -122,10 +92,6 @@ bool is_sync_replica_by_time(
   return snap.lag_ms <= thresholds->max_lag_ms;
 }
 
-/**
- * condition_handler that searches for a live replica that is considered
- * byte-synchronous
- */
 bool is_sync_replica_by_bytes(
   const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
@@ -136,10 +102,6 @@ bool is_sync_replica_by_bytes(
   return snap.lag_bytes <= thresholds->max_lag_bytes;
 }
 
-/**
- * condition_handler that searches for a live replica that is considered
- * time-synchronous or byte-synchronous
- */
 bool is_sync_replica_by_time_or_bytes(
   const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
@@ -151,10 +113,6 @@ bool is_sync_replica_by_time_or_bytes(
          snap.lag_bytes <= thresholds->max_lag_bytes;
 }
 
-/**
- * condition_handler that searches for a live replica that is considered
- * time-synchronous and byte-synchronous
- */
 bool is_sync_replica_by_time_and_bytes(
   const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
@@ -201,29 +159,35 @@ static unsigned int next_replica_round_robin(void) {
   return new_cursor;
 }
 
-/**
- * Searches for a replica host that matches the given condition using the
- * round-robin algorithm. Prefers a fully alive match; falls back to a
- * `possible_dead` match if no alive replica satisfies the handler. If no
- * replica matches at all, returns the current master as a fallback,
- * or nullptr if there is no master either.
- * @param handler A function that determines whether the specified host
- * matches
- * @param ctx Opaque context forwarded to the handler
- * @param log_context The context that will be visible in the logs
- * @return Host name matching the condition, or the master as a fallback, or
- * nullptr if no host is available
- */
-const char *find_replica_round_robin(
-  const condition_handler handler, const void *ctx, const char *log_context
-) {
-  if (host_count == 0) {
-    return nullptr;
-  }
+enum {
+  LOCALITY_DC = 0,
+  LOCALITY_GEO = 1,
+  LOCALITY_ANY = 2,
+  LOCALITY_COUNT = 3,
+};
 
+static unsigned int locality_rank(const MonitorHost *host) {
+  if (
+    parameters.dc_locality_enabled &&
+    is_equal_strings(host->dc, parameters.current_dc)
+  ) {
+    return LOCALITY_DC;
+  }
+  if (
+    parameters.geo_locality_enabled &&
+    is_equal_strings(host->geo, parameters.current_geo)
+  ) {
+    return LOCALITY_GEO;
+  }
+  return LOCALITY_ANY;
+}
+
+static const MonitorHost *find_replica_round_robin_plain(
+  const condition_handler handler, const void *ctx
+) {
+  const MonitorHost *possible = nullptr;
   unsigned int cursor = next_replica_round_robin();
   const unsigned int start_cursor = cursor;
-  const MonitorHost *possible_mon_host = nullptr;
 
   do {
     const MonitorHost *mon_host = &monitor_host_list[cursor];
@@ -231,21 +195,84 @@ const char *find_replica_round_robin(
 
     if (handler(snap, mon_host, ctx)) {
       if (!snap.status.possible_dead) {
-        return mon_host->host;
+        return mon_host;
       }
-      if (!possible_mon_host) {
-        possible_mon_host = mon_host;
+      if (!possible) {
+        possible = mon_host;
       }
     }
 
     cursor = next_cursor_in_circle(cursor);
   } while (cursor != start_cursor);
 
-  if (possible_mon_host) {
-    return possible_mon_host->host;
+  return possible;
+}
+
+static const MonitorHost *find_replica_round_robin_locality_aware(
+  const condition_handler handler, const void *ctx
+) {
+  const MonitorHost *alive[LOCALITY_COUNT] = {0};
+  const MonitorHost *possible[LOCALITY_COUNT] = {0};
+  const unsigned int best_rank = parameters.dc_locality_enabled ? LOCALITY_DC
+                                                                : LOCALITY_GEO;
+
+  unsigned int cursor = next_replica_round_robin();
+  const unsigned int start_cursor = cursor;
+
+  do {
+    const MonitorHost *mon_host = &monitor_host_list[cursor];
+    const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
+
+    if (handler(snap, mon_host, ctx)) {
+      const unsigned int rank = locality_rank(mon_host);
+      if (!snap.status.possible_dead && rank == best_rank) {
+        return mon_host;
+      }
+
+      const MonitorHost **candidates = snap.status.possible_dead ? possible
+                                                                 : alive;
+      if (!candidates[rank]) {
+        candidates[rank] = mon_host;
+      }
+    }
+
+    cursor = next_cursor_in_circle(cursor);
+  } while (cursor != start_cursor);
+
+  for (unsigned int rank = 0; rank < LOCALITY_COUNT; rank++) {
+    if (alive[rank]) {
+      return alive[rank];
+    }
+  }
+  for (unsigned int rank = 0; rank < LOCALITY_COUNT; rank++) {
+    if (possible[rank]) {
+      return possible[rank];
+    }
+  }
+  return nullptr;
+}
+
+
+const MonitorHost *find_replica(
+  const condition_handler handler, const void *ctx, const char *log_context
+) {
+  if (host_count == 0) {
+    return nullptr;
   }
 
-  const char *master = get_master_host();
+  const MonitorHost *replica = nullptr;
+
+  if (parameters.dc_locality_enabled || parameters.geo_locality_enabled) {
+    replica = find_replica_round_robin_locality_aware(handler, ctx);
+  } else {
+    replica = find_replica_round_robin_plain(handler, ctx);
+  }
+
+  if (replica) {
+    return replica;
+  }
+
+  const MonitorHost *master = get_master_monitor_host();
   if (master) {
     pg_status_log(
       PG_STATUS_LOG_DEBUG, "selection",
@@ -255,18 +282,7 @@ const char *find_replica_round_robin(
   return master;
 }
 
-/**
- * Searches for the most byte-synchronous replica whose lag still satisfies
- * the byte threshold. Ties are broken by host order. Prefers a
- * fully alive match; falls back to a `possible_dead` match only if no
- * alive replica satisfies the thresholds. If no replica matches, returns
- * the current master, or nullptr if there is no master.
- * @param thresholds Lag thresholds the replica must satisfy
- * @param log_context The context that will be visible in the logs
- * @return Host name of the most byte-synchronous replica, or the master
- * as a fallback, or nullptr if no host is available
- */
-const char *find_most_sync_replica_by_bytes(
+const MonitorHost *find_most_sync_replica_by_bytes(
   const LagThresholds *thresholds, const char *log_context
 ) {
   const MonitorHost *best_alive = nullptr;
@@ -296,13 +312,13 @@ const char *find_most_sync_replica_by_bytes(
   }
 
   if (best_alive) {
-    return best_alive->host;
+    return best_alive;
   }
   if (best_possible) {
-    return best_possible->host;
+    return best_possible;
   }
 
-  const char *master = get_master_host();
+  const MonitorHost *master = get_master_monitor_host();
   if (master) {
     pg_status_log(
       PG_STATUS_LOG_DEBUG, "selection",

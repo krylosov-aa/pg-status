@@ -41,6 +41,8 @@ static void init_monitor_host(
 ) {
   monitor_host->host = copy_string(host);
   monitor_host->port = copy_string(port);
+  monitor_host->dc = nullptr;
+  monitor_host->geo = nullptr;
   monitor_host->failed_connections = 0;
 
   monitor_host->conn = nullptr;
@@ -67,6 +69,70 @@ static void init_monitor_host(
   atomic_store_explicit(&monitor_host->lag_ms, 0, memory_order_relaxed);
   atomic_store_explicit(&monitor_host->lag_bytes, 0, memory_order_relaxed);
   atomic_store_explicit(&monitor_host->lsn, 0, memory_order_relaxed);
+}
+
+static bool locality_values_are_complete(const char *values) {
+  if (!values) {
+    return false;
+  }
+
+  unsigned int count = 0;
+  const char *value = values;
+  for (;;) {
+    const char *separator = strchr(value, ',');
+    const char *end = separator ? separator : value + strlen(value);
+    if (end == value) {
+      return false;
+    }
+    count++;
+    if (!separator) {
+      break;
+    }
+    value = separator + 1;
+  }
+  return count == host_count;
+}
+
+static void assign_locality_values(const char *values, const bool is_dc) {
+  char *items = copy_string(values);
+  char *item = items;
+  for (unsigned int i = 0; i < host_count; i++) {
+    char *separator = strchr(item, ',');
+    if (separator) {
+      *separator = '\0';
+    }
+    if (is_dc) {
+      monitor_host_list[i].dc = copy_string(item);
+    } else {
+      monitor_host_list[i].geo = copy_string(item);
+    }
+    item = separator ? separator + 1 : nullptr;
+  }
+  free(items);
+}
+
+static bool init_locality(
+  const char *label, const char *hosts_parameter_name,
+  const char *current_parameter_name, const char *current_env_parameter_name,
+  const char *values, const char *current, const bool configured,
+  const bool is_dc
+) {
+  const bool values_complete = locality_values_are_complete(values);
+  if (values_complete) {
+    assign_locality_values(values, is_dc);
+  }
+
+  const bool enabled = values_complete && current && *current;
+  if (configured && !enabled) {
+    pg_status_log(
+      PG_STATUS_LOG_WARNING, "config",
+      "%s preference disabled: incomplete locality configuration; set %s "
+      "and %s or %s",
+      label, hosts_parameter_name, current_parameter_name,
+      current_env_parameter_name
+    );
+  }
+  return enabled;
 }
 
 /**
@@ -104,6 +170,17 @@ void init_monitor_host_list(void) {
   if (host_count == 0) {
     pg_status_log_fatal("config", "host count must be greater than 0");
   }
+
+  parameters.dc_locality_enabled = init_locality(
+    "DC", "pg_status__hosts_dc", "pg_status__current_dc",
+    "pg_status__current_dc_env", parameters.hosts_dc, parameters.current_dc,
+    parameters.dc_locality_configured, true
+  );
+  parameters.geo_locality_enabled = init_locality(
+    "geo", "pg_status__hosts_geo", "pg_status__current_geo",
+    "pg_status__current_geo_env", parameters.hosts_geo, parameters.current_geo,
+    parameters.geo_locality_configured, false
+  );
   free(hosts);
   free(ports);
 }

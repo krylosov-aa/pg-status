@@ -53,6 +53,9 @@ PROXIES: Final = (
     "pg-proxy-3",
 )
 
+LOCALITY_DC: Final = "e2e-dc"
+LOCALITY_GEO: Final = "e2e-geo"
+
 BACKENDS: Final = MappingProxyType(
     {
         "primary": "primary",

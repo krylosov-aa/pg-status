@@ -45,6 +45,8 @@ def test_replicas_remain_usable_without_a_master(
         json_response[1], helpers.PATH_MASTER
     ) == {
         helpers.HOST_FIELD: None,
+        helpers.DC_FIELD: None,
+        helpers.GEO_FIELD: None,
     }
     assert selected_replica in {helpers.PROXY_ONE, helpers.PROXY_TWO}
     assert filtered_response == (helpers.HTTP_NOT_FOUND, "")

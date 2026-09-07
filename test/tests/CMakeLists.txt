@@ -38,6 +38,39 @@ foreach(TEST_CASE IN LISTS CONNECTION_TEST_CASES)
     )
 endforeach()
 
+add_executable(locality_test test_locality.c)
+target_link_libraries(
+        locality_test PRIVATE
+        common_warnings
+        common_support
+        logging
+        pg_monitor
+)
+
+set(LOCALITY_TEST_CASES
+        complete_direct_and_indirect
+        no_locality_is_silent
+        empty_locality_is_silent
+        empty_direct_uses_indirect
+        partial_dimensions_warn_independently
+        empty_position_disables_only_dc
+        wrong_cardinality_disables_dc
+        extra_value_disables_geo
+        unresolved_source_warns
+        invalid_and_self_referencing_sources_warn
+)
+
+foreach(TEST_CASE IN LISTS LOCALITY_TEST_CASES)
+    set(TEST_NAME "locality.${TEST_CASE}")
+    add_test(NAME ${TEST_NAME} COMMAND locality_test ${TEST_CASE})
+    set_tests_properties(
+            ${TEST_NAME}
+            PROPERTIES
+            TIMEOUT 15
+            ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}"
+    )
+endforeach()
+
 add_executable(logger_test test_logger.c)
 target_link_libraries(
         logger_test PRIVATE
@@ -308,6 +341,12 @@ set(PG_STATUS_API_TEST_CASES
         unknown_route
         round_robin
         round_robin_master_in_middle
+        locality_prefers_dc_over_geo
+        locality_uses_geo_when_dc_candidate_is_ineligible
+        locality_incomplete_dc_still_uses_geo
+        locality_falls_back_to_round_robin
+        locality_preserves_alive_priority
+        most_sync_ignores_locality
         replica_combined_lag_filters
         replica_lag_ms_fallback
         replica_lag_bytes_fallback

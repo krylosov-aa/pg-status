@@ -69,7 +69,9 @@ static void test_master_text(void) {
   parameters.sync_max_lag_bytes = 1000;
   const char *master_host_name = "master";
   const TestHost hosts[] = {
-    fixture_pg_status_master_host(master_host_name),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_master_host(master_host_name), "frankfurt", "europe"
+    ),
     fixture_pg_status_replica_host("replica", 50, 500, 0x450),
     fixture_pg_status_dead_host("dead"),
   };
@@ -98,14 +100,19 @@ static void test_master_json(void) {
   parameters.sync_max_lag_bytes = 1000;
   const char *master_host_name = "master";
   const TestHost hosts[] = {
-    fixture_pg_status_master_host(master_host_name),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_master_host(master_host_name), "frankfurt", "europe"
+    ),
     fixture_pg_status_replica_host("replica", 50, 500, 0x450),
     fixture_pg_status_dead_host("dead"),
   };
   PgStatusApiFixture api = fixture_pg_status_start(
     hosts, sizeof(hosts) / sizeof(hosts[0]), 0
   );
-  char *expected_json = format_string("{\"host\":\"%s\"}", master_host_name);
+  char *expected_json = format_string(
+    "{\"host\":\"%s\",\"dc\":\"frankfurt\",\"geo\":\"europe\"}",
+    master_host_name
+  );
 
   // Act
   TestHTTPResponse response = http_test_get(
@@ -126,12 +133,18 @@ static void test_replica_json(void) {
   const char *replica_host_name = "replica";
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
-    fixture_pg_status_replica_host(replica_host_name, 50, 500, 0x450),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host(replica_host_name, 50, 500, 0x450),
+      "amsterdam", "europe"
+    ),
   };
   PgStatusApiFixture api = fixture_pg_status_start(
     hosts, sizeof(hosts) / sizeof(hosts[0]), 0
   );
-  char *expected_json = format_string("{\"host\":\"%s\"}", replica_host_name);
+  char *expected_json = format_string(
+    "{\"host\":\"%s\",\"dc\":\"amsterdam\",\"geo\":\"europe\"}",
+    replica_host_name
+  );
 
   // Act
   TestHTTPResponse response = http_test_get(
@@ -154,9 +167,12 @@ static void test_hosts(void) {
   const char *master_host_name = "master";
   const char *replica_host_name = "replica";
   const char *dead_host_name = "dead";
-  const TestHost master = fixture_pg_status_master_host(master_host_name);
-  const TestHost replica = fixture_pg_status_replica_host(
-    replica_host_name, 50, 500, 0x450
+  const TestHost master = fixture_pg_status_host_with_locality(
+    fixture_pg_status_master_host(master_host_name), "frankfurt", "europe"
+  );
+  const TestHost replica = fixture_pg_status_host_with_locality(
+    fixture_pg_status_replica_host(replica_host_name, 50, 500, 0x450),
+    "amsterdam", "europe"
   );
   const TestHost dead = fixture_pg_status_dead_host(dead_host_name);
   const TestHost hosts[] = {
@@ -173,17 +189,22 @@ static void test_hosts(void) {
   );
   char *expected_json = format_string(
     "["
-    "{\"host\":\"%s\",\"master\":true,\"possible_dead\":false,\"alive\":true,"
+    "{\"host\":\"%s\",\"dc\":\"frankfurt\",\"geo\":\"europe\","
+    "\"master\":true,"
+    "\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true,"
     "\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"},"
-    "{\"host\":\"%s\",\"master\":false,\"possible_dead\":false,\"alive\":true,"
+    "{\"host\":\"%s\",\"dc\":\"amsterdam\",\"geo\":\"europe\","
+    "\"master\":false,"
+    "\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true,"
     "\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"},"
-    "{\"host\":\"%s\",\"master\":false,\"possible_dead\":true,\"alive\":false,"
+    "{\"host\":\"%s\",\"dc\":null,\"geo\":null,\"master\":false,"
+    "\"possible_dead\":true,\"alive\":false,"
     "\"lag_ms\":null,\"sync_by_time\":false,\"lag_bytes\":null,"
     "\"sync_by_bytes\":false,\"lsn\":null}"
     "]",
@@ -218,7 +239,8 @@ static void test_hosts_ignores_accept(void) {
   );
   char *master_lsn = fixture_pg_status_format_expected_lsn(master.snapshot.lsn);
   char *expected_json = format_string(
-    "[{\"host\":\"%s\",\"master\":true,\"possible_dead\":false,\"alive\":true,"
+    "[{\"host\":\"%s\",\"dc\":null,\"geo\":null,\"master\":true,"
+    "\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}]",
     master.host, master.snapshot.lag_ms, master.snapshot.lag_bytes, master_lsn
@@ -244,8 +266,9 @@ static void test_status_alive(void) {
   parameters.sync_max_lag_ms = 100;
   parameters.sync_max_lag_bytes = 1000;
   const char *replica_host_name = "replica";
-  const TestHost replica = fixture_pg_status_replica_host(
-    replica_host_name, 50, 500, 0x450
+  const TestHost replica = fixture_pg_status_host_with_locality(
+    fixture_pg_status_replica_host(replica_host_name, 50, 500, 0x450),
+    "amsterdam", "europe"
   );
   const TestHost hosts[] = {
     fixture_pg_status_master_host("master"),
@@ -258,7 +281,9 @@ static void test_status_alive(void) {
   char *path = format_string("/status?host=%s", replica.host);
   char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
   char *expected_json = format_string(
-    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "{\"dc\":\"amsterdam\",\"geo\":\"europe\",\"master\":false,"
+    "\"possible_dead\":false,"
+    "\"alive\":true,\"lag_ms\":"
     "%" PRIu64
     ","
     "\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
@@ -300,7 +325,8 @@ static void test_status_mixed_sync(void) {
   char *path = format_string("/status?host=%s", replica.host);
   char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
   char *expected_json = format_string(
-    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "{\"dc\":null,\"geo\":null,\"master\":false,\"possible_dead\":false,"
+    "\"alive\":true,\"lag_ms\":"
     "%" PRIu64 ",\"sync_by_time\":false,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
     replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
@@ -338,7 +364,8 @@ static void test_status_max_lsn(void) {
   char *path = format_string("/status?host=%s", replica.host);
   char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
   char *expected_json = format_string(
-    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "{\"dc\":null,\"geo\":null,\"master\":false,\"possible_dead\":false,"
+    "\"alive\":true,\"lag_ms\":"
     "%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
     replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
@@ -376,7 +403,8 @@ static void test_status_ignores_accept(void) {
   char *path = format_string("/status?host=%s", replica.host);
   char *lsn = fixture_pg_status_format_expected_lsn(replica.snapshot.lsn);
   char *expected_json = format_string(
-    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "{\"dc\":null,\"geo\":null,\"master\":false,\"possible_dead\":false,"
+    "\"alive\":true,\"lag_ms\":"
     "%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
     replica.snapshot.lag_ms, replica.snapshot.lag_bytes, lsn
@@ -418,13 +446,15 @@ static void test_snapshot_consistency(void) {
   char *first_lsn = fixture_pg_status_format_expected_lsn(first.snapshot.lsn);
   char *second_lsn = fixture_pg_status_format_expected_lsn(second.snapshot.lsn);
   char *first_json = format_string(
-    "{\"master\":false,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "{\"dc\":null,\"geo\":null,\"master\":false,\"possible_dead\":false,"
+    "\"alive\":true,\"lag_ms\":"
     "%" PRIu64 ",\"sync_by_time\":true,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"}",
     first.snapshot.lag_ms, first.snapshot.lag_bytes, first_lsn
   );
   char *second_json = format_string(
-    "{\"master\":true,\"possible_dead\":false,\"alive\":true,\"lag_ms\":"
+    "{\"dc\":null,\"geo\":null,\"master\":true,\"possible_dead\":false,"
+    "\"alive\":true,\"lag_ms\":"
     "%" PRIu64 ",\"sync_by_time\":false,\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":false,\"lsn\":\"%s\"}",
     second.snapshot.lag_ms, second.snapshot.lag_bytes, second_lsn
@@ -489,7 +519,8 @@ static void test_status_dead(void) {
   // Assert
   fixture_pg_status_expect_json(
     &response, 200,
-    "{\"master\":false,\"possible_dead\":true,\"alive\":false,\"lag_ms\":null,"
+    "{\"dc\":null,\"geo\":null,\"master\":false,\"possible_dead\":true,"
+    "\"alive\":false,\"lag_ms\":null,"
     "\"sync_by_time\":false,\"lag_bytes\":null,"
     "\"sync_by_bytes\":false,\"lsn\":null}"
   );
@@ -516,7 +547,8 @@ static void test_status_possible_dead(void) {
   );
   char *path = format_string("/status?host=%s", possible_dead_replica.host);
   const char *expected_json = format_string(
-    "{\"master\":false,\"alive\":true,\"possible_dead\":true,"
+    "{\"dc\":null,\"geo\":null,\"master\":false,\"alive\":true,"
+    "\"possible_dead\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true"
     ",\"lag_bytes\":%" PRIu64
@@ -570,7 +602,9 @@ static void test_missing_master_json(void) {
   );
 
   // Assert
-  fixture_pg_status_expect_json(&response, 404, "{\"host\":null}");
+  fixture_pg_status_expect_json(
+    &response, 404, "{\"host\":null,\"dc\":null,\"geo\":null}"
+  );
 
   // Cleanup
   http_test_response_free(&response);
@@ -623,7 +657,9 @@ static void test_missing_replica_json(void) {
   );
 
   // Assert
-  fixture_pg_status_expect_json(&response, 404, "{\"host\":null}");
+  fixture_pg_status_expect_json(
+    &response, 404, "{\"host\":null,\"dc\":null,\"geo\":null}"
+  );
 
   // Cleanup
   http_test_response_free(&response);
@@ -851,6 +887,220 @@ static void test_round_robin_master_in_middle(void) {
   }
 
   // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
+static void test_locality_prefers_dc_over_geo(void) {
+  // Arrange
+  parameters.current_dc = "frankfurt";
+  parameters.current_geo = "europe";
+  const char *dc_host_name = "dc-replica";
+  const TestHost hosts[] = {
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_master_host("master"), "frankfurt", "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host("geo-replica", 10, 10, 0x490), "amsterdam",
+      "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host(dc_host_name, 20, 20, 0x480), "frankfurt",
+      "north-america"
+    ),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, "/replica", nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, dc_host_name);
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_locality_uses_geo_when_dc_candidate_is_ineligible(void) {
+  // Arrange
+  parameters.current_dc = "frankfurt";
+  parameters.current_geo = "europe";
+  const char *geo_host_name = "geo-replica";
+  const TestHost hosts[] = {
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_master_host("master"), "frankfurt", "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host("stale-dc-replica", 500, 10, 0x490),
+      "frankfurt", "north-america"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host(geo_host_name, 10, 20, 0x480), "amsterdam",
+      "europe"
+    ),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/sync_by_time?lag_ms=100", nullptr
+  );
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, geo_host_name);
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_locality_incomplete_dc_still_uses_geo(void) {
+  // Arrange
+  parameters.current_dc = "frankfurt";
+  parameters.current_geo = "europe";
+  const char *geo_host_name = "geo-replica";
+  const TestHost hosts[] = {
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_master_host("master"), "frankfurt", "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host("partial-dc-replica", 10, 10, 0x490),
+      "frankfurt", "north-america"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host(geo_host_name, 20, 20, 0x480), nullptr,
+      "europe"
+    ),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, "/replica", nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, geo_host_name);
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_locality_falls_back_to_round_robin(void) {
+  // Arrange
+  parameters.current_dc = "unknown-dc";
+  parameters.current_geo = "unknown-geo";
+  const char *first_replica = "replica-1";
+  const char *second_replica = "replica-2";
+  const TestHost hosts[] = {
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_master_host("master"), "frankfurt", "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host(first_replica, 10, 10, 0x490), "amsterdam",
+      "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host(second_replica, 20, 20, 0x480), "virginia",
+      "north-america"
+    ),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+
+  // Act
+  const char *expected[] = {
+    first_replica,
+    second_replica,
+    first_replica,
+    second_replica,
+  };
+  for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
+    TestHTTPResponse response = http_test_get(api.port, "/replica", nullptr);
+
+    // Assert
+    fixture_pg_status_expect_text(&response, 200, expected[i]);
+    http_test_response_free(&response);
+  }
+
+  // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
+static void test_locality_preserves_alive_priority(void) {
+  // Arrange
+  parameters.current_dc = "frankfurt";
+  parameters.current_geo = "europe";
+  const char *alive_host_name = "alive-remote-replica";
+  const TestHost hosts[] = {
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_master_host("master"), "frankfurt", "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_possible_dead_replica_host(
+        "possible-local-replica", 10, 10, 0x490
+      ),
+      "frankfurt", "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host(alive_host_name, 20, 20, 0x480),
+      "amsterdam", "north-america"
+    ),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(api.port, "/replica", nullptr);
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, alive_host_name);
+
+  // Cleanup
+  http_test_response_free(&response);
+  fixture_pg_status_stop(&api);
+}
+
+static void test_most_sync_ignores_locality(void) {
+  // Arrange
+  parameters.current_dc = "frankfurt";
+  parameters.current_geo = "europe";
+  parameters.sync_max_lag_bytes = 1000;
+  const char *lowest_lag_host_name = "lowest-lag-remote-replica";
+  const TestHost hosts[] = {
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_master_host("master"), "frankfurt", "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host("local-replica", 10, 100, 0x490),
+      "frankfurt", "europe"
+    ),
+    fixture_pg_status_host_with_locality(
+      fixture_pg_status_replica_host(lowest_lag_host_name, 20, 10, 0x480),
+      "amsterdam", "north-america"
+    ),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+
+  // Act
+  TestHTTPResponse response = http_test_get(
+    api.port, "/most_sync_by_bytes", nullptr
+  );
+
+  // Assert
+  fixture_pg_status_expect_text(&response, 200, lowest_lag_host_name);
+
+  // Cleanup
+  http_test_response_free(&response);
   fixture_pg_status_stop(&api);
 }
 
@@ -1851,12 +2101,14 @@ static void test_master_switch_hosts(void) {
   );
   char *expected_json = format_string(
     "["
-    "{\"host\":\"%s\",\"master\":false,\"possible_dead\":false,\"alive\":true,"
+    "{\"host\":\"%s\",\"dc\":null,\"geo\":null,\"master\":false,"
+    "\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true,"
     "\"lag_bytes\":%" PRIu64
     ",\"sync_by_bytes\":true,\"lsn\":\"%s\"},"
-    "{\"host\":\"%s\",\"master\":true,\"possible_dead\":false,\"alive\":true,"
+    "{\"host\":\"%s\",\"dc\":null,\"geo\":null,\"master\":true,"
+    "\"possible_dead\":false,\"alive\":true,"
     "\"lag_ms\":%" PRIu64
     ",\"sync_by_time\":true,"
     "\"lag_bytes\":%" PRIu64
@@ -1962,6 +2214,15 @@ static const struct {
   {"unknown_route", test_unknown_route},
   {"round_robin", test_round_robin},
   {"round_robin_master_in_middle", test_round_robin_master_in_middle},
+  {"locality_prefers_dc_over_geo", test_locality_prefers_dc_over_geo},
+  {"locality_uses_geo_when_dc_candidate_is_ineligible",
+   test_locality_uses_geo_when_dc_candidate_is_ineligible},
+  {"locality_incomplete_dc_still_uses_geo",
+   test_locality_incomplete_dc_still_uses_geo},
+  {"locality_falls_back_to_round_robin",
+   test_locality_falls_back_to_round_robin},
+  {"locality_preserves_alive_priority", test_locality_preserves_alive_priority},
+  {"most_sync_ignores_locality", test_most_sync_ignores_locality},
   {"replica_combined_lag_filters", test_replica_combined_lag_filters},
   {"replica_lag_ms_fallback", test_replica_lag_ms_fallback},
   {"replica_lag_bytes_fallback", test_replica_lag_bytes_fallback},

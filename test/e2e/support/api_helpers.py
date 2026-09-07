@@ -30,6 +30,8 @@ PATH_SYNC_TIME_AND_BYTES = "/sync_by_time_and_bytes"
 PATH_MOST_SYNC_BYTES = "/most_sync_by_bytes"
 REQUEST_HOST_ERROR = "Get parameter 'host' wasn't passed"
 HOST_FIELD = "host"
+DC_FIELD = "dc"
+GEO_FIELD = "geo"
 
 
 def parse_json_object(raw_body: str, path: str) -> dict[str, object]:

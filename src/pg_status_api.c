@@ -12,12 +12,14 @@
 #include "pg_status_version.h"
 #include "utils.h"
 
-static void add_host_to_json(cJSON *json_obj, const char *host) {
+static void add_host_to_json(cJSON *json_obj, const MonitorHost *host) {
   if (!host) {
     add_null_to_json_object(json_obj, "host");
   } else {
-    add_str_to_json_object(json_obj, "host", host);
+    add_str_to_json_object(json_obj, "host", host->host);
   }
+  add_nullable_str_to_json_object(json_obj, "dc", host ? host->dc : nullptr);
+  add_nullable_str_to_json_object(json_obj, "geo", host ? host->geo : nullptr);
 }
 
 static void add_host_status_to_json(
@@ -55,7 +57,7 @@ static void get_all_hosts(const HTTPRequest *request, HTTPResponse *response) {
   for (unsigned int i = 0; i < host_count; i++) {
     const MonitorHost *mon_host = &monitor_host_list[i];
     cJSON *json_obj = json_object();
-    add_host_to_json(json_obj, mon_host->host);
+    add_host_to_json(json_obj, mon_host);
 
     const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
     add_host_status_to_json(json_obj, snap);
@@ -68,7 +70,7 @@ static void get_all_hosts(const HTTPRequest *request, HTTPResponse *response) {
 }
 
 static void return_single_host(
-  const HTTPRequest *request, HTTPResponse *response, const char *host
+  const HTTPRequest *request, HTTPResponse *response, const MonitorHost *host
 ) {
   if (!host) {
     http_response_set_status(response, 404);
@@ -82,7 +84,8 @@ static void return_single_host(
     );
   } else {
     http_response_set_borrowed_body(
-      response, host, host ? "text/plain; charset=utf-8" : nullptr
+      response, host ? host->host : nullptr,
+      host ? "text/plain; charset=utf-8" : nullptr
     );
   }
 }
@@ -125,14 +128,14 @@ static void get_random_replica(
     return;
   }
 
-  const char *host = find_replica_round_robin(
+  const MonitorHost *host = find_replica(
     is_sync_replica_by_time_and_bytes, &thresholds, "/replica"
   );
   return_single_host(request, response, host);
 }
 
 static void get_master(const HTTPRequest *request, HTTPResponse *response) {
-  return_single_host(request, response, get_master_host());
+  return_single_host(request, response, get_master_monitor_host());
 }
 
 static void get_sync_host_by_time(
@@ -142,7 +145,7 @@ static void get_sync_host_by_time(
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
   }
-  const char *host = find_replica_round_robin(
+  const MonitorHost *host = find_replica(
     is_sync_replica_by_time, &thresholds, "/sync_by_time"
   );
   return_single_host(request, response, host);
@@ -155,7 +158,7 @@ static void get_sync_host_by_bytes(
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
   }
-  const char *host = find_replica_round_robin(
+  const MonitorHost *host = find_replica(
     is_sync_replica_by_bytes, &thresholds, "/sync_by_bytes"
   );
   return_single_host(request, response, host);
@@ -168,7 +171,7 @@ static void get_sync_host_by_time_or_bytes(
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
   }
-  const char *host = find_replica_round_robin(
+  const MonitorHost *host = find_replica(
     is_sync_replica_by_time_or_bytes, &thresholds, "/sync_by_time_or_bytes"
   );
   return_single_host(request, response, host);
@@ -181,7 +184,7 @@ static void get_sync_host_by_time_and_bytes(
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
   }
-  const char *host = find_replica_round_robin(
+  const MonitorHost *host = find_replica(
     is_sync_replica_by_time_and_bytes, &thresholds, "/sync_by_time_and_bytes"
   );
   return_single_host(request, response, host);
@@ -194,7 +197,7 @@ static void get_most_sync_host_by_bytes(
   if (!parse_lag_thresholds(&thresholds, request, response)) {
     return;
   }
-  const char *host = find_most_sync_replica_by_bytes(
+  const MonitorHost *host = find_most_sync_replica_by_bytes(
     &thresholds, "/most_sync_by_bytes"
   );
   return_single_host(request, response, host);
@@ -218,6 +221,8 @@ static void get_host_status(
 
   const MonitorSnapshot snap = atomic_get_snapshot(mon_host);
   cJSON *json_obj = json_object();
+  add_nullable_str_to_json_object(json_obj, "dc", mon_host->dc);
+  add_nullable_str_to_json_object(json_obj, "geo", mon_host->geo);
   add_host_status_to_json(json_obj, snap);
   http_response_set_owned_body(
     response, json_to_str(json_obj), "application/json", cJSON_free

@@ -33,7 +33,7 @@ These endpoints are `/master`, `/replica`, `/sync_by_*`, and
 `/most_sync_by_bytes`.
 
 Include the `Accept: application/json` header to receive JSON, for example:
-`{"host": "localhost"}`.
+`{"host": "localhost", ...}`.
 
 Without this header, the response is plain text: `localhost`.
 
@@ -41,7 +41,7 @@ The `/hosts` and `/status` endpoints always return JSON, while `/version`
 always returns plain text.
 
 If a host-selection endpoint cannot find a matching host, it returns HTTP 404.
-The response body is empty in plain-text mode and `{"host": null}` in JSON
+The response body is empty in plain-text mode and `{"host": null, ...}` in JSON
 mode.
 
 #### Lag query parameters
@@ -99,6 +99,24 @@ GET /replica?min_lsn=0/3000060
 Either a replica whose replay LSN is at or beyond `0/3000060` is returned, or
 the master is returned.
 
+#### Locality-aware replica selection
+
+When complete locality metadata is available, `/replica` and the `/sync_by_*`
+endpoints prefer eligible replicas in the following order:
+
+1. Replicas whose `dc` matches the current `dc`.
+2. If there is no matching-DC replica, replicas whose `geo` matches the
+   current `geo`.
+3. If neither locality rule can be applied, all eligible replicas participate
+   in the existing round-robin selection.
+
+DC and geo are independent. Locality is a preference after the endpoint's
+health, lag, and `min_lsn` eligibility filters; it does not make an otherwise
+unsuitable replica eligible.
+
+`/most_sync_by_bytes` deliberately ignores locality. It always prioritizes the
+smallest byte lag, with ties resolved by host order.
+
 #### `GET /master`
 
 Returns the current master's host name. If no master is available, the endpoint
@@ -106,7 +124,8 @@ returns HTTP 404 as described above.
 
 #### `GET /replica`
 
-Returns the host name of a replica, selected using round-robin.
+Returns the host name of a replica, selected using DC preference, then geo
+preference, then round-robin as described above.
 Optional `lag_ms`, `lag_bytes`, and `min_lsn` query parameters constrain
 the result:
 
@@ -123,40 +142,43 @@ If no replica matches, the master's host name is returned instead.
 
 #### `GET /sync_by_time`
 
-Returns the host name of a replica, selected using round-robin, whose time lag
-is less than or equal to the threshold. The threshold is taken from the
-`lag_ms` query parameter when provided; otherwise,
+Returns the host name of a replica, selected using locality preference and
+round-robin, whose time lag is less than or equal to the threshold. The
+threshold is taken from the `lag_ms` query parameter when provided; otherwise,
 `pg_status__sync_max_lag_ms` is used. If no replica meets this condition, the
 master's host name is returned.
 
 #### `GET /sync_by_bytes`
 
-Returns the host name of a replica, selected using round-robin, whose WAL lag
-in bytes is less than or equal to the threshold. The threshold is taken from
-the `lag_bytes` query parameter when provided; otherwise,
+Returns the host name of a replica, selected using locality preference and
+round-robin, whose WAL lag in bytes is less than or equal to the threshold. The
+threshold is taken from the `lag_bytes` query parameter when provided;
+otherwise,
 `pg_status__sync_max_lag_bytes` is used. If no replica meets this condition,
 the master's host name is returned.
 
 #### `GET /sync_by_time_or_bytes`
 
-Returns the host name of a replica, selected using round-robin, that is
-synchronous either by time or by bytes. The `lag_ms` and `lag_bytes` query
-parameters override the corresponding global thresholds for the current
-request. If no such replica exists, the master's host name is returned.
+Returns the host name of a replica, selected using locality preference and
+round-robin, that is synchronous either by time or by bytes. The `lag_ms` and
+`lag_bytes` query parameters override the corresponding global thresholds for
+the current request. If no such replica exists, the master's host name is
+returned.
 
 #### `GET /sync_by_time_and_bytes`
 
-Returns the host name of a replica, selected using round-robin, that is
-synchronous by both time and bytes. The `lag_ms` and `lag_bytes` query
-parameters override the corresponding global thresholds for the current
-request. If no such replica exists, the master's host name is returned.
+Returns the host name of a replica, selected using locality preference and
+round-robin, that is synchronous by both time and bytes. The `lag_ms` and
+`lag_bytes` query parameters override the corresponding global thresholds for
+the current request. If no such replica exists, the master's host name is
+returned.
 
 #### `GET /most_sync_by_bytes`
 
 Returns the host name of the replica with the smallest `lag_bytes` among those
 that satisfy the byte threshold and the optional `min_lsn` constraint. Unlike
-the `/sync_by_*` endpoints, this endpoint does not use round-robin: selection
-is deterministic, and ties are resolved by host order.
+the `/sync_by_*` endpoints, this endpoint does not use locality preference or
+round-robin: selection is deterministic, and ties are resolved by host order.
 
 The `lag_bytes` query parameter overrides `pg_status__sync_max_lag_bytes` for
 the current request. Neither `lag_ms` nor `pg_status__sync_max_lag_ms` is
@@ -168,6 +190,8 @@ is returned.
 #### `GET /hosts`
 
 Returns a JSON list containing status information for every configured host.
+The `dc` and `geo` fields contain the host's configured locality metadata and
+are `null` when the corresponding metadata is not configured.
 The `sync_by_time` and `sync_by_bytes` flags indicate whether the current lag
 is within the global `pg_status__sync_max_lag_*` thresholds. For a dead host
 (`alive: false`), the lag fields and `lsn` are `null`, and the sync flags are
@@ -183,6 +207,8 @@ Example:
 [
   {
     "host": "host-1",
+    "dc": "frankfurt",
+    "geo": "europe",
     "master": true,
     "alive": true,
     "lag_ms": 0,
@@ -193,6 +219,8 @@ Example:
   },
   {
     "host": "host-2",
+    "dc": "amsterdam",
+    "geo": "europe",
     "master": false,
     "alive": true,
     "lag_ms": 6193,
@@ -203,6 +231,8 @@ Example:
   },
   {
     "host": "host-3",
+    "dc": null,
+    "geo": null,
     "master": false,
     "alive": false,
     "lag_ms": null,
@@ -228,6 +258,8 @@ Example: `http://127.0.0.1:8000/status?host=host-1`
 
 ```json
 {
+  "dc": "amsterdam",
+  "geo": "europe",
   "master": false,
   "alive": true,
   "lag_ms": 0,
@@ -253,6 +285,18 @@ Configure pg-status using the following environment variables:
 - `pg_status__pg_port` — PostgreSQL port. To use a different port for each
   host, provide a comma-separated list in the same order as
   `pg_status__hosts`. A single value applies to every host. Default: `5432`.
+- `pg_status__hosts_dc` — Optional comma-separated DC for each host, in the
+  same positional order as `pg_status__hosts`.
+- `pg_status__current_dc` — Optional DC of the pg-status instance. When set,
+  it takes precedence over `pg_status__current_dc_env`.
+- `pg_status__current_dc_env` — Optional name of another environment variable
+  whose value is the current DC.
+- `pg_status__hosts_geo` — Optional comma-separated geo for each host, in the
+  same positional order as `pg_status__hosts`.
+- `pg_status__current_geo` — Optional geo of the pg-status instance. When set,
+  it takes precedence over `pg_status__current_geo_env`.
+- `pg_status__current_geo_env` — Optional name of another environment variable
+  whose value is the current geo.
 - `pg_status__connect_timeout` — Time limit, in seconds, for establishing a
   PostgreSQL connection. Default: `2`.
 - `pg_status__max_fails` — Number of consecutive failed checks before a host
@@ -276,6 +320,34 @@ Configure pg-status using the following environment variables:
 - `pg_status__http_port` — HTTP server port. Default: `8000`.
 - `pg_status__log_level` — Minimum logging level. Accepts `debug`, `info`,
   `warning` (or `warn`), `error`, or `fatal`. Default: `info`.
+
+All locality variables are optional. A dimension is used for replica selection
+only when both its current value and one non-empty positional value for every
+entry in `pg_status__hosts` are available. If only part of a DC or geo
+configuration is supplied, pg-status logs a startup warning and disables that
+dimension. It continues to use the other complete dimension, or round-robin
+when neither dimension is complete.
+
+Direct current-locality values take precedence over indirect values. For
+example, if both `pg_status__current_dc` and `pg_status__current_dc_env` are
+set, `pg_status__current_dc` is used. Otherwise the value of the environment
+variable named by `pg_status__current_dc_env` is used. Geo follows the same
+rule. Indirect variable names must match `[A-Za-z_][A-Za-z0-9_]*`; lookup is
+performed once and is not recursive. In a container deployment, the referenced
+environment variable must also be passed into the container. The bundled
+Compose example forwards `PLATFORM_DC` and `PLATFORM_GEO`; add an equivalent
+entry when using another variable name.
+
+Example using a direct DC and an indirectly supplied geo:
+
+```sh
+pg_status__hosts="db-frankfurt.example,db-amsterdam.example"
+pg_status__hosts_dc="frankfurt,amsterdam"
+pg_status__hosts_geo="europe,europe"
+pg_status__current_dc="frankfurt"
+pg_status__current_geo_env="PLATFORM_GEO"
+PLATFORM_GEO="europe"
+```
 
 ### PostgreSQL TLS
 

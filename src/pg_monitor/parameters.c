@@ -2,8 +2,10 @@
  * Parameters and settings with which monitoring is started
  */
 
+#include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "logger.h"
 #include "pg_monitor.h"
@@ -17,6 +19,16 @@ MonitorParameters parameters = {
   .password = "postgres",
   .database = "postgres",
   .hosts = nullptr,
+  .hosts_dc = nullptr,
+  .hosts_geo = nullptr,
+  .current_dc = nullptr,
+  .current_dc_env = nullptr,
+  .dc_locality_configured = false,
+  .dc_locality_enabled = false,
+  .current_geo = nullptr,
+  .current_geo_env = nullptr,
+  .geo_locality_configured = false,
+  .geo_locality_enabled = false,
   .port = "5432",
   .connect_timeout = "2",
   .sleep_ms = 5000,
@@ -26,6 +38,70 @@ MonitorParameters parameters = {
   .conn_max_age_ms = 300000,      // 5 minutes
   .query_timeout_ms = 5000,
 };
+
+static bool is_valid_environment_name(const char *name) {
+  if (!name || !*name) {
+    return false;
+  }
+  const unsigned char first = (unsigned char)*name;
+  if (!(isalpha(first) || first == '_')) {
+    return false;
+  }
+  for (const unsigned char *c = (const unsigned char *)name + 1; *c; c++) {
+    if (!(isalnum(*c) || *c == '_')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool environment_has_value(const char *name) {
+  const char *value = getenv(name);
+  return value && *value;
+}
+
+static const char *resolve_locality(
+  const char *direct_name, const char *source_name,
+  const char *source_parameter_name
+) {
+  const char *direct = getenv(direct_name);
+  if (direct && *direct) {
+    return direct;
+  }
+  if (
+    !is_valid_environment_name(source_name) ||
+    strcmp(source_name, source_parameter_name) == 0
+  ) {
+    return nullptr;
+  }
+  const char *indirect = getenv(source_name);
+  return indirect && *indirect ? indirect : nullptr;
+}
+
+static void set_locality(void) {
+  parameters.dc_locality_configured =
+    environment_has_value("pg_status__hosts_dc") ||
+    environment_has_value("pg_status__current_dc") ||
+    environment_has_value("pg_status__current_dc_env");
+  parameters.geo_locality_configured =
+    environment_has_value("pg_status__hosts_geo") ||
+    environment_has_value("pg_status__current_geo") ||
+    environment_has_value("pg_status__current_geo_env");
+
+  replace_from_env("pg_status__hosts_dc", &parameters.hosts_dc);
+  replace_from_env("pg_status__hosts_geo", &parameters.hosts_geo);
+  replace_from_env("pg_status__current_dc_env", &parameters.current_dc_env);
+  replace_from_env("pg_status__current_geo_env", &parameters.current_geo_env);
+
+  parameters.current_dc = resolve_locality(
+    "pg_status__current_dc", parameters.current_dc_env,
+    "pg_status__current_dc_env"
+  );
+  parameters.current_geo = resolve_locality(
+    "pg_status__current_geo", parameters.current_geo_env,
+    "pg_status__current_geo_env"
+  );
+}
 
 static void set_sleep(void) {
   const char *env_val = getenv("pg_status__sleep_ms");
@@ -71,6 +147,7 @@ void set_parameters_from_env(void) {
   replace_from_env_ull(
     "pg_status__query_timeout_ms", &parameters.query_timeout_ms
   );
+  set_locality();
   set_sleep();
   set_hosts();
 }

@@ -165,6 +165,8 @@ def test_unavailable_topology_returns_not_found(
         )
         assert helpers.parse_json_object(body, endpoint) == {
             helpers.HOST_FIELD: None,
+            helpers.DC_FIELD: None,
+            helpers.GEO_FIELD: None,
         }
 
     assert monitor.status(helpers.PROXY_ONE)[ALIVE_FIELD] is False
