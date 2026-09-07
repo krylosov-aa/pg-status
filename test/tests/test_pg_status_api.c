@@ -3,6 +3,7 @@
  */
 
 #include <inttypes.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -982,6 +983,252 @@ static void test_round_robin_master_in_middle(void) {
     // Cleanup
     http_test_response_free(&response);
   }
+
+  // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
+static void expect_round_robin_sequence(
+  const PgStatusApiFixture *api, const char *path, const char *const *expected,
+  const size_t count, const unsigned int repeats
+) {
+  for (unsigned int repeat = 0; repeat < repeats; repeat++) {
+    for (size_t i = 0; i < count; i++) {
+      TestHTTPResponse response = http_test_get(api->port, path, nullptr);
+      fixture_pg_status_expect_text(&response, 200, expected[i]);
+      http_test_response_free(&response);
+    }
+  }
+}
+
+static void test_round_robin_filtered_hosts(void) {
+  // Arrange
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host("replica-1", 10, 10, 0x450),
+    fixture_pg_status_replica_host("excluded", 5000, 2000, 0x300),
+    fixture_pg_status_replica_host("replica-3", 20, 20, 0x450),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  const char *paths[] = {
+    "/sync_by_time?lag_ms=100",
+    "/sync_by_bytes?lag_bytes=1000",
+    "/replica?min_lsn=0/400",
+  };
+  const char *expected[] = {"replica-1", "replica-3"};
+
+  // Act and assert: each eligible host gets 150 of 300 selections.
+  for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+    expect_round_robin_sequence(&api, paths[i], expected, 2, 150);
+  }
+  const TestHost dead = fixture_pg_status_dead_host("excluded");
+  publish_monitor_snapshot(&monitor_host_list[2], dead.snapshot);
+  expect_round_robin_sequence(&api, "/replica", expected, 2, 150);
+
+  // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
+static void test_round_robin_locality_groups(void) {
+  // Exercise both healthy and possible_dead candidates in DC, geo and
+  // non-local groups. A lower-priority host between peers must not bias them.
+  const char *current_dcs[] = {"frankfurt", "unknown", "unknown"};
+  const char *current_geos[] = {"europe", "europe", "unknown"};
+  const char *expected[] = {"replica-1", "replica-3"};
+  for (unsigned int possible = 0; possible < 2; possible++) {
+    for (size_t group = 0; group < 3; group++) {
+      // Arrange
+      parameters.current_dc = current_dcs[group];
+      parameters.current_geo = current_geos[group];
+      TestHost hosts[] = {
+        fixture_pg_status_host_with_locality(
+          fixture_pg_status_master_host("master"), "frankfurt", "europe"
+        ),
+        fixture_pg_status_host_with_locality(
+          fixture_pg_status_replica_host("replica-1", 10, 10, 0x450),
+          "frankfurt", "europe"
+        ),
+        fixture_pg_status_host_with_locality(
+          fixture_pg_status_replica_host("excluded", 10, 10, 0x450), "virginia",
+          "north-america"
+        ),
+        fixture_pg_status_host_with_locality(
+          fixture_pg_status_replica_host("replica-3", 20, 20, 0x450),
+          "frankfurt", "europe"
+        ),
+      };
+      for (size_t i = 1; i < 4; i++) {
+        hosts[i].snapshot.status.possible_dead = possible != 0;
+      }
+      if (group == 2) {
+        hosts[2].snapshot.status.alive = false;
+      }
+      PgStatusApiFixture api = fixture_pg_status_start(
+        hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+      );
+
+      // Act and assert
+      expect_round_robin_sequence(&api, "/replica", expected, 2, 150);
+
+      // Cleanup
+      fixture_pg_status_stop(&api);
+    }
+  }
+}
+
+static void test_round_robin_health_groups(void) {
+  // Arrange
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host("replica-1", 10, 10, 0x450),
+    fixture_pg_status_possible_dead_replica_host("possible", 10, 10, 0x450),
+    fixture_pg_status_replica_host("replica-3", 20, 20, 0x450),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  const char *expected[] = {"replica-1", "replica-3"};
+
+  // Act and assert: skip a possible_dead host when fully alive peers exist.
+  expect_round_robin_sequence(&api, "/replica", expected, 2, 150);
+
+  // Both remaining candidates become possible_dead; alternate within them.
+  MonitorSnapshot first = hosts[1].snapshot;
+  MonitorSnapshot third = hosts[3].snapshot;
+  first.status.possible_dead = true;
+  third.status.possible_dead = true;
+  const TestHost dead = fixture_pg_status_dead_host("possible");
+  publish_monitor_snapshot(&monitor_host_list[1], first);
+  publish_monitor_snapshot(&monitor_host_list[2], dead.snapshot);
+  publish_monitor_snapshot(&monitor_host_list[3], third);
+  expect_round_robin_sequence(&api, "/replica", expected, 2, 150);
+
+  // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
+static void test_round_robin_topology_changes(void) {
+  // Arrange
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host("replica-1", 10, 10, 0x450),
+    fixture_pg_status_dead_host("replica-2"),
+    fixture_pg_status_replica_host("replica-3", 20, 20, 0x450),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  const char *pair[] = {"replica-1", "replica-3"};
+  expect_round_robin_sequence(&api, "/replica", pair, 2, 1);
+
+  // Act and assert: a recovered replica joins the rotation.
+  const TestHost recovered = fixture_pg_status_replica_host(
+    "replica-2", 10, 10, 0x450
+  );
+  publish_monitor_snapshot(&monitor_host_list[2], recovered.snapshot);
+  const char *all[] = {"replica-1", "replica-2", "replica-3"};
+  expect_round_robin_sequence(&api, "/replica", all, 3, 2);
+
+  // A removed replica stops participating immediately.
+  const TestHost dead = fixture_pg_status_dead_host("dead");
+  publish_monitor_snapshot(&monitor_host_list[1], dead.snapshot);
+  const char *remaining[] = {"replica-2", "replica-3"};
+  expect_round_robin_sequence(&api, "/replica", remaining, 2, 2);
+
+  // Master fallback does not consume a turn in the replica rotation.
+  publish_monitor_snapshot(&monitor_host_list[2], dead.snapshot);
+  publish_monitor_snapshot(&monitor_host_list[3], dead.snapshot);
+  const char *master[] = {"master"};
+  expect_round_robin_sequence(&api, "/replica", master, 1, 1);
+  publish_monitor_snapshot(&monitor_host_list[1], hosts[1].snapshot);
+  publish_monitor_snapshot(&monitor_host_list[3], hosts[3].snapshot);
+  expect_round_robin_sequence(&api, "/replica", pair, 2, 2);
+
+  // Selecting the only eligible replica can retain the same cursor value.
+  publish_monitor_snapshot(&monitor_host_list[3], dead.snapshot);
+  const char *single[] = {"replica-1"};
+  expect_round_robin_sequence(&api, "/replica", single, 1, 2);
+
+  // Cleanup
+  fixture_pg_status_stop(&api);
+}
+
+enum { SELECTION_THREAD_COUNT = 8, SELECTIONS_PER_THREAD = 3000 };
+
+typedef struct {
+  atomic_bool *start;
+  atomic_uint *ready;
+  unsigned int counts[2];
+} SelectionWorker;
+
+static void *run_selection_worker(void *argument) {
+  SelectionWorker *worker = argument;
+  atomic_fetch_add_explicit(worker->ready, 1, memory_order_release);
+  while (!atomic_load_explicit(worker->start, memory_order_acquire)) {
+    sched_yield();
+  }
+  const LagThresholds thresholds = {.max_lag_ms = 100};
+  for (unsigned int i = 0; i < SELECTIONS_PER_THREAD; i++) {
+    const MonitorHost *selected = find_replica(
+      is_sync_replica_by_time, &thresholds, "concurrent test"
+    );
+    http_test_assert_true(
+      selected == &monitor_host_list[1] || selected == &monitor_host_list[3],
+      "concurrent selection returned an ineligible host"
+    );
+    worker->counts[selected == &monitor_host_list[1] ? 0 : 1]++;
+  }
+  return nullptr;
+}
+
+static void test_round_robin_concurrent(void) {
+  // Arrange
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"),
+    fixture_pg_status_replica_host("replica-1", 10, 10, 0x450),
+    fixture_pg_status_replica_host("excluded", 5000, 2000, 0x300),
+    fixture_pg_status_replica_host("replica-3", 20, 20, 0x450),
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  atomic_bool start = false;
+  atomic_uint ready = 0;
+  SelectionWorker workers[SELECTION_THREAD_COUNT] = {0};
+  pthread_t threads[SELECTION_THREAD_COUNT];
+  for (size_t i = 0; i < SELECTION_THREAD_COUNT; i++) {
+    workers[i].start = &start;
+    workers[i].ready = &ready;
+    http_test_assert_true(
+      pthread_create(&threads[i], nullptr, run_selection_worker, &workers[i]) ==
+        0,
+      "selection worker start"
+    );
+  }
+
+  // Act: call the HTTP handlers' shared selector concurrently.
+  while (atomic_load_explicit(&ready, memory_order_acquire) !=
+         SELECTION_THREAD_COUNT) {
+    sched_yield();
+  }
+  atomic_store_explicit(&start, true, memory_order_release);
+  unsigned int counts[2] = {0};
+  for (size_t i = 0; i < SELECTION_THREAD_COUNT; i++) {
+    http_test_assert_true(
+      pthread_join(threads[i], nullptr) == 0, "worker join"
+    );
+    counts[0] += workers[i].counts[0];
+    counts[1] += workers[i].counts[1];
+  }
+
+  // Assert: every committed selection advances the rotation exactly once.
+  const unsigned int half = SELECTION_THREAD_COUNT * SELECTIONS_PER_THREAD / 2;
+  http_test_assert_true(
+    counts[0] == half && counts[1] == half,
+    "concurrent selection is not balanced"
+  );
 
   // Cleanup
   fixture_pg_status_stop(&api);
@@ -2315,6 +2562,11 @@ static const struct {
   {"unknown_route", test_unknown_route},
   {"round_robin", test_round_robin},
   {"round_robin_master_in_middle", test_round_robin_master_in_middle},
+  {"round_robin_filtered_hosts", test_round_robin_filtered_hosts},
+  {"round_robin_locality_groups", test_round_robin_locality_groups},
+  {"round_robin_health_groups", test_round_robin_health_groups},
+  {"round_robin_topology_changes", test_round_robin_topology_changes},
+  {"round_robin_concurrent", test_round_robin_concurrent},
   {"locality_prefers_dc_over_geo", test_locality_prefers_dc_over_geo},
   {"locality_uses_geo_when_dc_candidate_is_ineligible",
    test_locality_uses_geo_when_dc_candidate_is_ineligible},

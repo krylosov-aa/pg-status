@@ -277,13 +277,11 @@ typedef bool (*condition_handler)(
 );
 
 /**
- * Same selection as find_replica_round_robin(), but returns the selected
- * host object so callers can access immutable endpoint metadata.
- */
-/**
  * Searches for a replica host that matches the given condition. Within each
  * health class, prefers the current DC, then the current geo, then uses the
- * existing round-robin order. Prefers a fully alive match; falls back to a
+ * round-robin order within the best available group. The shared cursor
+ * advances to the selected replica; concurrent selections retry on conflict.
+ * Prefers a fully alive match; falls back to a
  * `possible_dead` match if no alive replica satisfies the handler. If no
  * replica matches at all, returns the current master as a fallback, or nullptr
  * if there is no master either.

@@ -364,6 +364,11 @@ set(PG_STATUS_API_TEST_CASES
         unknown_route
         round_robin
         round_robin_master_in_middle
+        round_robin_filtered_hosts
+        round_robin_locality_groups
+        round_robin_health_groups
+        round_robin_topology_changes
+        round_robin_concurrent
         locality_prefers_dc_over_geo
         locality_uses_geo_when_dc_candidate_is_ineligible
         locality_incomplete_dc_still_uses_geo

@@ -514,8 +514,7 @@ host selection:
   already been detected, pg-status immediately switches to the new master.
 - When selecting a replica, pg-status prefers fully responsive hosts. If no
   such replica meets the search criteria, it returns a possibly dead replica.
-  Consequently, load-balancing fairness may be temporarily reduced while a
-  host remains in this state.
+  Round-robin applies within the best available health and locality group.
 
 Failed checks preserve the last successfully measured `lag_ms`, `lag_bytes`,
 and `lsn`. While the host is possibly dead, lag and LSN filters use these

@@ -134,30 +134,10 @@ static unsigned int next_cursor_in_circle(const unsigned int cursor) {
 }
 
 /**
- * A pointer to the last host returned in the round-robin algorithm
+ * Index of the last replica returned, shared by all round-robin selectors.
+ * Commit the selected index only after filtering and priority selection.
  */
 static atomic_size_t round_robin_cursor = 0;
-
-/**
- * Moves the cursor of the round-robin algorithm and returns the host from
- * which to start the crawl. Special logic to skip the master host so it
- * doesn't interfere with fair load balancing across the replicas.
- */
-static unsigned int next_replica_round_robin(void) {
-  size_t cursor;
-  unsigned int new_cursor;
-  do {
-    cursor = atomic_load_explicit(&round_robin_cursor, memory_order_relaxed);
-    new_cursor = (unsigned int)((cursor + 1) % host_count);
-    const int master_i = get_master_index();
-    if (master_i != -1 && new_cursor == (unsigned int)master_i) {
-      new_cursor = next_cursor_in_circle(new_cursor);
-    }
-  } while (
-    !atomic_compare_exchange_weak(&round_robin_cursor, &cursor, new_cursor));
-
-  return new_cursor;
-}
 
 enum {
   LOCALITY_DC = 0,
@@ -183,11 +163,11 @@ static unsigned int locality_rank(const MonitorHost *host) {
 }
 
 static const MonitorHost *find_replica_round_robin_plain(
-  const condition_handler handler, const void *ctx
+  const condition_handler handler, const void *ctx,
+  const unsigned int start_cursor
 ) {
   const MonitorHost *possible = nullptr;
-  unsigned int cursor = next_replica_round_robin();
-  const unsigned int start_cursor = cursor;
+  unsigned int cursor = start_cursor;
 
   do {
     const MonitorHost *mon_host = &monitor_host_list[cursor];
@@ -209,15 +189,15 @@ static const MonitorHost *find_replica_round_robin_plain(
 }
 
 static const MonitorHost *find_replica_round_robin_locality_aware(
-  const condition_handler handler, const void *ctx
+  const condition_handler handler, const void *ctx,
+  const unsigned int start_cursor
 ) {
   const MonitorHost *alive[LOCALITY_COUNT] = {0};
   const MonitorHost *possible[LOCALITY_COUNT] = {0};
   const unsigned int best_rank = parameters.dc_locality_enabled ? LOCALITY_DC
                                                                 : LOCALITY_GEO;
 
-  unsigned int cursor = next_replica_round_robin();
-  const unsigned int start_cursor = cursor;
+  unsigned int cursor = start_cursor;
 
   do {
     const MonitorHost *mon_host = &monitor_host_list[cursor];
@@ -259,16 +239,37 @@ const MonitorHost *find_replica(
     return nullptr;
   }
 
-  const MonitorHost *replica = nullptr;
+  size_t previous = atomic_load_explicit(
+    &round_robin_cursor, memory_order_relaxed
+  );
+  for (;;) {
+    const unsigned int start_cursor = (unsigned int)((previous + 1) %
+                                                     host_count);
+    const MonitorHost *replica;
 
-  if (parameters.dc_locality_enabled || parameters.geo_locality_enabled) {
-    replica = find_replica_round_robin_locality_aware(handler, ctx);
-  } else {
-    replica = find_replica_round_robin_plain(handler, ctx);
-  }
+    if (parameters.dc_locality_enabled || parameters.geo_locality_enabled) {
+      replica = find_replica_round_robin_locality_aware(
+        handler, ctx, start_cursor
+      );
+    } else {
+      replica = find_replica_round_robin_plain(handler, ctx, start_cursor);
+    }
 
-  if (replica) {
-    return replica;
+    if (!replica) {
+      break;
+    }
+
+    const size_t selected = (size_t)(replica - monitor_host_list);
+    if (
+      atomic_compare_exchange_weak_explicit(
+        &round_robin_cursor, &previous, selected, memory_order_relaxed,
+        memory_order_relaxed
+      )
+    ) {
+      return replica;
+    }
+    // Another request advanced the cursor. Recompute the candidate after
+    // that selection; skipped hosts must not consume round-robin turns.
   }
 
   const MonitorHost *master = get_master_monitor_host();
