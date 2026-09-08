@@ -547,7 +547,10 @@ static void test_status_possible_dead(void) {
     hosts, sizeof(hosts) / sizeof(hosts[0]), 0
   );
   char *path = format_string("/status?host=%s", possible_dead_replica.host);
-  const char *expected_json = format_string(
+  char *expected_lsn = fixture_pg_status_format_expected_lsn(
+    possible_dead_replica.snapshot.lsn
+  );
+  char *expected_json = format_string(
     "{\"dc\":null,\"geo\":null,\"master\":false,\"alive\":true,"
     "\"possible_dead\":true,"
     "\"lag_ms\":%" PRIu64
@@ -556,8 +559,7 @@ static void test_status_possible_dead(void) {
     ",\"sync_by_bytes\":true"
     ",\"lsn\":\"%s\"}",
     possible_dead_replica.snapshot.lag_ms,
-    possible_dead_replica.snapshot.lag_bytes,
-    fixture_pg_status_format_expected_lsn(possible_dead_replica.snapshot.lsn)
+    possible_dead_replica.snapshot.lag_bytes, expected_lsn
   );
 
   // Act
@@ -567,6 +569,8 @@ static void test_status_possible_dead(void) {
   fixture_pg_status_expect_json(&response, 200, expected_json);
 
   // Cleanup
+  free(expected_json);
+  free(expected_lsn);
   free(path);
   http_test_response_free(&response);
   fixture_pg_status_stop(&api);
