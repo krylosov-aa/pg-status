@@ -106,6 +106,33 @@ foreach(TEST_CASE
     )
 endforeach()
 
+add_executable(master_selection_test test_master_selection.c)
+target_link_libraries(
+        master_selection_test PRIVATE
+        common_warnings
+        common_support
+        pg_monitor
+        utils
+        logging
+        Threads::Threads
+)
+foreach(TEST_CASE
+        healthy_priority
+        possible_priority
+        selected_master_becomes_replica
+        selected_master_becomes_dead
+        no_master
+        dead_master_flags
+        empty_hosts)
+    add_test(NAME master_selection.${TEST_CASE} COMMAND master_selection_test ${TEST_CASE})
+    set_tests_properties(
+            master_selection.${TEST_CASE}
+            PROPERTIES
+            TIMEOUT 15
+            ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}"
+    )
+endforeach()
+
 add_executable(logger_test test_logger.c)
 target_link_libraries(
         logger_test PRIVATE

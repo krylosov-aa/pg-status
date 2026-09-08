@@ -31,17 +31,16 @@ static int stop_pipe[2] = {-1, -1};
 
 /**
  * Picks the current master by scanning hosts in declared order:
- * first fully-alive master wins; otherwise the previously stored
- * master_index is left in place if any host is marked possible_dead
- * master; only when no master exists at all is master_index cleared
- * to -1. Same rules the synchronous loop used to apply.
+ * first fully-alive master wins, then the first possible_dead master.
+ * Dead hosts and replicas are excluded. Always publish the selected index,
+ * or -1 when no candidate exists, replacing any previous selection.
  */
 static void recompute_master_index(void) {
   int master_i = -1;
   int possible_master = -1;
   for (unsigned int i = 0; i < host_count; i++) {
     const MonitorStatus status = atomic_get_status(&monitor_host_list[i]);
-    if (!status.master) {
+    if (!status.alive || !status.master) {
       continue;
     }
     if (!status.possible_dead) {
@@ -52,11 +51,8 @@ static void recompute_master_index(void) {
       possible_master = (int)i;
     }
   }
-  if (master_i != -1) {
-    save_master_index(master_i);
-  } else if (possible_master == -1) {
-    save_master_index(-1);
-  }
+
+  save_master_index(master_i != -1 ? master_i : possible_master);
 }
 
 /**

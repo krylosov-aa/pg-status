@@ -532,8 +532,9 @@ After the first failed check, but before the failure count reaches
 `pg_status__max_fails`, the host is marked as possibly dead. This state affects
 host selection:
 
-- If the current master is marked as possibly dead and a new master has
-  already been detected, pg-status immediately switches to the new master.
+- Master selection prefers fully responsive masters, then possibly dead
+  masters. If neither exists, no master is selected. Dead hosts and replicas
+  are excluded.
 - When selecting a replica, pg-status prefers fully responsive hosts. If no
   such replica meets the search criteria, it returns a possibly dead replica.
   Round-robin applies within the best available health and locality group.
@@ -548,8 +549,8 @@ updates the measurements and clears the failure counter and possibly dead state.
 ### Split-brain
 
 With client-side master detection, pg-status cannot determine which host
-*should* be the master during a split-brain scenario. The first live master in
-`pg_status__hosts` wins.
+*should* be the master during a split-brain scenario. Within the best available
+health group, the first master in `pg_status__hosts` wins.
 
 ## Logging
 
