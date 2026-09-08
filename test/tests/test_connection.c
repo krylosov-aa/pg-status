@@ -28,14 +28,13 @@ static void test_separate_values(void) {
   parameters.password = "password=not-a-key ' \\ 密码";
   parameters.database =
     "host=attacker.example password=injected db name ' \\ БД";
-  parameters.connect_timeout = "17";
   const MonitorHost host = {.host = "2001:db8::1", .port = "6543"};
   const char *expected_keywords[] = {
-    "user", "password", "host", "port", "dbname", "connect_timeout",
+    "user", "password", "host", "port", "dbname",
   };
   const char *expected_values[] = {
     parameters.user, parameters.password, host.host,
-    host.port,       parameters.database, parameters.connect_timeout,
+    host.port,       parameters.database,
   };
 
   // Act
@@ -66,7 +65,6 @@ static void test_dbname_not_expanded(void) {
   parameters.password = "expected password";
   parameters.database =
     "host=attacker.example user=attacker password=exposed dbname=other";
-  parameters.connect_timeout = "1";
   const MonitorHost host = {.host = "127.0.0.1", .port = "1"};
 
   // Act
@@ -95,7 +93,6 @@ static void test_tls_environment(void) {
   parameters.user = "postgres";
   parameters.password = "postgres";
   parameters.database = "postgres";
-  parameters.connect_timeout = "1";
   const MonitorHost host = {.host = "database.example", .port = "5432"};
   const char *environment_names[] = {
     "PGSSLMODE", "PGSSLROOTCERT", "PGSSLCRL", "PGSSLCERT", "PGSSLKEY",
@@ -163,7 +160,6 @@ static void test_secret_marker_not_logged(void) {
   support_set_environment("pg_status__hosts", "127.0.0.1");
   support_set_environment("pg_status__pg_port", "1");
   support_set_environment("pg_status__pg_password", secret_marker);
-  support_set_environment("pg_status__connect_timeout", "1");
   support_set_environment("pg_status__query_timeout_ms", "1000");
   support_set_environment("pg_status__sleep_ms", "1");
   support_set_environment("PGSSLMODE", "disable");

@@ -80,7 +80,6 @@ static void configure_monitor(const char *ports) {
   support_set_environment("pg_status__pg_port", ports);
   support_set_environment("pg_status__sleep_ms", "60000");
   support_set_environment("pg_status__query_timeout_ms", "60000");
-  support_set_environment("pg_status__connect_timeout", "60");
   support_set_environment("PGSSLMODE", "disable");
   support_set_environment("PGGSSENCMODE", "disable");
 }

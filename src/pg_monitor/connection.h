@@ -3,7 +3,7 @@
 
 #include "pg_monitor.h"
 
-enum { PG_CONNECTION_PARAMETER_COUNT = 6 };
+enum { PG_CONNECTION_PARAMETER_COUNT = 5 };
 
 /**
  * Exact keyword/value arrays passed to libpq for one connection attempt.

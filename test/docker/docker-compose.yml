@@ -21,7 +21,6 @@ x-security-environment: &security-environment
   ASAN_OPTIONS: "abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1"
   UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
   TSAN_OPTIONS: "halt_on_error=1"
-  pg_status__connect_timeout: "1"
   pg_status__hosts: postgres-security
   pg_status__pg_database: postgres
   pg_status__pg_password: "space 'quote' \\backslash password"
@@ -56,7 +55,6 @@ services:
       ASAN_OPTIONS: "abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1"
       UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
       TSAN_OPTIONS: "halt_on_error=1"
-      pg_status__connect_timeout: "1"
       pg_status__hosts: "pg-proxy-1,pg-proxy-2,pg-proxy-3"
       pg_status__hosts_dc: "e2e-dc,e2e-dc,e2e-dc"
       pg_status__hosts_geo: "e2e-geo,e2e-geo,e2e-geo"

@@ -162,7 +162,6 @@ smoke_runtime_image() {
     --publish 127.0.0.1::8000 \
     --env pg_status__hosts=127.0.0.1 \
     --env pg_status__pg_port=1 \
-    --env pg_status__connect_timeout=1 \
     --env pg_status__sleep_ms=1000 \
     "$image")"
 
@@ -470,7 +469,6 @@ docker run --rm \
       env \
         pg_status__hosts=127.0.0.1 \
         pg_status__pg_port=1 \
-        pg_status__connect_timeout=1 \
         pg_status__sleep_ms=1000 \
         pg_status__http_listen_address=127.0.0.1 \
         pg_status__http_port="$audit_http_port" \

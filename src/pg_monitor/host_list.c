@@ -49,6 +49,7 @@ static void init_monitor_host(
   monitor_host->poll_state = HOST_POLL_IDLE;
   monitor_host->poll_events = 0;
   monitor_host->next_poll_at_ms = 0;
+  monitor_host->iter_started_at_ms = 0;
   monitor_host->iter_deadline_ms = 0;
   monitor_host->connected_at_ms = 0;
   monitor_host->pollfd_slot = -1;

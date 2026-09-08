@@ -72,9 +72,10 @@ static bool all_hosts_have_polled(void) {
  * Starts any IDLE host whose next_poll_at_ms has elapsed; time out
  * any non-IDLE host whose iter_deadline_ms has passed.
  */
-static void start_and_timeout_hosts(const uint64_t now_ms) {
+static void start_and_timeout_hosts(void) {
   for (unsigned int i = 0; i < host_count; i++) {
     MonitorHost *host = &monitor_host_list[i];
+    const uint64_t now_ms = monotonic_ms();
     if (host->poll_state == HOST_POLL_IDLE) {
       if (now_ms >= host->next_poll_at_ms) {
         start_host_poll(host, now_ms);
@@ -96,7 +97,7 @@ static int build_poll_fd(
   };
   pfds[0] = stop_pipe_slot;
 
-  uint64_t soonest_wake = now_ms + (uint64_t)parameters.sleep_ms;
+  uint64_t soonest_wake = UINT64_MAX;
 
   int n_pfds = 1;
   for (unsigned int i = 0; i < host_count; i++) {
@@ -115,6 +116,7 @@ static int build_poll_fd(
       // Connection vanished mid-iteration; force a timeout next tick.
       host->iter_deadline_ms = now_ms;
       host->pollfd_slot = -1;
+      soonest_wake = now_ms;
       continue;
     }
 
@@ -140,19 +142,18 @@ static bool is_poll_stopped(const struct pollfd *pfds) {
 }
 
 static void process_poll_result(const struct pollfd *pfds) {
-  const uint64_t now_ms = monotonic_ms();
   for (unsigned int i = 0; i < host_count; i++) {
     MonitorHost *host = &monitor_host_list[i];
 
-    if (host->pollfd_slot < 0) {
+    if (host->poll_state == HOST_POLL_IDLE) {
       continue;
     }
 
-    const short revents = pfds[host->pollfd_slot].revents;
-    if (revents != 0) {
-      advance_host_poll(host, now_ms);
-    } else if (now_ms >= host->iter_deadline_ms) {
+    const uint64_t now_ms = monotonic_ms();
+    if (now_ms >= host->iter_deadline_ms) {
       timeout_host_poll(host, now_ms);
+    } else if (host->pollfd_slot >= 0 && pfds[host->pollfd_slot].revents != 0) {
+      advance_host_poll(host, now_ms);
     }
   }
 }
@@ -163,20 +164,17 @@ static void process_poll_result(const struct pollfd *pfds) {
  *   2. Build pollfd[].
  *   3. poll() until the earliest deadline (per-host iter_deadline_ms
  *      or next_poll_at_ms).
- *   4. Advance any host whose fd became ready; time out any host whose
- *      deadline expired without ready events.
+ *   4. Time out expired checks, then advance hosts whose fd became ready.
  *   5. Recompute the master index from the freshly published statuses.
  *
  * Returns false if a stop signal was received, true otherwise.
  */
 static bool pump_one_iteration(void) {
-  const uint64_t now_ms = monotonic_ms();
-
-  start_and_timeout_hosts(now_ms);
+  start_and_timeout_hosts();
 
   struct pollfd pfds[MAX_HOSTS + 1];  // +1 for stop pipe
   int timeout_ms;
-  const int n_pfds = build_poll_fd(now_ms, pfds, &timeout_ms);
+  const int n_pfds = build_poll_fd(monotonic_ms(), pfds, &timeout_ms);
 
   const int rc = poll(pfds, (nfds_t)n_pfds, timeout_ms);
   if (rc < 0) {

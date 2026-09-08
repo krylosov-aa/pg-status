@@ -74,6 +74,7 @@ static int scripted_flush(PGconn *conn) {
 
 // Exercise the private parser and publication path without exposing a
 // production API solely for tests. Other monitor objects come from pg_monitor.
+// NOLINTNEXTLINE(bugprone-suspicious-include)
 #include "../../src/pg_monitor/check_utils.c"
 
 #undef PQconsumeInput

@@ -322,16 +322,16 @@ Configure pg-status using the following environment variables:
   it takes precedence over `pg_status__current_geo_env`.
 - `pg_status__current_geo_env` — Optional name of another environment variable
   whose value is the current geo.
-- `pg_status__connect_timeout` — Time limit, in seconds, for establishing a
-  PostgreSQL connection. Default: `2`.
 - `pg_status__max_fails` — Number of consecutive failed checks before a host
   is considered dead. Default: `3`.
-- `pg_status__sleep_ms` — Delay, in milliseconds, between consecutive checks
-  of a host. Default: `5000`.
+- `pg_status__sleep_ms` — Target period, in milliseconds, between the starts
+  of consecutive checks of each host. Default: `1000`. Checks never overlap;
+  if a check takes longer than the period, the next starts immediately after
+  it finishes. Must be greater than `0`.
 - `pg_status__query_timeout_ms` — Hard deadline, in milliseconds, for one poll
   iteration (connect, send, and read). When an iteration times out, its
   connection is closed and the host's failure counter is incremented.
-  Default: `5000`.
+  Default: `1000`. Must be greater than `0`; may exceed `sleep_ms`.
 - `pg_status__conn_max_age_ms` — Maximum age, in milliseconds, of a reused
   PostgreSQL connection. Older connections are closed after the current
   iteration and reopened for the next one. Default: `300000` (5 minutes).
@@ -458,14 +458,23 @@ See the [detailed performance reports](docs/performance.md).
 
 A single writer thread polls **all hosts concurrently** using libpq's
 non-blocking API and one `poll()` system call across their sockets. Each host
-has an independent polling cycle: a new check starts `pg_status__sleep_ms`
-after the previous one finishes. Every iteration has a hard deadline of
+has an independent polling cycle: each check is scheduled
+`pg_status__sleep_ms` after the previous check **started**. Time spent checking
+the host counts toward this period, on both success and failure. If a check
+overruns the period, the next starts immediately after it finishes; missed
+periods do not accumulate, and checks of the same host never overlap.
+
+For example, with a 1000 ms period and a 200 ms check, the remaining wait is
+800 ms. This scheduling rule replaces the previous delay-after-completion
+behavior for all configurations; there is no mode switch.
+
+Every iteration has a deadline of
 `pg_status__query_timeout_ms`; when that deadline expires, the connection is
 closed and the host's failure counter is incremented.
 
-A slow or unresponsive host therefore does not block updates for the other
-hosts. The rest of the cluster continues to refresh independently while the
-slow host waits for its deadline.
+Waiting for a slow or unresponsive host's socket does not block updates for
+the other hosts. DNS resolution during connection setup can still block
+inside libpq and delay the monitoring loop, including deadline handling.
 
 ### Byte lag
 
@@ -522,12 +531,19 @@ important for this project than a consistent view across all hosts.
 If a host does not respond to a status check, the cause may be either a
 temporary issue or an actual outage. To avoid marking a host as dead
 prematurely, pg-status waits for `pg_status__max_fails` consecutive failed
-checks. A failed iteration is aborted after at most
-`pg_status__query_timeout_ms`. The worst-case detection time is approximately:
+checks. With responsive event-loop scheduling, an unanswered check times out
+after `pg_status__query_timeout_ms`. Counting from the outage, the worst-case
+detection time is approximately:
 
 ```text
-max_fails × query_timeout_ms + (max_fails − 1) × sleep_ms
+sleep_ms + query_timeout_ms
+  + (max_fails − 1) × max(sleep_ms, query_timeout_ms)
 ```
+
+The initial `sleep_ms` allows for an outage just after a successful check.
+With the defaults (1000 ms period, 1000 ms timeout, 3 failures), detection
+takes up to roughly 4 seconds. Immediate connection errors can be detected
+sooner; DNS stalls or delays in the monitoring thread can extend this time.
 
 After the first failed check, but before the failure count reaches
 `pg_status__max_fails`, the host is marked as possibly dead. This state affects

@@ -106,6 +106,35 @@ foreach(TEST_CASE
     )
 endforeach()
 
+add_executable(poll_scheduler_test test_poll_scheduler.c)
+target_link_libraries(poll_scheduler_test PRIVATE
+        common_warnings common_support pg_monitor utils logging
+        pg_status_libpq Threads::Threads)
+target_include_directories(poll_scheduler_test PRIVATE "${PROJECT_BINARY_DIR}/src/pg_monitor")
+foreach(TEST_CASE
+        period overrun failure_period default_failure_timing
+        independent_hosts_and_warmup deadline_before_event fresh_clock
+        missing_socket wait_for_deadline defaults custom_parameters)
+    add_test(NAME poll_scheduler.${TEST_CASE} COMMAND poll_scheduler_test ${TEST_CASE})
+    set_tests_properties(poll_scheduler.${TEST_CASE} PROPERTIES
+            TIMEOUT 15 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")
+endforeach()
+foreach(TEST_CASE zero_period zero_timeout overflow_timeout)
+    if(TEST_CASE STREQUAL "zero_period")
+        set(EXPECTED_OUTPUT "pg_status__sleep_ms must be greater than 0")
+    else()
+        set(EXPECTED_OUTPUT "pg_status__query_timeout_ms must be between 1 and")
+    endif()
+    add_test(NAME poll_scheduler.${TEST_CASE}
+            COMMAND ${CMAKE_COMMAND}
+            "-DPROGRAM=$<TARGET_FILE:poll_scheduler_test>"
+            "-DARGUMENT=${TEST_CASE}"
+            "-DEXPECTED_OUTPUT=${EXPECTED_OUTPUT}"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake)
+    set_tests_properties(poll_scheduler.${TEST_CASE} PROPERTIES
+            TIMEOUT 15 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")
+endforeach()
+
 add_executable(master_selection_test test_master_selection.c)
 target_link_libraries(
         master_selection_test PRIVATE

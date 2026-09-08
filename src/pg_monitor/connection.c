@@ -13,7 +13,6 @@ PGConnectionParameters pg_connection_parameters(const MonitorHost *host) {
         "host",
         "port",
         "dbname",
-        "connect_timeout",
         nullptr,
       },
     .values = {
@@ -22,7 +21,6 @@ PGConnectionParameters pg_connection_parameters(const MonitorHost *host) {
       host->host,
       host->port,
       parameters.database,
-      parameters.connect_timeout,
       nullptr,
     },
   };

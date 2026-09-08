@@ -519,11 +519,11 @@ $ curl http://localhost:8000/hosts | jq .
 | Parameter | Default | What it does |
 |---|---|---|
 | `pg_status__hosts` | — | Comma-separated list of hosts (required) |
-| `pg_status__sleep_ms` | 5000 | Host polling interval in ms |
+| `pg_status__sleep_ms` | 1000 | Period between starts of checks of each host, in ms |
 | `pg_status__sync_max_lag_ms` | 1000 | Lag threshold for `sync_by_time` |
 | `pg_status__sync_max_lag_bytes` | 1000000 | Lag threshold for `sync_by_bytes` |
 | `pg_status__max_fails` | 3 | Consecutive failures before a host is declared dead |
-| `pg_status__query_timeout_ms` | 5000 | Timeout for a single host poll in ms |
+| `pg_status__query_timeout_ms` | 1000 | Timeout for a single host poll in ms |
 
 ### Where to Get It
 

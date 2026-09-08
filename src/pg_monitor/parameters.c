@@ -30,13 +30,12 @@ MonitorParameters parameters = {
   .geo_locality_configured = false,
   .geo_locality_enabled = false,
   .port = "5432",
-  .connect_timeout = "2",
-  .sleep_ms = 5000,
+  .sleep_ms = 1000,
   .max_fails = 3,
   .sync_max_lag_ms = 1000,
   .sync_max_lag_bytes = 1000000,  // 1 mb
   .conn_max_age_ms = 300000,      // 5 minutes
-  .query_timeout_ms = 5000,
+  .query_timeout_ms = 1000,
 };
 
 static bool is_valid_environment_name(const char *name) {
@@ -132,7 +131,6 @@ void set_parameters_from_env(void) {
   replace_from_env("pg_status__pg_user", &parameters.user);
   replace_from_env("pg_status__pg_database", &parameters.database);
   replace_from_env("pg_status__pg_password", &parameters.password);
-  replace_from_env("pg_status__connect_timeout", &parameters.connect_timeout);
   replace_from_env("pg_status__pg_port", &parameters.port);
   replace_from_env_uint("pg_status__max_fails", &parameters.max_fails);
   replace_from_env_ull(
@@ -149,5 +147,16 @@ void set_parameters_from_env(void) {
   );
   set_locality();
   set_sleep();
+  if (parameters.sleep_ms == 0) {
+    pg_status_log_fatal("config", "pg_status__sleep_ms must be greater than 0");
+  }
+  if (
+    parameters.query_timeout_ms == 0 ||
+    parameters.query_timeout_ms > (uint64_t)INT_MAX
+  ) {
+    pg_status_log_fatal(
+      "config", "pg_status__query_timeout_ms must be between 1 and %d", INT_MAX
+    );
+  }
   set_hosts();
 }

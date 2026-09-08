@@ -6,6 +6,7 @@
 #include "common_support.h"
 
 // Exercise the actual private recomputation without exposing a test-only API.
+// NOLINTNEXTLINE(bugprone-suspicious-include)
 #include "../../src/pg_monitor/pg_monitor.c"
 
 static const MonitorStatus healthy_master = {.alive = true, .master = true};

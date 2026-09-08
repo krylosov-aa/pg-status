@@ -221,7 +221,9 @@ static void poll_state_idle(MonitorHost *host, const uint64_t now_ms) {
   host->iter_deadline_ms = 0;
   host->iter_data_ready = false;
   host->iter_retry_without_wal_receiver = false;
-  host->next_poll_at_ms = now_ms + (uint64_t)parameters.sleep_ms;
+  const uint64_t scheduled_at_ms = host->iter_started_at_ms +
+                                   (uint64_t)parameters.sleep_ms;
+  host->next_poll_at_ms = scheduled_at_ms > now_ms ? scheduled_at_ms : now_ms;
 }
 
 /**
@@ -323,7 +325,7 @@ static bool parse_result(MonitorHost *host, const PGresult *res) {
  * preserves the last successful measurements, and closes the connection
  * so the next iteration will reconnect.
  * Always returns the host to IDLE and schedules the next iteration
- * `sleep_ms` into the future.
+ * relative to the iteration's start, without overlapping checks or catch-up.
  */
 static void finish_iteration(
   MonitorHost *host, const bool success, const uint64_t now_ms
@@ -544,6 +546,7 @@ static bool start_connect(MonitorHost *host) {
 }
 
 static void reset_iter_state(MonitorHost *host, const uint64_t now_ms) {
+  host->iter_started_at_ms = now_ms;
   host->iter_data_ready = false;
   host->iter_retry_without_wal_receiver = false;
   host->iter_new_status = (MonitorStatus){

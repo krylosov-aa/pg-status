@@ -63,16 +63,13 @@ typedef struct {
   // pg port. You can specify multiple ports, comma-separated.
   const char *port;
 
-  // Time to attempt connection to host
-  const char *connect_timeout;
-
   // The lag in ms below which a replica is considered synchronous
   uint64_t sync_max_lag_ms;
 
   // The lag in bytes below which a replica is considered synchronous
   uint64_t sync_max_lag_bytes;
 
-  // Time between checks in ms
+  // Target period between starts of checks of the same host, in ms (> 0).
   int sleep_ms;
 
   // After this number of failed checks in a row, the host is considered dead.
@@ -189,14 +186,15 @@ typedef struct {
   _Atomic MonitorStatus status;     // protected by seq
 
   // ---- writer-private async-poll state ----
-  struct pg_conn *conn;        // reused PGconn, or NULL when disconnected
-  HostPollState poll_state;    // current phase of the state machine
-  short poll_events;           // events to wait for on PQsocket(conn)
-  uint64_t next_poll_at_ms;    // monotonic deadline to start next iteration
-  uint64_t iter_deadline_ms;   // monotonic deadline for current iteration
-  uint64_t connected_at_ms;    // monotonic time of last successful connect
-  int pollfd_slot;             // transient index into the main-loop pollfd[]
-  bool wal_receiver_disabled;  // permission fallback, reset on disconnect
+  struct pg_conn *conn;         // reused PGconn, or NULL when disconnected
+  HostPollState poll_state;     // current phase of the state machine
+  short poll_events;            // events to wait for on PQsocket(conn)
+  uint64_t next_poll_at_ms;     // monotonic deadline to start next iteration
+  uint64_t iter_started_at_ms;  // monotonic start of current/last iteration
+  uint64_t iter_deadline_ms;    // monotonic deadline for current iteration
+  uint64_t connected_at_ms;     // monotonic time of last successful connect
+  int pollfd_slot;              // transient index into the main-loop pollfd[]
+  bool wal_receiver_disabled;   // permission fallback, reset on disconnect
   bool iter_retry_without_wal_receiver;  // drain results before retrying
 
   // Staging area for the current iteration. Populated once the result row
@@ -388,7 +386,8 @@ void start_host_poll(MonitorHost *host, uint64_t now_ms);
  * Drives the per-host state machine in response to `revents` from
  * poll(). On completion (success or any error), the host returns to IDLE and
  * its shared state (`status`, `lag_ms`, `lag_bytes`, `lsn`) is updated via the
- * seqlock; `next_poll_at_ms` is scheduled `sleep_ms` into the future.
+ * seqlock. The next check is due at the previous start plus `sleep_ms`,
+ * or immediately if that time has already passed. Checks never overlap.
  */
 void advance_host_poll(MonitorHost *host, uint64_t now_ms);
 
