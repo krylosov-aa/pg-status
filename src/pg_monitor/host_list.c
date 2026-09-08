@@ -138,10 +138,47 @@ static bool init_locality(
   return enabled;
 }
 
-/**
- * Initializes the MonitorHost array to its initial values.
- */
+/** Reject empty entries before tokenization can discard their positions. */
+static size_t count_required_list_items(
+  const char *values, const char *parameter_name
+) {
+  size_t count = 0;
+  const char *item = values;
+  for (;;) {
+    if (!item || !*item || *item == ',') {
+      pg_status_log_fatal(
+        "config", "%s must not contain empty entries", parameter_name
+      );
+    }
+    count++;
+    const char *separator = strchr(item, ',');
+    if (!separator) {
+      return count;
+    }
+    item = separator + 1;
+  }
+}
+
+/** Initializes the MonitorHost array to its initial values. */
 void init_monitor_host_list(void) {
+  const size_t configured_host_count = count_required_list_items(
+    parameters.hosts, "pg_status__hosts"
+  );
+  if (configured_host_count > MAX_HOSTS) {
+    pg_status_log_fatal("config", "too many hosts; maximum=%d", MAX_HOSTS);
+  }
+  const size_t port_count = count_required_list_items(
+    parameters.port, "pg_status__pg_port"
+  );
+  if (port_count != 1 && port_count != configured_host_count) {
+    pg_status_log_fatal(
+      "config",
+      "pg_status__pg_port must contain one port or exactly one port per host "
+      "(hosts=%zu, ports=%zu)",
+      configured_host_count, port_count
+    );
+  }
+
   char *hosts = copy_string(parameters.hosts);
   char *host_save_ptr = nullptr;
   char *host = strtok_r(hosts, ",", &host_save_ptr);
@@ -149,13 +186,6 @@ void init_monitor_host_list(void) {
   char *ports = copy_string(parameters.port);
   char *port_save_ptr = nullptr;
   char *port = strtok_r(ports, ",", &port_save_ptr);
-  if (!port) {
-    free(hosts);
-    free(ports);
-    pg_status_log_fatal(
-      "config", "pg_status__pg_port must contain at least one port"
-    );
-  }
 
   while (host) {
     if (host_count == MAX_HOSTS) {
@@ -164,14 +194,10 @@ void init_monitor_host_list(void) {
     init_monitor_host(&monitor_host_list[host_count], host, port);
 
     host = strtok_r(nullptr, ",", &host_save_ptr);
-    char *next_port = strtok_r(nullptr, ",", &port_save_ptr);
-    if (next_port) {
-      port = next_port;
+    if (port_count > 1) {
+      port = strtok_r(nullptr, ",", &port_save_ptr);
     }
     host_count++;
-  }
-  if (host_count == 0) {
-    pg_status_log_fatal("config", "host count must be greater than 0");
   }
 
   parameters.dc_locality_enabled = init_locality(

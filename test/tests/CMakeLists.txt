@@ -38,6 +38,35 @@ foreach(TEST_CASE IN LISTS CONNECTION_TEST_CASES)
     )
 endforeach()
 
+add_executable(host_list_test test_host_list.c)
+target_link_libraries(host_list_test PRIVATE common_warnings common_support pg_monitor)
+foreach(TEST_CASE shared_port per_host_ports)
+    add_test(NAME host_list.${TEST_CASE} COMMAND host_list_test ${TEST_CASE})
+    set_tests_properties(host_list.${TEST_CASE} PROPERTIES
+            TIMEOUT 15 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")
+endforeach()
+
+foreach(TEST_CASE
+        empty_ports leading_empty_port middle_empty_port trailing_empty_port
+        too_few_ports too_many_ports extra_port_single_host
+        empty_hosts leading_empty_host middle_empty_host trailing_empty_host)
+    if(TEST_CASE MATCHES "^(empty_hosts|leading_empty_host|middle_empty_host|trailing_empty_host)$")
+        set(EXPECTED_OUTPUT "pg_status__hosts must not contain empty entries")
+    elseif(TEST_CASE MATCHES "^(too_few_ports|too_many_ports|extra_port_single_host)$")
+        set(EXPECTED_OUTPUT "pg_status__pg_port must contain one port or exactly one port per host")
+    else()
+        set(EXPECTED_OUTPUT "pg_status__pg_port must not contain empty entries")
+    endif()
+    add_test(NAME host_list.${TEST_CASE}
+            COMMAND ${CMAKE_COMMAND}
+            "-DPROGRAM=$<TARGET_FILE:host_list_test>"
+            "-DARGUMENT=${TEST_CASE}"
+            "-DEXPECTED_OUTPUT=${EXPECTED_OUTPUT}"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake)
+    set_tests_properties(host_list.${TEST_CASE} PROPERTIES
+            TIMEOUT 15 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")
+endforeach()
+
 add_executable(locality_test test_locality.c)
 target_link_libraries(
         locality_test PRIVATE
@@ -388,7 +417,7 @@ add_test(
         NAME pg_status.invalid_port_list
         COMMAND ${CMAKE_COMMAND}
         "-DPROGRAM=$<TARGET_FILE:pg-status>"
-        "-DEXPECTED_OUTPUT=pg_status__pg_port must contain at least one port"
+        "-DEXPECTED_OUTPUT=pg_status__pg_port must not contain empty entries"
         -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
 )
 set_tests_properties(
