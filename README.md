@@ -345,6 +345,7 @@ Configure pg-status using the following environment variables:
 - `pg_status__http_port` — HTTP server port. Default: `8000`.
 - `pg_status__log_level` — Minimum logging level. Accepts `debug`, `info`,
   `warning` (or `warn`), `error`, or `fatal`. Default: `info`.
+- `pg_status__log_format` — Log format: `text` (default) or `json`.
 
 All locality variables are optional. A dimension is used for replica selection
 only when both its current value and one non-empty positional value for every
@@ -554,15 +555,27 @@ health group, the first master in `pg_status__hosts` wins.
 
 ## Logging
 
-The service writes thread-safe, single-line logs to stderr. Calls from the HTTP
-and monitor threads enqueue records in a bounded in-memory queue; a dedicated
-logging thread writes them in queue order. Every line contains an RFC 3339 UTC
-timestamp, severity, component, and message:
+The service writes thread-safe, single-line logs to stderr.
+The default `text` format contains an RFC 3339 UTC timestamp, severity, component,
+and message:
 
 ```text
 2026-08-21T12:34:56.123Z INFO http: server started address=0.0.0.0 port=8000
 2026-08-21T12:35:01.245Z WARNING monitor: host state changed host=pg-2 state=possible_dead
 ```
+
+Set `pg_status__log_format=json` for one JSON object per line, with the same
+RFC 3339 UTC timestamps and Deploy-compatible fields:
+
+```json
+{"@timestamp":"2026-08-21T12:35:01.245Z","levelStr":"WARNING","component":"monitor","message":"host state changed host=pg-2 state=possible_dead"}
+```
+
+`pg_status__log_level` applies independently of the format. System errors add
+a numeric `errno`. Fatal records use `levelStr=ERROR`.
+Long values are shortened with `...[truncated]`
+while preserving valid JSON. Host names, states, and lag values remain in
+`message`.
 
 The default `info` level reports startup, shutdown, role changes, availability
 changes, and transitions across the global `pg_status__sync_max_lag_*`

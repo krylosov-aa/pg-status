@@ -138,12 +138,42 @@ target_link_libraries(
         logger_test PRIVATE
         common_warnings
         logging
+        pg_status_cjson
         common_support
         Threads::Threads
 )
 
+# Controlled formatter doubles verify that callers never execute formatting
+# or retain caller-owned strings. Output tests below use the real formatters.
+add_executable(logger_deferred_test test_logger_deferred.c ../../src/logging/logger.c)
+target_include_directories(logger_deferred_test PRIVATE ../../src/logging)
+target_link_libraries(logger_deferred_test PRIVATE common_warnings common_support Threads::Threads)
+foreach(FORMAT IN ITEMS text json)
+    add_test(NAME logger.deferred_${FORMAT} COMMAND logger_deferred_test ${FORMAT})
+    set_tests_properties(logger.deferred_${FORMAT} PROPERTIES
+            TIMEOUT 15 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")
+endforeach()
+
 set(LOGGER_TEST_CASES
         message_format
+        text_format_environment
+        json_format
+        json_escape_roundtrip
+        json_unicode_boundaries
+        json_errno_boundaries
+        json_exact_capacity
+        json_shutdown_flushes
+        json_concurrent_lifecycle
+        json_truncation
+        json_fitting_values_preserved
+        json_retry_truncation
+        json_utf8_truncation
+        json_small_output_buffer
+        json_invalid_utf8
+        json_concurrent_messages
+        json_backpressure_recovery
+        json_partial_write_recovery
+        json_failure_paths
         level_filtering
         init_from_environment
         system_error
@@ -175,6 +205,14 @@ foreach(TEST_CASE IN LISTS LOGGER_TEST_CASES)
     )
 endforeach()
 
+add_test(
+        NAME logger.invalid_format
+        COMMAND ${CMAKE_COMMAND}
+        "-DPROGRAM=$<TARGET_FILE:logger_test>"
+        "-DARGUMENT=invalid_format"
+        "-DEXPECTED_OUTPUT=invalid pg_status__log_format='yaml'"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
+)
 add_test(
         NAME logger.invalid_level
         COMMAND ${CMAKE_COMMAND}
@@ -216,6 +254,7 @@ add_test(
         -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
 )
 set_tests_properties(
+        logger.invalid_format
         logger.invalid_level
         logger.fatal
         logger.fatal_flushes_queue
