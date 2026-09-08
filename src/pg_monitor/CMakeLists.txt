@@ -7,23 +7,23 @@ add_library(pg_monitor
         parameters.c
 )
 
-set_property(
-        DIRECTORY APPEND
-        PROPERTY CMAKE_CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/streaming_replication_query.sql"
-)
-file(
-        READ
-        "${CMAKE_CURRENT_SOURCE_DIR}/streaming_replication_query.sql"
-        PG_STATUS_STREAMING_REPLICATION_QUERY_HEX
-        HEX
-)
-string(
-        REGEX REPLACE
-        "(..)" "0x\\1, "
-        PG_STATUS_STREAMING_REPLICATION_QUERY_BYTES
-        "${PG_STATUS_STREAMING_REPLICATION_QUERY_HEX}"
-)
+foreach(QUERY_NAME
+        streaming_replication_query
+        streaming_replication_query_without_wal_receiver)
+    set_property(
+            DIRECTORY APPEND
+            PROPERTY CMAKE_CONFIGURE_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/${QUERY_NAME}.sql"
+    )
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${QUERY_NAME}.sql" QUERY_HEX HEX)
+    string(TOUPPER "${QUERY_NAME}" QUERY_VARIABLE)
+    string(
+            REGEX REPLACE
+            "(..)" "0x\\1, "
+            PG_STATUS_${QUERY_VARIABLE}_BYTES
+            "${QUERY_HEX}"
+    )
+endforeach()
 configure_file(
         streaming_replication_query.h.in
         "${CMAKE_CURRENT_BINARY_DIR}/streaming_replication_query.h"

@@ -189,13 +189,15 @@ typedef struct {
   _Atomic MonitorStatus status;     // protected by seq
 
   // ---- writer-private async-poll state ----
-  struct pg_conn *conn;       // reused PGconn, or NULL when disconnected
-  HostPollState poll_state;   // current phase of the state machine
-  short poll_events;          // events to wait for on PQsocket(conn)
-  uint64_t next_poll_at_ms;   // monotonic deadline to start next iteration
-  uint64_t iter_deadline_ms;  // monotonic deadline for current iteration
-  uint64_t connected_at_ms;   // monotonic time of last successful connect
-  int pollfd_slot;            // transient index into the main-loop pollfd[]
+  struct pg_conn *conn;        // reused PGconn, or NULL when disconnected
+  HostPollState poll_state;    // current phase of the state machine
+  short poll_events;           // events to wait for on PQsocket(conn)
+  uint64_t next_poll_at_ms;    // monotonic deadline to start next iteration
+  uint64_t iter_deadline_ms;   // monotonic deadline for current iteration
+  uint64_t connected_at_ms;    // monotonic time of last successful connect
+  int pollfd_slot;             // transient index into the main-loop pollfd[]
+  bool wal_receiver_disabled;  // permission fallback, reset on disconnect
+  bool iter_retry_without_wal_receiver;  // drain results before retrying
 
   // Staging area for the current iteration. Populated once the result row
   // is parsed; published to {status, lag_ms, lag_bytes, lsn} on success.

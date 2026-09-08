@@ -71,6 +71,41 @@ foreach(TEST_CASE IN LISTS LOCALITY_TEST_CASES)
     )
 endforeach()
 
+add_executable(poll_result_test test_poll_result.c)
+target_link_libraries(
+        poll_result_test PRIVATE
+        common_warnings
+        common_support
+        pg_monitor
+        utils
+        logging
+        pg_status_libpq
+)
+target_include_directories(
+        poll_result_test PRIVATE "${PROJECT_BINARY_DIR}/src/pg_monitor"
+)
+foreach(TEST_CASE
+        latest_end_lsn
+        latest_end_lsn_without_master
+        older_latest_end_lsn
+        missing_latest_end_lsn
+        replay_ahead_of_observations
+        master_ignores_latest_end_lsn
+        permission_fallback_replica
+        permission_fallback_master
+        permission_fallback_failure
+        permission_fallback_unrelated_error
+        permission_fallback_timeout
+        permission_fallback_send_failure)
+    add_test(NAME poll_result.${TEST_CASE} COMMAND poll_result_test ${TEST_CASE})
+    set_tests_properties(
+            poll_result.${TEST_CASE}
+            PROPERTIES
+            TIMEOUT 15
+            ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}"
+    )
+endforeach()
+
 add_executable(logger_test test_logger.c)
 target_link_libraries(
         logger_test PRIVATE

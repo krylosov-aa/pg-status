@@ -466,6 +466,28 @@ A slow or unresponsive host therefore does not block updates for the other
 hosts. The rest of the cluster continues to refresh independently while the
 slow host waits for its deadline.
 
+### Byte lag
+
+`lag_bytes` estimates how many WAL bytes a replica has yet to replay.
+It uses the maximum of three known positions: the last observed master LSN
+(`pg_current_wal_lsn()`), WAL received by the replica
+(`pg_last_wal_receive_lsn()`), and the upstream WAL end reported to its receiver
+(`pg_stat_wal_receiver.latest_end_lsn`).
+
+```text
+lag_bytes = max(0, max(master_lsn, received_lsn, latest_end_lsn) - replay_lsn)
+```
+
+`replay_lsn` is `pg_last_wal_replay_lsn()`: WAL already applied by the replica.
+These observations can be stale, so zero byte lag does not guarantee freshness.
+
+For more complete measurements, the monitoring user needs `pg_read_all_stats`
+(or `pg_monitor`) and access to `pg_stat_wal_receiver`.
+
+If receiver statistics are unavailable, polling continues using other WAL
+positions. Permission errors produce a warning; access is retried after
+reconnection.
+
 ### Connection reuse
 
 PostgreSQL connections are kept alive between polling iterations. Opening a

@@ -9,7 +9,5 @@ select
   , case when is_replica
       then coalesce(greatest(0, (extract(epoch from now() - pg_last_xact_replay_timestamp()) * 1000)::bigint), 0)
       else 0 end replica_lag_ms
-  , case when is_replica
-      then (select latest_end_lsn from pg_catalog.pg_stat_wal_receiver)
-      end receiver_latest_end_lsn
+  , null::pg_lsn receiver_latest_end_lsn
 from is_in_recovery;

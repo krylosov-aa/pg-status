@@ -190,7 +190,10 @@ static MonitorStatus replica_status() {
 }
 
 static bool send_query(const MonitorHost *host) {
-  if (PQsendQuery(host->conn, streaming_replication_query) == 0) {
+  const char *query = host->wal_receiver_disabled
+                        ? streaming_replication_query_without_wal_receiver
+                        : streaming_replication_query;
+  if (PQsendQuery(host->conn, query) == 0) {
     log_postgres_error(host, "send_query");
     return false;
   }
@@ -217,6 +220,7 @@ static void poll_state_idle(MonitorHost *host, const uint64_t now_ms) {
   host->poll_events = 0;
   host->iter_deadline_ms = 0;
   host->iter_data_ready = false;
+  host->iter_retry_without_wal_receiver = false;
   host->next_poll_at_ms = now_ms + (uint64_t)parameters.sleep_ms;
 }
 
@@ -237,6 +241,8 @@ static void close_conn(MonitorHost *host) {
     host->conn = nullptr;
   }
   host->connected_at_ms = 0;
+  host->wal_receiver_disabled = false;
+  host->iter_retry_without_wal_receiver = false;
 }
 
 /**
@@ -272,9 +278,14 @@ static bool validate_sql_result(const MonitorHost *host, const PGresult *res) {
 static void parse_replica_result(MonitorHost *host, const PGresult *res) {
   const uint64_t replica_received_lsn = parse_lsn(PQgetvalue(res, 0, 2));
   const uint64_t replica_lsn = parse_lsn(PQgetvalue(res, 0, 3));
+  const uint64_t receiver_latest_end_lsn = parse_lsn(PQgetvalue(res, 0, 5));
+  const uint64_t known_end_lsn = max_lsn(
+    master_lsn, max_lsn(replica_received_lsn, receiver_latest_end_lsn)
+  );
   host->iter_new_lag_ms = str_to_ull(PQgetvalue(res, 0, 4));
-  host->iter_new_lag_bytes = max_lsn(master_lsn, replica_received_lsn) -
-                             replica_lsn;
+  host->iter_new_lag_bytes = known_end_lsn > replica_lsn
+                               ? known_end_lsn - replica_lsn
+                               : 0;
   host->iter_new_lsn = replica_lsn;
   host->iter_new_status = replica_status();
 }
@@ -382,6 +393,32 @@ static bool consume_input(const MonitorHost *host) {
   return true;
 }
 
+static bool retry_without_wal_receiver(MonitorHost *host, const PGresult *res) {
+  if (
+    host->wal_receiver_disabled || PQresultStatus(res) != PGRES_FATAL_ERROR ||
+    !is_equal_strings(PQresultErrorField(res, PG_DIAG_SQLSTATE), "42501")
+  ) {
+    return false;
+  }
+
+  // SQLSTATE identifies insufficient_privilege without depending on the
+  // server's message language. If another required object is denied, the
+  // query without the receiver will still fail and count as a failed poll.
+  host->wal_receiver_disabled = true;
+  host->iter_retry_without_wal_receiver = true;
+  pg_status_log(
+    PG_STATUS_LOG_WARNING, "monitor",
+    "PostgreSQL permission denied host=%s sqlstate=42501; "
+    "retrying poll without WAL receiver statistics until reconnect; "
+    "for more complete byte lag measurements, check SELECT on "
+    "pg_catalog.pg_stat_wal_receiver and EXECUTE on "
+    "pg_catalog.pg_stat_get_wal_receiver(); pg_read_all_stats privileges "
+    "are also needed to expose latest_end_lsn",
+    host->host
+  );
+  return true;
+}
+
 /**
  * Drives the QUERY_READ phase: consume any pending input, drain ready
  * results, finish if the end-of-results NULL is observed, otherwise
@@ -397,10 +434,24 @@ static void read_step(MonitorHost *host, const uint64_t now_ms) {
   while (PQisBusy(host->conn) == 0) {
     PGresult *res = PQgetResult(host->conn);
     if (res == nullptr) {
+      if (host->iter_retry_without_wal_receiver) {
+        // libpq requires draining the previous query through NULL before
+        // sending another one. Keep the original iteration deadline.
+        host->iter_retry_without_wal_receiver = false;
+        if (!send_query(host)) {
+          finish_iteration(host, false, now_ms);
+          return;
+        }
+        poll_state_query_send(host);
+        return;
+      }
       finish_iteration(host, host->iter_data_ready, now_ms);
       return;
     }
-    if (!host->iter_data_ready) {
+    if (
+      !host->iter_data_ready && !host->iter_retry_without_wal_receiver &&
+      !retry_without_wal_receiver(host, res)
+    ) {
       host->iter_data_ready = parse_result(host, res);
     }
     PQclear(res);
@@ -494,6 +545,7 @@ static bool start_connect(MonitorHost *host) {
 
 static void reset_iter_state(MonitorHost *host, const uint64_t now_ms) {
   host->iter_data_ready = false;
+  host->iter_retry_without_wal_receiver = false;
   host->iter_new_status = (MonitorStatus){
     .alive = false, .master = false, .possible_dead = true
   };

@@ -52,6 +52,8 @@ static void init_monitor_host(
   monitor_host->iter_deadline_ms = 0;
   monitor_host->connected_at_ms = 0;
   monitor_host->pollfd_slot = -1;
+  monitor_host->wal_receiver_disabled = false;
+  monitor_host->iter_retry_without_wal_receiver = false;
   monitor_host->iter_data_ready = false;
   monitor_host->iter_new_status = (MonitorStatus){
     .alive = false, .master = false, .possible_dead = false

@@ -2,3 +2,8 @@
 static const char streaming_replication_query[] = {
   @PG_STATUS_STREAMING_REPLICATION_QUERY_BYTES@ '\0',
 };
+
+/* Generated from streaming_replication_query_without_wal_receiver.sql. */
+static const char streaming_replication_query_without_wal_receiver[] = {
+  @PG_STATUS_STREAMING_REPLICATION_QUERY_WITHOUT_WAL_RECEIVER_BYTES@ '\0',
+};
