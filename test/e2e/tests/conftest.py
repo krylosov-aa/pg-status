@@ -1,5 +1,8 @@
 """Configuration and fixture plugins for explicit end-to-end tests."""
 
+import signal
+from types import FrameType
+
 import pytest
 
 from support.config import PROFILES
@@ -25,3 +28,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--e2e-project",
         help="explicit Docker Compose project name",
     )
+
+
+def _interrupt(_signal: int, _frame: FrameType | None) -> None:
+    raise KeyboardInterrupt("e2e interrupted; cleaning up owned resources")
+
+
+def pytest_configure() -> None:
+    """Let fixture finalizers run when the enclosing audit times out."""
+    signal.signal(signal.SIGTERM, _interrupt)

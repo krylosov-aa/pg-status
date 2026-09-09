@@ -170,7 +170,7 @@ static void test_text_format_environment(void) {
 
 static void emit_json_messages(void) {
   static const char *component = "monitor\n\"\\\t";
-  static const char *message = "реплика 😀\n\r\t\b\f\001\037\177\"\\";
+  static const char *message = "replica µ 😀\n\r\t\b\f\001\037\177\"\\";
   pg_status_log_set_level(PG_STATUS_LOG_DEBUG);
   pg_status_log(PG_STATUS_LOG_DEBUG, component, "%s", message);
   pg_status_log(PG_STATUS_LOG_INFO, nullptr, "info");
@@ -202,7 +202,7 @@ static void test_json_format(void) {
     if (index == 0) {
       assert_json_string(record, "component", "monitor\n\"\\\t");
       assert_json_string(
-        record, "message", "реплика 😀\n\r\t\b\f\001\037\177\"\\"
+        record, "message", "replica µ 😀\n\r\t\b\f\001\037\177\"\\"
       );
     } else if (index == 1) {
       assert_json_string(record, "component", "unknown");
@@ -769,6 +769,76 @@ static void emit_concurrent_messages(void) {
     }
     pg_status_log_flush();
   }
+  // Wait for the final dropped-message summary before restoring stderr.
+  pg_status_log_shutdown();
+}
+
+typedef struct {
+  bool seen[CONCURRENT_ROUND_COUNT * WORKER_COUNT][MESSAGES_PER_WORKER];
+  size_t written;
+  size_t dropped;
+} ConcurrentRecords;
+
+static size_t read_concurrent_number(const char **cursor, const char *prefix) {
+  const size_t prefix_length = strlen(prefix);
+  if (strncmp(*cursor, prefix, prefix_length) != 0) {
+    support_fail("corrupted concurrent message prefix");
+  }
+  const char *number = *cursor + prefix_length;
+  if (!isdigit((unsigned char)*number)) {
+    support_fail("missing concurrent message number");
+  }
+  errno = 0;
+  char *end = nullptr;
+  const unsigned long parsed = strtoul(number, &end, 10);
+  if (errno != 0 || end == number) {
+    support_fail("invalid concurrent message number");
+  }
+  *cursor = end;
+  return (size_t)parsed;
+}
+
+static void count_concurrent_message(
+  ConcurrentRecords *records, const char *message
+) {
+  const size_t worker = read_concurrent_number(&message, "worker=");
+  const size_t index = read_concurrent_number(&message, " message=");
+  support_assert_true(*message == '\0', "corrupted concurrent message");
+  if (
+    worker >= (size_t)CONCURRENT_ROUND_COUNT * WORKER_COUNT ||
+    index >= MESSAGES_PER_WORKER
+  ) {
+    support_fail("unexpected concurrent message identity");
+  }
+  support_assert_true(!records->seen[worker][index], "duplicate log message");
+  records->seen[worker][index] = true;
+  records->written++;
+}
+
+static void count_concurrent_drops(
+  ConcurrentRecords *records, const char *message
+) {
+  const size_t dropped = read_concurrent_number(
+    &message, "messages dropped count="
+  );
+  support_assert_string_equal(
+    message, " reason=backpressure", "corrupted dropped-message summary"
+  );
+  support_assert_true(
+    dropped > 0 && dropped <= (size_t)CONCURRENT_ROUND_COUNT * WORKER_COUNT *
+                                MESSAGES_PER_WORKER,
+    "invalid dropped-message count"
+  );
+  records->dropped += dropped;
+}
+
+static void assert_concurrent_accounting(const ConcurrentRecords *records) {
+  support_assert_true(records->written > 0, "no concurrent messages written");
+  support_assert_true(
+    records->written + records->dropped ==
+      (size_t)CONCURRENT_ROUND_COUNT * WORKER_COUNT * MESSAGES_PER_WORKER,
+    "concurrent messages lost without an accurate summary"
+  );
 }
 
 static void test_concurrent_messages(void) {
@@ -780,22 +850,26 @@ static void test_concurrent_messages(void) {
   char *output = support_capture_standard_error(emit_concurrent_messages);
 
   // Assert
-  size_t line_count = 0;
+  ConcurrentRecords records = {0};
   char *save_pointer = nullptr;
   char *line = strtok_r(output, "\n", &save_pointer);
   while (line) {
     support_assert_true(has_timestamp_shape(line), "concurrent timestamp");
-    support_assert_contains(
-      line, " INFO concurrency: worker=", "interleaved concurrent log line"
-    );
-    line_count++;
+    static const char prefix[] = "INFO concurrency: ";
+    static const char drop_prefix[] = "WARNING logger: ";
+    const char *record = line + 25;
+    if (strncmp(record, prefix, sizeof(prefix) - 1) == 0) {
+      count_concurrent_message(&records, record + sizeof(prefix) - 1);
+    } else {
+      support_assert_true(
+        strncmp(record, drop_prefix, sizeof(drop_prefix) - 1) == 0,
+        "interleaved concurrent log line"
+      );
+      count_concurrent_drops(&records, record + sizeof(drop_prefix) - 1);
+    }
     line = strtok_r(nullptr, "\n", &save_pointer);
   }
-  support_assert_true(
-    line_count ==
-      (size_t)CONCURRENT_ROUND_COUNT * WORKER_COUNT * MESSAGES_PER_WORKER,
-    "concurrent log line count"
-  );
+  assert_concurrent_accounting(&records);
 
   // Cleanup
   free(output);
@@ -807,19 +881,24 @@ static void test_json_concurrent_messages(void) {
   char *output = support_capture_standard_error(emit_concurrent_messages);
   pg_status_log_shutdown();
   char *cursor = output;
-  size_t count = 0;
+  ConcurrentRecords records = {0};
   while (*cursor) {
     cJSON *record = parse_next_json_record(&cursor);
-    assert_json_string(record, "component", "concurrency");
-    assert_json_string(record, "levelStr", "INFO");
+    const char *component =
+      cJSON_GetObjectItemCaseSensitive(record, "component")->valuestring;
+    const char *message =
+      cJSON_GetObjectItemCaseSensitive(record, "message")->valuestring;
+    if (strcmp(component, "concurrency") == 0) {
+      assert_json_string(record, "levelStr", "INFO");
+      count_concurrent_message(&records, message);
+    } else {
+      assert_json_string(record, "component", "logger");
+      assert_json_string(record, "levelStr", "WARNING");
+      count_concurrent_drops(&records, message);
+    }
     cJSON_Delete(record);
-    count++;
   }
-  support_assert_true(
-    count ==
-      (size_t)CONCURRENT_ROUND_COUNT * WORKER_COUNT * MESSAGES_PER_WORKER,
-    "concurrent JSON log line count"
-  );
+  assert_concurrent_accounting(&records);
   free(output);
 }
 

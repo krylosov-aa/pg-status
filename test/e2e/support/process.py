@@ -1,8 +1,10 @@
 """Run trusted argv sequences without involving a command shell."""
 
 import os
+import signal
+import time
 from collections.abc import Mapping, Sequence
-from contextlib import ExitStack, chdir
+from contextlib import ExitStack, chdir, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
@@ -61,10 +63,13 @@ class CommandRunner:
         capture: bool = False,
         check: bool = True,
         stdin: str | None = None,
+        timeout: float = 120,
     ) -> CommandResult:
         """Run one command and optionally capture both output streams."""
         with chdir(self._root):
-            command_result = self._run_in_root(command, capture, stdin)
+            command_result = self._run_in_root(
+                command, capture, stdin, timeout
+            )
         if check and command_result.return_code != 0:
             raise E2EError(_failure_message(command, command_result))
         return command_result
@@ -74,6 +79,7 @@ class CommandRunner:
         command: Sequence[str],
         capture: bool,
         stdin: str | None,
+        timeout: float,
     ) -> CommandResult:
         arguments = tuple(command)
         with ExitStack() as stack:
@@ -82,6 +88,7 @@ class CommandRunner:
                 arguments,
                 self._environment,
                 command_files.actions(capture),
+                timeout,
             )
             captured = command_files.captured(capture)
         return CommandResult(exit_code, *captured)
@@ -107,15 +114,44 @@ def _spawn(
     arguments: tuple[str, ...],
     environment: Mapping[str, str],
     file_actions: list[tuple[int, int, int]],
+    timeout: float,
 ) -> int:
     process_id = os.posix_spawn(
         arguments[0],
         arguments,
         environment,
         file_actions=file_actions,
+        setpgroup=0,
     )
-    _process_id, status = os.waitpid(process_id, 0)
-    return os.waitstatus_to_exitcode(status)
+    try:
+        return _wait_process(process_id, timeout)
+    except BaseException:
+        _stop_process_group(process_id)
+        raise
+
+
+def _wait_process(process_id: int, timeout: float) -> int:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        finished, status = os.waitpid(process_id, os.WNOHANG)
+        if finished:
+            return os.waitstatus_to_exitcode(status)
+        time.sleep(0.02)
+    raise E2EError(f"command exceeded {timeout:g}s deadline")
+
+
+def _stop_process_group(process_id: int) -> None:
+    try:
+        os.killpg(process_id, signal.SIGTERM)
+        _wait_process(process_id, 5)
+    except E2EError:
+        os.killpg(process_id, signal.SIGKILL)
+        os.waitpid(process_id, 0)
+    except ProcessLookupError:
+        os.waitpid(process_id, 0)
+    finally:
+        with suppress(ProcessLookupError):
+            os.killpg(process_id, signal.SIGKILL)
 
 
 def _read_stream(stream: TextIO) -> str:

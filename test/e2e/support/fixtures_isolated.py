@@ -21,8 +21,8 @@ def isolated_environment(
         request,
         isolated=True,
     )
-    e2e_environment.start()
     try:
+        e2e_environment.start()
         yield e2e_environment
     finally:
         e2e_environment.close(request.session.testsfailed == 0)

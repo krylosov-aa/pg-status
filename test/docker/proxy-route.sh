@@ -9,7 +9,8 @@ fi
 
 readonly proxy="$1"
 readonly selected_backend="$2"
-readonly script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly script_directory
 readonly compose_file="$script_directory/docker-compose.yml"
 
 case "$proxy" in
@@ -28,7 +29,9 @@ case "$selected_backend" in
     ;;
 esac
 
-if docker compose version >/dev/null 2>&1; then
+if [[ -n "${COMPOSE:-}" ]]; then
+  read -r -a compose <<< "$COMPOSE"
+elif docker compose version >/dev/null 2>&1; then
   compose=(docker compose)
 else
   compose=(docker-compose)
@@ -36,7 +39,7 @@ fi
 
 haproxy_command() {
   printf '%s\n' "$1" | "${compose[@]}" \
-    --project-name test \
+    --project-name "${TEST_PROJECT:-test}" \
     --file "$compose_file" \
     --profile pg-status \
     exec -T "$proxy" socat stdio /run/haproxy/admin.sock >/dev/null

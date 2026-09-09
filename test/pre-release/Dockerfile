@@ -22,9 +22,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libevent-dev \
         libpq-dev \
         make \
+        llvm \
         ninja-build \
         pkg-config \
         python3 \
+        shellcheck \
         valgrind && \
     rm -rf /var/lib/apt/lists/*
 
@@ -48,4 +50,8 @@ WORKDIR /app
 COPY Makefile CMakeLists.txt CMakePresets.json .clang-format .clang-tidy ./
 COPY src/ src/
 COPY test/CMakeLists.txt test/
+COPY test/configure.sh test/
 COPY test/tests/ test/tests/
+COPY test/pre-release/run.sh /usr/local/bin/run-gates
+COPY test/audit/ test/audit/
+COPY test/fuzz/ test/fuzz/

@@ -22,8 +22,8 @@ from support.waiting import Waiter
 
 _MONITOR_SERVICE: Final = "pg-status"
 _MONITOR_LOG_LINES: Final = 250
-_MONITOR_STOP_TIMEOUT_SECONDS: Final = 30
 _COMPOSE_DOWN_TIMEOUT_SECONDS: Final = 10
+_BUILT_IMAGES: set[str] = set()
 
 
 class E2EEnvironment:
@@ -41,6 +41,23 @@ class E2EEnvironment:
         self._profile = find_profile(profile_name)
         self._project = project or default_project(profile_name)
         environment = profile_environment(self._profile, profile_name)
+        run_id = os.environ.get("PG_STATUS_AUDIT_RUN_ID", str(os.getpid()))
+        postgres_version = os.environ.get("PG_STATUS_POSTGRES_VERSION", "18")
+        environment.setdefault(
+            "PG_STATUS_E2E_IMAGE", f"pg-status-e2e:{profile_name}-{run_id}"
+        )
+        environment.setdefault(
+            "PG_STATUS_E2E_INFRA_PREFIX",
+            f"pg-status-e2e-{run_id}-pg{postgres_version}",
+        )
+        self._image = environment["PG_STATUS_E2E_IMAGE"]
+        self._infrastructure_image = environment["PG_STATUS_E2E_INFRA_PREFIX"]
+        self._external_image = "PG_STATUS_E2E_IMAGE" in os.environ
+        self._build_flags = []
+        if os.environ.get("AUDIT_PULL") == "1":
+            self._build_flags.append("--pull")
+        if os.environ.get("AUDIT_NO_CACHE") == "1":
+            self._build_flags.append("--no-cache")
         self.compose = ComposeProject(
             _find_repository_root(),
             self._project,
@@ -77,17 +94,23 @@ class E2EEnvironment:
             self._profile_name,
             self._project,
         )
+        if self._infrastructure_image not in _BUILT_IMAGES:
+            self.compose.invoke(
+                "build", *self._build_flags, *INFRASTRUCTURE_SERVICES
+            )
+            _BUILT_IMAGES.add(self._infrastructure_image)
         self.compose.invoke(
-            "up",
-            "--detach",
-            "--build",
-            *INFRASTRUCTURE_SERVICES,
+            "up", "--detach", "--no-build", *INFRASTRUCTURE_SERVICES
         )
         self._readiness.wait_for_proxies()
         self._readiness.wait_for_database_roles()
         self.proxy.reset()
 
-        self.compose.invoke("build", self._monitor_service)
+        if not self._external_image and self._image not in _BUILT_IMAGES:
+            self.compose.invoke(
+                "build", *self._build_flags, self._monitor_service
+            )
+            _BUILT_IMAGES.add(self._image)
         self.compose.invoke(
             "up",
             "--detach",
@@ -104,6 +127,8 @@ class E2EEnvironment:
     def close(self, tests_passed: bool) -> None:
         """Stop the monitor and remove all resources."""
         monitor_exit_code = self._cleanup.stop_monitor()
+        if self._monitor is not None and monitor_exit_code is None:
+            monitor_exit_code = 1
         if monitor_exit_code not in (None, 0):
             logger = logging.getLogger(__name__)
             logger.error(
@@ -215,6 +240,10 @@ class _EnvironmentCleanup:
     def down(self) -> bool:
         """Stop and remove compose resources, returning `True` on failure."""
         try:
+            self._compose.save_diagnostics("compose", self._compose.logs())
+        except E2EError as error:
+            logging.getLogger(__name__).error("Could not save logs: %s", error)
+        try:
             self._compose_down()
         except E2EError as error:
             logger = logging.getLogger(__name__)
@@ -257,14 +286,8 @@ class _EnvironmentCleanup:
         )
         if not container_id:
             return None
-        self._compose.invoke(
-            "stop",
-            "--timeout",
-            str(_MONITOR_STOP_TIMEOUT_SECONDS),
-            self._monitor_service,
-            check=False,
-        )
-        return self._compose.service_exit_code(self._monitor_service)
+        self._compose.stop_monitor(self._monitor_service)
+        return 0
 
 
 def find_profile(profile_name: str) -> Profile:
@@ -280,7 +303,8 @@ def find_profile(profile_name: str) -> Profile:
 
 def default_project(profile_name: str) -> str:
     """Create an isolated per-process project name."""
-    return f"pg-status-e2e-{profile_name}-{os.getpid()}"
+    run_id = os.environ.get("PG_STATUS_AUDIT_RUN_ID", str(os.getpid()))
+    return f"pg-status-e2e-{profile_name}-{run_id}"
 
 
 def profile_environment(

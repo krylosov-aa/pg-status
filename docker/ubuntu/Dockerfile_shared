@@ -38,7 +38,7 @@ COPY LICENSE LICENSE
 COPY docker/ubuntu/package/shared-third-party-notices.txt THIRD-PARTY-NOTICES
 COPY docker/ubuntu/package/shared-readme.txt README
 
-# Создаём архив
+# Create the archive.
 RUN apt-get update && apt-get install -y --no-install-recommends tar gzip && \
     rm -rf /var/lib/apt/lists/*
 

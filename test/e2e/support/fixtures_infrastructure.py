@@ -23,8 +23,8 @@ def environment(request: pytest.FixtureRequest) -> Iterator[E2EEnvironment]:
         request,
         isolated=False,
     )
-    e2e_environment.start()
     try:
+        e2e_environment.start()
         yield e2e_environment
     finally:
         e2e_environment.close(request.session.testsfailed == 0)

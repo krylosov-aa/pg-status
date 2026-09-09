@@ -1,6 +1,8 @@
 # Testing pg-status
 
 Run the commands in this document from the repository root.
+For a concise guide to every Make target and when to use it, see the
+[developer Make reference](../docs/make-targets.md).
 
 ## Automated tests
 
@@ -13,7 +15,7 @@ ctest --preset debug
 ```
 
 The `debug` and `release` presets are ordinary builds. The `asan` and `tsan`
-presets explicitly enable their respective sanitizer and clang-tidy profiles.
+presets enable their respective sanitizers; `asan` also enables clang-tidy.
 The functional HTTP API tests are deterministic and do not require PostgreSQL
 or Docker. Startup tests hold real monitor connections on local TCP listeners
 to verify liveness, readiness, HTTP 503 responses during warmup, and shutdown
@@ -23,10 +25,9 @@ All local Make targets place their CMake build trees under `cmake-builds/` by
 default. Override the common root with `CMAKE_BUILDS_DIR=<path>` or override
 an individual build directory with its corresponding variable.
 
-`make pre-release` invokes this target before analysis and tests, so a local
-pre-release run may update files in the working tree. The containerized
-`pre-release-docker` and `full-audit` variants format only their isolated
-source copies.
+`make format` explicitly rewrites C formatting. Verification commands use
+`format-check`, which fails without changing source files. `make python_check`
+also checks formatting, lint, types and runner regression tests without fixes.
 
 ### AddressSanitizer and UndefinedBehaviorSanitizer
 
@@ -63,8 +64,8 @@ directory when needed with `TSAN_BUILD_DIR=<path> make test_tsan`.
 
 ### Repeated tests
 
-To run tests repeatedly until the first failure, use the optimized Release
-configuration:
+Run the complete suite once, then repeat tests labelled `stress` until the
+first failure, using the optimized Release configuration:
 
 ```sh
 make test_repeat
@@ -77,8 +78,11 @@ make test_repeat_asan
 make test_repeat_tsan
 ```
 
-Repeated Release builds use the separate `cmake-builds/repeat` directory. It
-can be overridden with `REPEAT_BUILD_DIR=<path>`.
+Repeated Release builds reuse `cmake-builds/release`, overridable with
+`RELEASE_BUILD_DIR`. `REPEAT_COUNT` is the total execution count for stress
+tests, including their first execution in the complete suite. Repetitions
+cover snapshot publication, concurrent selection, logger races/backpressure,
+and startup/shutdown. Deterministic contracts run once in each profile.
 
 ### Valgrind Memcheck
 
@@ -141,33 +145,109 @@ for a shorter or longer run:
 REPEAT_COUNT=20 make pre-release
 ```
 
-Run the same complete pre-release verification inside an Ubuntu/glibc
-`linux/amd64` container with:
+Run the same C pre-release verification inside an Ubuntu/glibc container
+on the Docker engine's native architecture with:
 
 ```sh
 make pre-release-docker
 ```
 
-To run this gate and then build every supported container image and
-distributable artifact, use:
+Reports survive container removal under a new `out/pre-release-*` directory,
+including failures. TSan and Valgrind require the native Docker architecture;
+use `full-audit` for both the release architecture and native instrumentation.
+
+To build all container images and distributable artifacts, use the following
+packaging command. It runs the Dockerfile build tests, but does not run the
+pre-release or full-audit gates:
 
 ```sh
 make release-builds
 ```
 
-Full audit. Use this procedure before a release or after changing CMake, tests, toolchain
-settings, dependencies, Dockerfiles, or packaging. It is intentionally more
-thorough than the normal development loop.
+### Full audit
+
+Use `make full-audit` before release and after changes to CMake, the test
+runner, toolchains, dependencies or packaging:
 
 ```sh
 make full-audit
 ```
 
+The audit copies tracked and nonignored inputs, including local edits, into
+one snapshot under `out/audit-<run-id>/source`. Every build and e2e run uses
+that snapshot.
+
+The release target is Linux amd64. On an ARM Docker engine, the target CTest
+pass runs under emulation, while TSan, Valgrind and stress repetitions run natively.
+The report records both architectures. The stages are:
+
+1. Compose/shell validation, Python checks and audit-runner regression tests.
+2. ShellCheck for audit scripts, strict formatting, Clang Static Analyzer,
+   clang-tidy, complete CTest under
+   ASan/UBSan, TSan, Release and Valgrind; additional stress repetitions.
+   Expected-failure tests validate the exact exit and reject sanitizer
+   diagnostics. Valgrind runs their child binaries too. Fault injection checks
+   that the gate rejects deliberately broken programs.
+3. GCC Release preset and Ninja installation checks, bounded installed-process
+   shutdown, source coverage reports and bounded input/HTTP fuzzing.
+4. The complete Release e2e suite on PostgreSQL **16, 17 and 18**, plus
+   ASan/UBSan, TSan and Valgrind e2e on PostgreSQL 18. These are the PostgreSQL
+   major versions exercised by the release audit; other versions are not
+   certified by this matrix.
+5. Alpine/Ubuntu shared/static builds, one fresh build per distinct variant.
+   Runtime images, archives and DEB reuse the corresponding builder output.
+6. A PostgreSQL 18 smoke subset against all four production images and all three
+   distributables. Each archive/DEB is installed in its own clean image; static
+   tests do not inherit the shared package's libraries. Tests cover version,
+   actual primary/replica observations through DNS, lag, timeout/recovery,
+   TLS/mTLS and invalid certificate identities. Every process is stopped and
+   its final exit status and diagnostics checked.
+
+E2e also checks connection reuse/expiry, recovery after server termination,
+continued progress of healthy databases during another database's failure,
+receiver-statistics permission fallback on a real replica, and bounded FD/RSS
+under mixed HTTP/polling/fault load. The load check uses generous resource
+bounds; it does not assert machine-dependent throughput or p99 latency.
+
+`report.json` stores stage status/duration, test reports, image IDs, source
+identity and artifact SHA-256 values. Stage logs, CTest reports, scan-build
+reports, coverage HTML/JSON, fuzz corpus/crashes and e2e teardown logs survive
+both success and failure. Conditional IPv6 checks are reported explicitly.
+Coverage is diagnostic; no arbitrary 100% threshold is imposed.
+
+Each audit owns uniquely named/labeled Compose resources and image tags.
+Cleanup removes only its resources, including after failures/timeouts. It
+never invokes a global prune or removes projects by a shared name prefix.
+The source snapshot, reports and release files remain in the artifact folder.
+
+Configuration examples:
+
+```sh
+# Shorter diagnostic pass; still runs all stages and runtime profiles.
+make full-audit REPEAT_COUNT=5 FULL_AUDIT_PULL=0 FULL_AUDIT_NO_CACHE=0
+
+# Explicit reduced PostgreSQL matrix for diagnosis (reported in the results).
+AUDIT_POSTGRES_VERSIONS="18" make full-audit
+```
+
+Defaults: `REPEAT_COUNT=100`, `FULL_AUDIT_PULL=1`,
+`FULL_AUDIT_NO_CACHE=1`, `FULL_AUDIT_EMULATED_REPEAT_COUNT=1`,
+`AUDIT_POSTGRES_VERSIONS="16 17 18"`, `AUDIT_BUILD_TIMEOUT=3600`,
+`AUDIT_TEST_TIMEOUT=3600`, `PG_STATUS_E2E_SOAK_SECONDS=30`.
+`AUDIT_POSTGRES_VERSIONS` controls only the Release compatibility matrix.
+Sanitizer, Valgrind and release-artifact checks always use PostgreSQL 18,
+recorded separately as `runtime_postgres_version` in the report.
+`ARTIFACT_DIR` controls the output root; `AUDIT_ARTIFACT_DIR` selects a new,
+exact output directory. The directory must not already exist. Build/test
+stage timeouts are seconds. Individual e2e commands and HTTP requests also
+have deadlines; timeouts fail the audit and trigger cleanup.
+
+
 ## Docker environments
 
 ### Automated PostgreSQL e2e tests
 
-The e2e suite starts a real PostgreSQL primary, two physical streaming
+The e2e suite starts a real PostgreSQL 18 primary, two physical streaming
 replicas, three HAProxy endpoints, and an instrumented pg-status container.
 
 Tests live only in [`e2e/tests`](e2e/tests); Docker, PostgreSQL, HAProxy,
@@ -183,7 +263,16 @@ make test_e2e_tsan
 make test_e2e_valgrind
 ```
 
-Run every profile sequentially with `make test_e2e_all`.
+Run every profile sequentially with `make test_e2e_all`. Each pytest session
+owns its topology and cleans up even when setup fails. To remove an abandoned
+project explicitly, use `make test_e2e_cleanup E2E_PROJECT=<exact-name>`.
+Automatic cleanup never enumerates all `pg-status-e2e-*` projects.
+
+PostgreSQL 18 is the default for all e2e profiles and the manual Docker topology.
+`PG_STATUS_POSTGRES_VERSION` can override it for an explicit compatibility run.
+`PG_STATUS_E2E_IMAGE=<image>` exercises an existing production image
+without rebuilding pg-status; `PG_STATUS_E2E_PLATFORM=linux/amd64` selects its
+architecture. Infrastructure remains native to the Docker engine.
 
 ### Run pg-status with your own PostgreSQL setup
 
@@ -207,6 +296,8 @@ make build_up_test
 
 This builds the e2e Release image and starts the full environment defined in
 [docker/docker-compose.yml](docker/docker-compose.yml).
+Existing database volumes are preserved. To reset the database state explicitly,
+run `make down_test` before starting the topology again.
 
 The environment contains pg-status, one PostgreSQL primary, two physical
 replicas, and three proxy services. Switching a proxy's target simulates a
@@ -243,13 +334,16 @@ Stop either test topology with:
 make down_test
 ```
 
-To stop every container managed by this repository, including the root
-Compose environment, the test topology, and an active pre-release container,
+To stop both manual Compose environments and remove the test database volumes,
 run:
 
 ```sh
 make down_all
 ```
+
+This does not stop independent e2e sessions, pre-release containers or audits.
+`TEST_PROJECT` selects the manual test project (default `test`) consistently
+for startup, proxy routing and cleanup.
 
 ## Sustainable-RPS benchmark
 

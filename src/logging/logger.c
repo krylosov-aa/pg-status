@@ -465,7 +465,8 @@ static void wake_logger(void) {
   /* One non-blocking attempt. The worker also polls periodically, so EINTR
    * cannot lose a notification forever or force the caller into a retry loop.
    */
-  (void)write(wake_pipe[1], &byte, 1);
+  const ssize_t written = write(wake_pipe[1], &byte, 1);
+  (void)written;
 }
 
 static void end_logger_operation(void) {

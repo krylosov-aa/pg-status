@@ -36,6 +36,10 @@ class ComposeProject:
         environment: Mapping[str, str],
     ) -> None:
         self._runner = CommandRunner(repository_root, environment)
+        self._project = project
+        self._artifact_directory = environment.get(
+            "PG_STATUS_E2E_ARTIFACT_DIR"
+        )
         compose_file = repository_root / "test/docker/docker-compose.yml"
         self._prefix = (
             *find_compose_command(),
@@ -55,6 +59,7 @@ class ComposeProject:
         capture: bool = False,
         check: bool = True,
         stdin: str | None = None,
+        timeout: float | None = None,
     ) -> CommandResult:
         """Invoke Docker Compose inside this project."""
         return self._runner.run(
@@ -62,6 +67,11 @@ class ComposeProject:
             capture=capture,
             check=check,
             stdin=stdin,
+            timeout=timeout
+            if timeout is not None
+            else (
+                1800 if "build" in arguments or "--build" in arguments else 120
+            ),
         )
 
     def service_container_id(self, service: str) -> str:
@@ -139,6 +149,33 @@ class ComposeProject:
         if service is not None:
             arguments.append(service)
         return self.invoke(*arguments, capture=True).stdout
+
+    def stop_monitor(self, service: str) -> None:
+        """Validate final diagnostics before removing a monitor."""
+        if not self.service_container_id(service):
+            raise E2EError(f"monitor container disappeared: {service}")
+        self.invoke("stop", "--timeout", "30", service, capture=True)
+        exit_code = self.service_exit_code(service)
+        diagnostics = self.logs(service)
+        self.save_diagnostics(service, diagnostics)
+        markers = (
+            "AddressSanitizer",
+            "UndefinedBehaviorSanitizer",
+            "ThreadSanitizer",
+            "LeakSanitizer",
+            "runtime error:",
+        )
+        if exit_code or any(marker in diagnostics for marker in markers):
+            raise E2EError(
+                f"{service} exited with {exit_code}:\n{diagnostics}",
+            )
+
+    def save_diagnostics(self, name: str, diagnostics: str) -> None:
+        """Persist logs outside containers, including successful teardown."""
+        if self._artifact_directory:
+            directory = Path(self._artifact_directory) / self._project
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / f"{name}.log").write_text(diagnostics)
 
 
 def _format_timestamp(timestamp: datetime) -> str:

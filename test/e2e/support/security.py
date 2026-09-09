@@ -1,5 +1,6 @@
 """TLS and authentication controls for connection-security tests."""
 
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import partial
@@ -28,10 +29,18 @@ class SecurityTopology:
 
     def start(self) -> None:
         """Build and start the dedicated TLS PostgreSQL service."""
+        flags = []
+        if os.environ.get("AUDIT_PULL") == "1":
+            flags.append("--pull")
+        if os.environ.get("AUDIT_NO_CACHE") == "1":
+            flags.append("--no-cache")
+        self._compose.invoke(
+            "build", *flags, SECURITY_DATABASE, "security-certs"
+        )
         self._compose.invoke(
             "up",
             "--detach",
-            "--build",
+            "--no-build",
             SECURITY_DATABASE,
         )
         self._waiter.until(
@@ -43,26 +52,28 @@ class SecurityTopology:
     def monitor(self, scenario: str) -> Iterator[MonitorClient]:
         """Run one configured monitor scenario and remove it afterwards."""
         service = _monitor_service(scenario)
-        self._compose.invoke("up", "--detach", "--no-build", service)
-        monitor = MonitorClient(
-            _discover_port(self._compose, self._waiter, service),
-        )
-        self._waiter.until(
-            f"{service} monitor readiness",
-            lambda: monitor.text("/ready"),
-            lambda body: body == "OK",
-        )
         try:
+            self._compose.invoke("up", "--detach", "--no-build", service)
+            monitor = MonitorClient(
+                _discover_port(self._compose, self._waiter, service),
+            )
+            self._waiter.until(
+                f"{service} monitor readiness",
+                lambda: monitor.text("/ready"),
+                lambda body: body == "OK",
+            )
             yield monitor
         finally:
-            self._compose.invoke(
-                "rm",
-                "--stop",
-                "--force",
-                service,
-                capture=True,
-                check=False,
-            )
+            try:
+                self._compose.stop_monitor(service)
+            finally:
+                self._compose.invoke(
+                    "rm",
+                    "--stop",
+                    "--force",
+                    service,
+                    capture=True,
+                )
 
     def logs(self, scenario: str) -> str:
         """Return logs for an active security monitor."""

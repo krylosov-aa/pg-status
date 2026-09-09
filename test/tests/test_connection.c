@@ -24,10 +24,10 @@ static const char *find_connection_option(
 
 static void test_separate_values(void) {
   // Arrange
-  parameters.user = "user with spaces 'quotes' \\slashes Юникод";
-  parameters.password = "password=not-a-key ' \\ 密码";
+  parameters.user = "user with spaces 'quotes' \\slashes Unicode_µ";
+  parameters.password = "password=not-a-key ' \\ password_€";
   parameters.database =
-    "host=attacker.example password=injected db name ' \\ БД";
+    "host=attacker.example password=injected db name ' \\ database_µ";
   const MonitorHost host = {.host = "2001:db8::1", .port = "6543"};
   const char *expected_keywords[] = {
     "user", "password", "host", "port", "dbname",
@@ -156,7 +156,7 @@ static void run_monitor_with_secret(void) {
 static void test_secret_marker_not_logged(void) {
   // Arrange
   static const char secret_marker[] =
-    "PG_STATUS_PASSWORD_SECRET_MARKER_'_\\_Юникод";
+    "PG_STATUS_PASSWORD_SECRET_MARKER_'_\\_Unicode_µ";
   support_set_environment("pg_status__hosts", "127.0.0.1");
   support_set_environment("pg_status__pg_port", "1");
   support_set_environment("pg_status__pg_password", secret_marker);

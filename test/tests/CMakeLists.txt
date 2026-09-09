@@ -300,6 +300,7 @@ add_test(
         COMMAND ${CMAKE_COMMAND}
         "-DPROGRAM=$<TARGET_FILE:logger_test>"
         "-DARGUMENT=invalid_enum_log"
+        "-DEXPECTED_EXIT_CODE=Subprocess aborted"
         "-DEXPECTED_OUTPUT=invalid log level value=100"
         -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
 )
@@ -308,6 +309,7 @@ add_test(
         COMMAND ${CMAKE_COMMAND}
         "-DPROGRAM=$<TARGET_FILE:logger_test>"
         "-DARGUMENT=invalid_enum_set"
+        "-DEXPECTED_EXIT_CODE=Subprocess aborted"
         "-DEXPECTED_OUTPUT=invalid log level value=100"
         -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake
 )
@@ -585,3 +587,25 @@ foreach(TEST_CASE IN LISTS PG_STATUS_API_TEST_CASES)
             "${PG_STATUS_TEST_ENVIRONMENT}"
     )
 endforeach()
+
+# Repetitions target scheduling and shared-state risks; deterministic contracts
+# still run once in every runtime profile.
+get_property(PG_STATUS_REGISTERED_TESTS DIRECTORY PROPERTY TESTS)
+foreach(TEST_NAME IN LISTS PG_STATUS_REGISTERED_TESTS)
+    if(TEST_NAME MATCHES "^startup\\.|snapshot_consistency|round_robin_concurrent|^logger\\..*(concurrent|backpressure|partial_write|shutdown|ordered_messages|periodic_recovery|deferred_)")
+        set_property(TEST ${TEST_NAME} APPEND PROPERTY LABELS stress)
+    endif()
+endforeach()
+
+add_executable(audit_probe support/audit_probe.c)
+target_link_libraries(audit_probe PRIVATE common_warnings)
+# Deliberate defects belong to the gate's runtime fault-injection test; static
+# analysis of these defects would prevent testing the rejection mechanism.
+set_target_properties(audit_probe PROPERTIES C_CLANG_TIDY "")
+add_test(NAME audit.expected_failure_gate
+        COMMAND ${CMAKE_COMMAND}
+        "-DPROBE=$<TARGET_FILE:audit_probe>"
+        "-DCHECK_MEMORY=$<STREQUAL:${PG_STATUS_SANITIZER},address-undefined>"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/support/check_audit_gate.cmake)
+set_tests_properties(audit.expected_failure_gate PROPERTIES
+        TIMEOUT 90 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")

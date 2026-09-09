@@ -1,9 +1,14 @@
 # Docker topology shared by manual tests and the automated e2e suite.
 
+x-audit-labels: &audit-labels
+  com.pg-status.audit.run: "${PG_STATUS_AUDIT_RUN_ID:-manual}"
+
 x-security-monitor: &security-monitor
+  labels: *audit-labels
   profiles:
     - security
-  image: "pg-status-e2e:${PG_STATUS_E2E_PROFILE:-release}"
+  image: "${PG_STATUS_E2E_IMAGE:-pg-status-e2e:release}"
+  platform: "${PG_STATUS_E2E_PLATFORM:-}"
   ports:
     - "127.0.0.1:0:8000"
   networks:
@@ -29,16 +34,19 @@ x-security-environment: &security-environment
   pg_status__sleep_ms: "200"
   pg_status__max_fails: "1"
   pg_status__query_timeout_ms: "1000"
-  pg_status__conn_max_age_ms: "1000"
+  pg_status__conn_max_age_ms: "${PG_STATUS_E2E_CONN_MAX_AGE_MS:-3000}"
   pg_status__sync_max_lag_ms: "500"
   pg_status__sync_max_lag_bytes: "1048576"
 
 services:
   pg-status:
+    labels: *audit-labels
     profiles:
       - pg-status
-    image: "pg-status-e2e:${PG_STATUS_E2E_PROFILE:-release}"
+    image: "${PG_STATUS_E2E_IMAGE:-pg-status-e2e:release}"
+    platform: "${PG_STATUS_E2E_PLATFORM:-}"
     build:
+      labels: *audit-labels
       context: ../..
       dockerfile: test/e2e/Dockerfile
       args:
@@ -68,7 +76,7 @@ services:
       pg_status__sleep_ms: "200"
       pg_status__max_fails: "2"
       pg_status__query_timeout_ms: "1000"
-      pg_status__conn_max_age_ms: "1000"
+      pg_status__conn_max_age_ms: "${PG_STATUS_E2E_CONN_MAX_AGE_MS:-3000}"
       pg_status__sync_max_lag_ms: "500"
       pg_status__sync_max_lag_bytes: "1048576"
     depends_on:
@@ -80,14 +88,20 @@ services:
         condition: service_healthy
 
   postgres-primary:
+    image: "${PG_STATUS_E2E_INFRA_PREFIX:-pg-status-demo}-postgres-primary"
+    labels: *audit-labels
     build:
+      labels: *audit-labels
       context: ./master
+      args:
+        POSTGRES_VERSION: "${PG_STATUS_POSTGRES_VERSION:-18}"
     networks:
       - net
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
       REPLICATION_ROLE: master
     volumes:
       - primary-data:/var/lib/postgresql/data
@@ -102,14 +116,20 @@ services:
       retries: 30
 
   postgres-replica-1:
+    image: "${PG_STATUS_E2E_INFRA_PREFIX:-pg-status-demo}-postgres-replica-1"
+    labels: *audit-labels
     build:
+      labels: *audit-labels
       context: ./replica
+      args:
+        POSTGRES_VERSION: "${PG_STATUS_POSTGRES_VERSION:-18}"
     networks:
       - net
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
       REPLICATION_ROLE: replica
       MASTER_HOST: postgres-primary
       MASTER_USER: replicator
@@ -130,14 +150,20 @@ services:
       retries: 30
 
   postgres-replica-2:
+    image: "${PG_STATUS_E2E_INFRA_PREFIX:-pg-status-demo}-postgres-replica-2"
+    labels: *audit-labels
     build:
+      labels: *audit-labels
       context: ./replica
+      args:
+        POSTGRES_VERSION: "${PG_STATUS_POSTGRES_VERSION:-18}"
     networks:
       - net
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
       REPLICATION_ROLE: replica
       MASTER_HOST: postgres-primary
       MASTER_USER: replicator
@@ -158,10 +184,15 @@ services:
       retries: 30
 
   postgres-security:
+    image: "${PG_STATUS_E2E_INFRA_PREFIX:-pg-status-demo}-postgres-security"
+    labels: *audit-labels
     profiles:
       - security
     build:
+      labels: *audit-labels
       context: ./security
+      args:
+        POSTGRES_VERSION: "${PG_STATUS_POSTGRES_VERSION:-18}"
     networks:
       net:
         aliases:
@@ -170,6 +201,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - security-data:/var/lib/postgresql/data
       - security-certs:/tls:ro
@@ -187,27 +219,35 @@ services:
       retries: 30
 
   security-certs:
+    image: "${PG_STATUS_E2E_INFRA_PREFIX:-pg-status-demo}-security-certs"
+    labels: *audit-labels
     profiles:
       - security
     build:
+      labels: *audit-labels
       context: ./security
+      args:
+        POSTGRES_VERSION: "${PG_STATUS_POSTGRES_VERSION:-18}"
       target: cert-generator
     volumes:
       - security-certs:/tls
 
   pg-status-security-disable:
+    labels: *audit-labels
     <<: *security-monitor
     environment:
       <<: *security-environment
       PGSSLMODE: disable
 
   pg-status-security-require:
+    labels: *audit-labels
     <<: *security-monitor
     environment:
       <<: *security-environment
       PGSSLMODE: require
 
   pg-status-security-verify-full:
+    labels: *audit-labels
     <<: *security-monitor
     environment:
       <<: *security-environment
@@ -215,6 +255,7 @@ services:
       PGSSLROOTCERT: /tls/ca.crt
 
   pg-status-security-wrong-host:
+    labels: *audit-labels
     <<: *security-monitor
     environment:
       <<: *security-environment
@@ -223,6 +264,7 @@ services:
       PGSSLROOTCERT: /tls/ca.crt
 
   pg-status-security-unknown-ca:
+    labels: *audit-labels
     <<: *security-monitor
     environment:
       <<: *security-environment
@@ -230,6 +272,7 @@ services:
       PGSSLROOTCERT: /tls/unknown-ca.crt
 
   pg-status-security-mtls:
+    labels: *audit-labels
     <<: *security-monitor
     environment:
       <<: *security-environment
@@ -240,14 +283,28 @@ services:
       PGSSLKEY: /tls/client.key
 
   pg-status-security-bad-password:
+    labels: *audit-labels
     <<: *security-monitor
     environment:
       <<: *security-environment
-      pg_status__pg_password: "PG_STATUS_E2E_SECRET_MARKER_'_\\_Юникод"
+      pg_status__pg_password: "PG_STATUS_E2E_SECRET_MARKER_'_\\_Unicode_µ"
       PGSSLMODE: require
 
+  pg-status-security-restricted:
+    labels: *audit-labels
+    <<: *security-monitor
+    environment:
+      <<: *security-environment
+      pg_status__hosts: postgres-replica-1
+      pg_status__pg_user: fallback_monitor
+      pg_status__pg_password: fallback
+      PGSSLMODE: disable
+
   pg-proxy-1:
+    image: "${PG_STATUS_E2E_INFRA_PREFIX:-pg-status-demo}-pg-proxy-1"
+    labels: *audit-labels
     build:
+      labels: *audit-labels
       context: ./haproxy-master
     networks:
       - net
@@ -271,7 +328,10 @@ services:
       retries: 15
 
   pg-proxy-2:
+    image: "${PG_STATUS_E2E_INFRA_PREFIX:-pg-status-demo}-pg-proxy-2"
+    labels: *audit-labels
     build:
+      labels: *audit-labels
       context: ./haproxy-replica
     networks:
       - net
@@ -287,7 +347,10 @@ services:
     healthcheck: *proxy-healthcheck
 
   pg-proxy-3:
+    image: "${PG_STATUS_E2E_INFRA_PREFIX:-pg-status-demo}-pg-proxy-3"
+    labels: *audit-labels
     build:
+      labels: *audit-labels
       context: ./haproxy-replica-2
     networks:
       - net
@@ -304,10 +367,16 @@ services:
 
 networks:
   net:
+    labels: *audit-labels
 
 volumes:
   primary-data:
+    labels: *audit-labels
   replica-1-data:
+    labels: *audit-labels
   replica-2-data:
+    labels: *audit-labels
   security-data:
+    labels: *audit-labels
   security-certs:
+    labels: *audit-labels

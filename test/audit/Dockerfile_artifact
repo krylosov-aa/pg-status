@@ -1,0 +1,38 @@
+# Clean installation environments for the exact release artifacts.
+FROM ubuntu:24.04 AS shared
+ARG VERSION
+ARG ARCH=amd64
+COPY shared/ /tmp/artifacts/
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates libpq5 libevent-2.1-7t64 libcjson1 && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir /app && tar -xzf "/tmp/artifacts/pg-status_${VERSION}_linux_${ARCH}_shared.tar.gz" -C /app && \
+    test -x /app/pg-status && test -s /app/LICENSE && test -s /app/THIRD-PARTY-NOTICES && \
+    ldd /app/pg-status > /tmp/linkage && ! grep -q 'not found' /tmp/linkage
+ENTRYPOINT ["/app/pg-status"]
+
+FROM ubuntu:24.04 AS static
+ARG VERSION
+ARG ARCH=amd64
+COPY static/ /tmp/artifacts/
+RUN mkdir /app && tar -xzf "/tmp/artifacts/pg-status_${VERSION}_linux_${ARCH}_static.tar.gz" -C /app && \
+    test -x /app/pg-status && test -s /app/LICENSE && test -s /app/THIRD-PARTY-NOTICES && \
+    for name in cJSON OpenSSL PostgreSQL libevent zlib; do test -s "/app/licenses/LICENSE-${name}" || exit 1; done
+# No libpq, libssl or other application libraries are installed in this image.
+RUN ! ldd /app/pg-status && apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+ENTRYPOINT ["/app/pg-status"]
+
+FROM ubuntu:24.04 AS deb
+ARG VERSION
+ARG ARCH=amd64
+COPY deb/ /tmp/artifacts/
+RUN package="/tmp/artifacts/pg-status_${VERSION}_${ARCH}.deb" && \
+    test "$(dpkg-deb -f "$package" Package)" = pg-status && \
+    test "$(dpkg-deb -f "$package" Version)" = "$VERSION" && \
+    test "$(dpkg-deb -f "$package" Architecture)" = "$ARCH" && \
+    apt-get update && apt-get install -y --no-install-recommends "$package" ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && test -x /usr/bin/pg-status && \
+    test -s /usr/share/doc/pg-status/copyright && \
+    ldd /usr/bin/pg-status > /tmp/linkage && ! grep -q 'not found' /tmp/linkage
+ENTRYPOINT ["/usr/bin/pg-status"]

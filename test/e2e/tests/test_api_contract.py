@@ -1,5 +1,6 @@
 """Contract tests for stable API responses and data shapes."""
 
+import os
 import re
 from types import MappingProxyType
 from typing import cast
@@ -52,6 +53,9 @@ def test_version_contract(monitor: MonitorClient) -> None:
     # Assert
     assert plain == json_variant
     assert semantic_version.fullmatch(plain) is not None
+    expected = os.environ.get("PG_STATUS_EXPECTED_VERSION")
+    if expected is not None:
+        assert plain == expected
 
 
 def test_hosts_contract(monitor: MonitorClient) -> None:

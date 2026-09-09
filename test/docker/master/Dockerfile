@@ -1,6 +1,8 @@
 # PostgreSQL master used by the Docker test topology.
 
-FROM postgres:16
+ARG POSTGRES_VERSION=18
+
+FROM postgres:${POSTGRES_VERSION}
 
 ENV POSTGRES_USER=postgres
 ENV POSTGRES_PASSWORD=postgres

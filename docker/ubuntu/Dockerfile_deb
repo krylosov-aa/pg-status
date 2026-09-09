@@ -1,5 +1,6 @@
 # -------- Build --------
-FROM ubuntu:24.04 AS builder
+ARG PG_STATUS_BUILDER=source-builder
+FROM ubuntu:24.04 AS source-builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -27,6 +28,10 @@ COPY test/tests/ test/tests/
 RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
     cmake --build build && \
     ctest --test-dir build --output-on-failure
+
+# Reuse an already audited shared builder when provided. Standalone builds
+# retain the source-builder path above.
+FROM ${PG_STATUS_BUILDER} AS builder
 
 # -------- Deb Package --------
 FROM ubuntu:24.04 AS packager

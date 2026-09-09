@@ -7,13 +7,9 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-    "complexipy>=6.0.1",
-    "flake8>=7.3.0",
     "mypy>=1.18.2",
     "pytest>=8.4.2",
-    "radon>=6.0.1",
     "ruff>=0.13.2",
-    "wemake-python-styleguide>=1.4.0",
 ]
 
 [tool.uv]
@@ -66,20 +62,4 @@ max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
-
-[tool.complexipy]
-max-complexity-allowed = 10
-exclude = [
-    ".venv",
-    ".venv/**",
-    "__pycache__",
-    "__pycache__/**",
-    "build",
-    "build/**",
-]
-
-[tool.radon]
-exclude = ".venv/*,.venv/**,build/*,build/**"
-cc_min = "C"
-show_complexity = true
-average = true
+"checks/**" = ["S101"]

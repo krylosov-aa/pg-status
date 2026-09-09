@@ -60,6 +60,20 @@ def reset_topology(
     request: pytest.FixtureRequest,
 ) -> Iterator[None]:
     """Reset topology to a stable baseline before and after each test."""
+    # Read-only HTTP contracts share the already-ready topology. Reset only
+    # tests with database/routing controls; their finalizer restores the next
+    # reader's baseline. Avoid dozens of Docker execs per pure HTTP assertion.
+    mutable_fixtures = {
+        "faults",
+        "proxy",
+        "postgres",
+        "wal",
+        "isolated_proxy",
+        "isolated_postgres",
+    }
+    if mutable_fixtures.isdisjoint(request.fixturenames):
+        yield
+        return
     if _uses_isolated_fixtures(request.fixturenames):
         proxy = request.getfixturevalue("isolated_proxy")
         postgres = request.getfixturevalue("isolated_postgres")

@@ -7,6 +7,7 @@ from support.compose import ComposeProject
 from support.faults import FaultController
 from support.monitor import MonitorWaiter
 from support.waiting import Waiter
+from support.wal import WalWriter
 
 FAULT_PROXY = "pg-proxy-3"
 ALIVE_FIELD = "alive"
@@ -86,3 +87,17 @@ def test_query_timeout_and_recovery(
         True,
         False,
     )
+
+
+def test_healthy_host_progresses_while_another_database_is_frozen(
+    faults: FaultController,
+    observed: MonitorWaiter,
+    wal: WalWriter,
+) -> None:
+    faults.pause_postgres("replica-2")
+    minimum_lsn = wal.warm_up()
+    # Keep the failing database frozen for both assertions. A stale
+    # snapshot is insufficient: the healthy nodes must observe new WAL.
+    observed.lsn("pg-proxy-1", minimum_lsn)
+    observed.lsn("pg-proxy-2", minimum_lsn)
+    observed.status("pg-proxy-3", EXPECTED_DEAD)

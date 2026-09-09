@@ -5,7 +5,7 @@ import pytest
 from support.security import SecurityTopology
 
 PASSWORD = r"space 'quote' \backslash password"  # noqa: S105
-SECRET_MARKER = r"PG_STATUS_E2E_SECRET_MARKER_'_\_Юникод"  # noqa: S105
+SECRET_MARKER = r"PG_STATUS_E2E_SECRET_MARKER_'_\_Unicode_µ"  # noqa: S105
 SECURITY_HOST = "postgres-security"
 ALIVE = "alive"
 MASTER = "master"

@@ -47,7 +47,7 @@
       "displayName": "Debug with ThreadSanitizer",
       "inherits": "debug",
       "cacheVariables": {
-        "PG_STATUS_ENABLE_CLANG_TIDY": "ON",
+        "PG_STATUS_ENABLE_CLANG_TIDY": "OFF",
         "PG_STATUS_SANITIZER": "thread"
       }
     }

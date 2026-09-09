@@ -14,8 +14,10 @@ static void test_valid_ports(const bool per_host) {
 
   init_monitor_host_list();
 
-  support_assert_true(host_count == 3, "unexpected host count");
-  for (unsigned int i = 0; i < host_count; i++) {
+  const size_t expected_count = sizeof(expected_hosts) /
+                                sizeof(expected_hosts[0]);
+  support_assert_true(host_count == expected_count, "unexpected host count");
+  for (size_t i = 0; i < expected_count; i++) {
     support_assert_string_equal(
       monitor_host_list[i].host, expected_hosts[i], "host order changed"
     );

@@ -183,6 +183,14 @@ elseif(PG_STATUS_SANITIZER STREQUAL "thread")
     )
 endif()
 
+set(PG_STATUS_TEST_VALGRIND "" CACHE FILEPATH "Valgrind for child processes in expected-failure tests")
+set(PG_STATUS_TEST_VALGRIND_OPTIONS "" CACHE STRING "Options for expected-failure Valgrind child processes")
+if(PG_STATUS_TEST_VALGRIND)
+    list(APPEND PG_STATUS_TEST_ENVIRONMENT
+            "PG_STATUS_TEST_VALGRIND=${PG_STATUS_TEST_VALGRIND}"
+            "PG_STATUS_TEST_VALGRIND_OPTIONS=${PG_STATUS_TEST_VALGRIND_OPTIONS}")
+endif()
+
 message(STATUS "pg-status sanitizer: ${PG_STATUS_SANITIZER}")
 message(STATUS "pg-status clang-tidy: ${PG_STATUS_ENABLE_CLANG_TIDY}")
 message(STATUS
@@ -192,6 +200,24 @@ message(STATUS
         "pg-status linker warnings as errors: "
         "${PG_STATUS_LINK_WARNINGS_AS_ERRORS}"
 )
+
+option(PG_STATUS_ENABLE_COVERAGE "Collect Clang source coverage" OFF)
+option(PG_STATUS_ENABLE_FUZZING "Build bounded libFuzzer input harnesses" OFF)
+if(PG_STATUS_ENABLE_COVERAGE OR PG_STATUS_ENABLE_FUZZING)
+    if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "Coverage and libFuzzer require Clang")
+    endif()
+endif()
+if(PG_STATUS_ENABLE_COVERAGE)
+    target_compile_options(common_warnings INTERFACE -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(common_warnings INTERFACE -fprofile-instr-generate)
+endif()
+if(PG_STATUS_ENABLE_FUZZING)
+    if(NOT PG_STATUS_SANITIZER STREQUAL "address-undefined")
+        message(FATAL_ERROR "Fuzzing requires address-undefined sanitizers")
+    endif()
+    target_compile_options(common_warnings INTERFACE -fsanitize=fuzzer-no-link)
+endif()
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
@@ -378,6 +404,10 @@ if(BUILD_TESTING)
     add_subdirectory(test)
 endif()
 
+if(PG_STATUS_ENABLE_FUZZING)
+    add_subdirectory(test/fuzz)
+endif()
+
 find_program(CLANG_FORMAT_EXE NAMES clang-format)
 
 if(CLANG_FORMAT_EXE)
@@ -387,7 +417,7 @@ if(CLANG_FORMAT_EXE)
             "${PROJECT_SOURCE_DIR}/test/*.c"
             "${PROJECT_SOURCE_DIR}/test/*.h"
     )
-    list(FILTER FORMAT_SOURCES EXCLUDE REGEX "/\\.venv/")
+    list(FILTER FORMAT_SOURCES EXCLUDE REGEX "/(\\.venv|\\.uv-cache|__pycache__|build)/")
 
     add_custom_target(format
             COMMAND "${CLANG_FORMAT_EXE}" -i ${FORMAT_SOURCES}
@@ -405,11 +435,4 @@ if(CLANG_FORMAT_EXE)
             VERBATIM
     )
 
-    add_custom_target(format-warn
-            COMMAND "${CLANG_FORMAT_EXE}" --dry-run ${FORMAT_SOURCES}
-            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            COMMENT "clang-format: dry-run (warnings only)"
-            COMMAND_EXPAND_LISTS
-            VERBATIM
-    )
 endif()

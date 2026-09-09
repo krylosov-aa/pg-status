@@ -109,7 +109,10 @@ static void assign_locality_values(const char *values, const bool is_dc) {
     } else {
       monitor_host_list[i].geo = copy_string(item);
     }
-    item = separator ? separator + 1 : nullptr;
+    if (!separator) {
+      break;
+    }
+    item = separator + 1;
   }
   free(items);
 }
