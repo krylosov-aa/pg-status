@@ -188,10 +188,12 @@ check_publish_args:
 build_push: check_publish_args ## Build and PUSH version/latest tags; requires r=... v=....
 	docker buildx build $(RELEASE_DOCKER_BUILD_FLAGS) \
 		--platform "$(RELEASE_PLATFORM)" \
+		--provenance=false \
+		--sbom=false \
 		-f docker/alpine/Dockerfile_shared \
 		-t "$(r)/pg-status:$(v)" \
 		-t "$(r)/pg-status:latest" \
-		--push \
+		--output type=image,push=true,oci-mediatypes=false \
 		.
 
 # Manual Docker environments. Startup preserves existing PostgreSQL data.
