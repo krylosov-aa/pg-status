@@ -24,25 +24,34 @@ def test_connection_reused_then_recycled(
     postgres: PostgreSQL,
     waiter: Waiter,
 ) -> None:
+    # Arrange
     first = waiter.until(
         "fresh backend",
         lambda: _session(postgres),
         lambda row: row is not None and row[2] < 0.5,
     )
     assert first is not None
+
+    # Act
     second = waiter.until(
         "another poll on the same backend",
         lambda: _session(postgres),
         lambda row: row is not None and row[1] != first[1],
     )
+
+    # Assert
     assert second is not None
     assert second[0] == first[0], "a healthy connection was not reused"
+
+    # Act
     replacement = waiter.until(
         "connection max age causes recycle",
         lambda: _session(postgres),
         lambda row: row is not None and row[0] != first[0],
         timeout=15,
     )
+
+    # Assert
     assert replacement is not None
 
 
@@ -51,9 +60,14 @@ def test_server_closed_connection_recovers(
     waiter: Waiter,
     observed: MonitorWaiter,
 ) -> None:
+    # Arrange
     before = waiter.until("backend exists", lambda: _session(postgres))
     assert before is not None
+
+    # Act
     postgres.sql("primary", f"select pg_terminate_backend({int(before[0])})")
+
+    # Assert
     waiter.until(
         "new backend after server termination",
         lambda: _session(postgres),

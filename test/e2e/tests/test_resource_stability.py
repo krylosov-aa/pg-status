@@ -34,6 +34,7 @@ def test_resources_stay_bounded_during_mixed_load(
     faults: FaultController,
     wal: WalWriter,
 ) -> None:
+    # Arrange
     duration = float(os.environ.get("PG_STATUS_E2E_SOAK_SECONDS", "10"))
     if duration < 1:
         raise ValueError("PG_STATUS_E2E_SOAK_SECONDS must be at least 1")
@@ -46,6 +47,8 @@ def test_resources_stay_bounded_during_mixed_load(
         samples = [initial]
         deadline = time.monotonic() + duration
         fault_active = False
+
+        # Act
         while time.monotonic() < deadline:
             list(pool.map(monitor.text, paths))
             faults.route(
@@ -60,6 +63,8 @@ def test_resources_stay_bounded_during_mixed_load(
         "fd_count,rss_kib\n"
         + "\n".join(f"{descriptors},{rss}" for descriptors, rss in samples),
     )
+
+    # Assert
     # Room for transient sockets and sanitizer quarantine, not an RPS claim.
     assert max(row[0] for row in samples) <= initial[0] + 8
     assert max(row[1] for row in samples) <= initial[1] + 64 * 1024

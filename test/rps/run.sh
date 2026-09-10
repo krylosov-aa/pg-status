@@ -8,10 +8,9 @@ pg_status_url="${PG_STATUS_URL:-http://127.0.0.1:8000}"
 target_rps="${TARGET_RPS:-5000}"
 duration="${DURATION:-5m}"
 warmup_duration="${WARMUP_DURATION:-30s}"
-connections="${CONNECTIONS:-512}"
+connections="${CONNECTIONS:-128}"
 attack_workers="${ATTACK_WORKERS:-512}"
 request_timeout="${REQUEST_TIMEOUT:-2s}"
-server_http_workers="${SERVER_HTTP_WORKERS:-1}"
 max_p99_ms="${MAX_P99_MS:-5}"
 min_success_ratio="${MIN_SUCCESS_RATIO:-1.0}"
 min_throughput_ratio="${MIN_THROUGHPUT_RATIO:-0.99}"
@@ -32,8 +31,6 @@ done
 [[ "${connections}" =~ ^[1-9][0-9]*$ ]] || fail "CONNECTIONS must be a positive integer"
 [[ "${attack_workers}" =~ ^[1-9][0-9]*$ ]] || \
   fail "ATTACK_WORKERS must be a positive integer"
-[[ "${server_http_workers}" =~ ^[1-9][0-9]*$ ]] || \
-  fail "SERVER_HTTP_WORKERS must be a positive integer"
 [[ -r "${profile_file}" ]] || fail "profile is not readable: ${profile_file}"
 
 soft_nofile="$(ulimit -Sn)"
@@ -87,7 +84,7 @@ done <"${profile_file}"
 ((target_count > 0)) || fail "profile contains no targets"
 
 curl --fail --silent --show-error --max-time 2 \
-  "${pg_status_url}/version" >/dev/null || \
+  "${pg_status_url}/ready" >/dev/null || \
   fail "pg-status is not ready at ${pg_status_url}"
 
 cp "${profile_file}" "${run_dir}/profile.txt"
@@ -98,11 +95,15 @@ cp "${profile_file}" "${run_dir}/profile.txt"
   printf 'duration=%s\n' "${duration}"
   printf 'warmup_duration=%s\n' "${warmup_duration}"
   printf 'connections=%s\n' "${connections}"
+  printf 'attack_workers=%s\n' "${attack_workers}"
   printf 'request_timeout=%s\n' "${request_timeout}"
   printf 'max_p99_ms=%s\n' "${max_p99_ms}"
   printf 'min_success_ratio=%s\n' "${min_success_ratio}"
   printf 'min_throughput_ratio=%s\n' "${min_throughput_ratio}"
   printf 'profile_targets=%s\n' "${target_count}"
+  printf 'source_commit=%s\n' "$(git -C "${script_dir}" rev-parse HEAD 2>/dev/null || true)"
+  printf 'server_version=%s\n' "$(curl --fail --silent --show-error --max-time 2 "${pg_status_url}/version")"
+  printf 'vegeta_version=%s\n' "$(vegeta -version 2>&1)"
   printf 'system='
   uname -a
 } >"${run_dir}/metadata.txt"
@@ -115,6 +116,7 @@ attack_options=(
   "-workers=${attack_workers}"
   "-max-workers=${attack_workers}"
   "-timeout=${request_timeout}"
+  "-redirects=0"
   "-max-body=0"
 )
 
@@ -149,11 +151,12 @@ if jq -e \
   --argjson min_success_ratio "${min_success_ratio}" \
   --argjson min_throughput_ratio "${min_throughput_ratio}" \
   '(.success >= $min_success_ratio) and
+   ((.status_codes["200"] // 0) >= (.requests * $min_success_ratio)) and
    (.throughput >= ($target_rps * $min_throughput_ratio)) and
    (.latencies["99th"] <= ($max_p99_ms * 1000000))' \
   "${json_report}" >/dev/null; then
   result=0
-  printf 'PASS: %s RPS is sustainable under the configured SLO.\n' "${target_rps}"
+  printf 'PASS: %s RPS meets the HTTP SLO; check generator headroom and response semantics separately.\n' "${target_rps}"
 else
   result=1
   printf 'FAIL: %s RPS does not satisfy the configured SLO.\n' "${target_rps}" >&2

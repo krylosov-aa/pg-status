@@ -1,9 +1,9 @@
 pg-status v2.2.0 (static build)
 ===============================
 
-A microservice (sidecar) that helps instantly determine the status of your
-PostgreSQL hosts including whether they are alive, which one is the master,
-which ones are replicas, and how far each replica is lagging behind the master.
+An HTTP service that reports the observed roles, availability and replication
+lag of PostgreSQL hosts. It polls hosts in the background and serves the
+latest results from memory.
 
 This is a statically linked binary with no external dependencies.
 

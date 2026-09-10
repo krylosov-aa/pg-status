@@ -125,8 +125,7 @@ bool is_sync_replica_by_time_and_bytes(
 }
 
 /**
- * It takes the next host from the list, and if it's over,
- * it starts from the beginning.
+ * Advances to the next host index, wrapping at host_count.
  */
 static unsigned int next_cursor_in_circle(const unsigned int cursor) {
   assert(cursor < host_count);

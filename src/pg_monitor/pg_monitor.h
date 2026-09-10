@@ -1,13 +1,9 @@
-/**
- * Monitoring of postgresql hosts
- */
-
 #ifndef PG_STATUS_PG_MONITOR_H
 #define PG_STATUS_PG_MONITOR_H
 
 #include <stdint.h>
 
-// ------------------------ Parameters ------------------------
+// Parameters
 
 /**
  * The maximum number of hosts monitored by pg-status
@@ -18,13 +14,10 @@ enum { MAX_HOSTS = 64 };
  * List of all monitoring parameters
  */
 typedef struct {
-  // pg user
   const char *user;
 
-  // pg password
   const char *password;
 
-  // pg database name
   const char *database;
 
   // pg hosts, comma-separated.
@@ -63,10 +56,10 @@ typedef struct {
   // pg port. You can specify multiple ports, comma-separated.
   const char *port;
 
-  // The lag in ms below which a replica is considered synchronous
+  // Maximum lag in ms for a time-synchronous replica (inclusive).
   uint64_t sync_max_lag_ms;
 
-  // The lag in bytes below which a replica is considered synchronous
+  // Maximum lag in bytes for a byte-synchronous replica (inclusive).
   uint64_t sync_max_lag_bytes;
 
   // Target period between starts of checks of the same host, in ms (> 0).
@@ -95,7 +88,7 @@ extern MonitorParameters parameters;
  */
 void set_parameters_from_env(void);
 
-// ------------------------ Start/Stop monitoring ------------------------
+// Start/Stop monitoring
 
 /**
  * Starts a host monitoring thread without waiting for its initial polls.
@@ -113,7 +106,7 @@ bool is_pg_monitor_ready(void);
  */
 void stop_pg_monitor(void);
 
-// ------------------------ Host list ------------------------
+// Host list
 
 /**
  * The actual number of hosts
@@ -150,28 +143,19 @@ typedef enum {
 } HostPollState;
 
 /**
- *  Host parameters.
+ * Host configuration and observed state.
  *
- *  Concurrency model: one writer (the poll thread) and many readers
- *  (HTTP handlers). The fields {status, lag_ms, lag_bytes, lsn}
- *  together describe a host and must be read as a consistent snapshot —
- *  otherwise routing endpoints could combine an old role with measurements
- *  from a newer poll and select a host using inconsistent data.
+ * The polling thread is the sole writer. Readers use atomic_get_snapshot()
+ * to read {status, lag_ms, lag_bytes, lsn} from the same poll, both for host
+ * selection and JSON responses. Single-field accessors do not provide this
+ * consistency across fields.
  *
- *  `lsn` is the latest WAL position known to this host as of the
- *  last successful poll: `pg_last_wal_replay_lsn()` on a replica,
- *  `pg_current_wal_lsn()` on a master.
- *  Failed polls preserve the last successful lags and LSN, including when
- *  the host is marked dead. The HTTP API hides these values for dead hosts.
+ * lsn is pg_last_wal_replay_lsn() on a replica and pg_current_wal_lsn() on a
+ * master, as of the last successful poll. Failed polls preserve the lags
+ * and LSN; the HTTP API hides these measurements once the host is dead.
  *
- *  A seqlock protects the snapshot:
- *  - Writer increments `seq` to odd, writes the four fields, then
- *    increments `seq` to even. Each step is lock-free; the writer
- *    never waits.
- *  - Readers must call atomic_get_snapshot() — never read status / lag_ms
- *    / lag_bytes / lsn directly during routing decisions. Direct
- *    atomic_get_* accessors remain available for places that only need
- *    one field (e.g. /hosts and /status JSON rendering).
+ * The writer sets seq to odd before updating the snapshot and to even after
+ * publication. Readers retry if seq is odd or changes during their read.
  */
 typedef struct {
   const char *host;                 // immutable after init
@@ -185,7 +169,7 @@ typedef struct {
   unsigned int failed_connections;  // writer-private
   _Atomic MonitorStatus status;     // protected by seq
 
-  // ---- writer-private async-poll state ----
+  // writer-private async-poll state
   struct pg_conn *conn;         // reused PGconn, or NULL when disconnected
   HostPollState poll_state;     // current phase of the state machine
   short poll_events;            // events to wait for on PQsocket(conn)
@@ -231,7 +215,7 @@ void init_monitor_host_list(void);
  */
 void save_master_index(int i);
 
-// ------------------------ Lookup utils ------------------------
+// Lookup utils
 
 /**
  * Returns the current master object, or NULL when no master is known.
@@ -254,7 +238,7 @@ uint64_t atomic_get_lag_ms(const MonitorHost *host);
 uint64_t atomic_get_lag_bytes(const MonitorHost *host);
 
 /**
- * Returns a consistent snapshot of {status, lag_ms, lag_bytes} via the
+ * Returns a consistent snapshot of {status, lag_ms, lag_bytes, lsn} via the
  * seqlock on host->seq. May spin briefly if the writer is mid-update,
  * but never blocks the writer.
  */
@@ -267,10 +251,7 @@ MonitorSnapshot atomic_get_snapshot(const MonitorHost *host);
 void publish_monitor_snapshot(MonitorHost *host, MonitorSnapshot snapshot);
 
 /**
- * Describes the interface of the function for searching hosts.
- * Receives a consistent MonitorSnapshot (status + lags from the same
- * poll), the host itself (for host->host name access), and an opaque
- * caller-supplied context pointer.
+ * Tests a host against a consistent snapshot and caller-supplied context.
  */
 typedef bool (*condition_handler)(
   MonitorSnapshot snap, const MonitorHost *host, const void *ctx
@@ -371,7 +352,7 @@ const MonitorHost *find_most_sync_replica_by_bytes(
   const LagThresholds *thresholds, const char *log_context
 );
 
-// ------------------------ Host checking utils ------------------------
+// Host checking utils
 
 /**
  * Kicks off a new poll iteration for `host`: opens the connection if needed
@@ -406,8 +387,7 @@ int host_socket(const MonitorHost *host);
 
 /**
  * Closes every open PGconn in monitor_host_list and resets each host to
- * IDLE. Called from the writer thread before it exits, so that valgrind
- * sees a clean shutdown.
+ * IDLE. Called from the writer thread before it exits.
  */
 void close_all_host_connections(void);
 

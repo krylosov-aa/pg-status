@@ -12,9 +12,12 @@ from support.security import SecurityTopology
 
 @pytest.mark.parametrize("exit_code", (99, 134, 137))
 def test_monitor_exit_is_checked(exit_code: int, tmp_path: Path) -> None:
+    # Arrange
     compose = object.__new__(ComposeProject)
     compose._project = "isolated-test"
     compose._artifact_directory = str(tmp_path)
+
+    # Act & Assert
     with (
         patch.object(
             compose, "service_container_id", return_value="container"
@@ -25,17 +28,24 @@ def test_monitor_exit_is_checked(exit_code: int, tmp_path: Path) -> None:
         pytest.raises(E2EError, match=str(exit_code)),
     ):
         compose.stop_monitor("pg-status-security-verify-full")
+
+    # Assert
     assert (
         tmp_path / "isolated-test/pg-status-security-verify-full.log"
     ).read_text() == "final diagnostics"
 
 
 def test_security_cleanup_validates_before_removing() -> None:
+    # Arrange
     compose = Mock()
     compose.invoke.side_effect = E2EError("startup failure")
     topology = SecurityTopology(compose, Mock())
+
+    # Act & Assert
     with pytest.raises(E2EError), topology.monitor("verify-full"):
         pytest.fail("startup unexpectedly succeeded")
+
+    # Assert
     compose.stop_monitor.assert_called_once_with(
         "pg-status-security-verify-full"
     )

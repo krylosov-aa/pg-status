@@ -1,0 +1,2 @@
+1 /master primary
+1 /replica?min_lsn={lsn} route

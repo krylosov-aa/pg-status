@@ -1,0 +1,6 @@
+8 /master primary
+6 /replica?min_lsn={lsn}&lag_ms=1000&lag_bytes=1000000 replica
+2 /sync_by_time?lag_ms=1000 route
+2 /most_sync_by_bytes replica
+1 /sync_by_time_and_bytes?lag_ms=1000&lag_bytes=1000000 route
+1 /hosts hosts

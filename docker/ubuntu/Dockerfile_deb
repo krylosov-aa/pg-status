@@ -1,4 +1,4 @@
-# -------- Build --------
+# Build
 ARG PG_STATUS_BUILDER=source-builder
 FROM ubuntu:24.04 AS source-builder
 
@@ -33,7 +33,7 @@ RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
 # retain the source-builder path above.
 FROM ${PG_STATUS_BUILDER} AS builder
 
-# -------- Deb Package --------
+# Deb Package
 FROM ubuntu:24.04 AS packager
 
 WORKDIR /pkgroot
@@ -52,6 +52,6 @@ RUN chmod 755 usr/bin/pg-status && chmod 755 DEBIAN
 RUN architecture="$(dpkg --print-architecture)" && \
     dpkg-deb --build . "/pg-status_2.2.0_${architecture}.deb"
 
-# -------- Export --------
+# Export
 FROM scratch AS export
 COPY --from=packager /pg-status_2.2.0_*.deb /

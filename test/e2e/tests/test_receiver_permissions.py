@@ -15,6 +15,7 @@ def test_receiver_permissions_recover_after_reconnection(
     security: SecurityTopology,
     waiter: Waiter,
 ) -> None:
+    # Arrange
     postgres.sql(
         "primary", "create role fallback_monitor login password 'fallback'"
     )
@@ -28,7 +29,10 @@ def test_receiver_permissions_recover_after_reconnection(
             lambda: postgres.sql("replica-1", _PERMISSION_SQL),
             lambda result: result == "f",
         )
+
+        # Act
         with security.monitor("restricted") as monitor:
+            # Assert
             waiter.until(
                 "restricted replica stays alive",
                 lambda: monitor.status("postgres-replica-1"),
@@ -43,6 +47,8 @@ def test_receiver_permissions_recover_after_reconnection(
                     "retrying poll without WAL receiver statistics" in logs
                 ),
             )
+
+            # Act
             postgres.sql(
                 "primary",
                 "grant select on pg_catalog.pg_stat_wal_receiver "
@@ -60,6 +66,8 @@ def test_receiver_permissions_recover_after_reconnection(
                 "select pg_terminate_backend(pid) from pg_stat_activity "
                 "where usename='fallback_monitor'",
             )
+
+            # Assert
             waiter.until(
                 "full receiver query after reconnect",
                 lambda: postgres.sql(
@@ -71,6 +79,7 @@ def test_receiver_permissions_recover_after_reconnection(
             )
             assert monitor.status("postgres-replica-1")["alive"] is True
     finally:
+        # Cleanup
         postgres.sql(
             "primary",
             "grant select on pg_catalog.pg_stat_wal_receiver to public",

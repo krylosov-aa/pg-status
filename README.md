@@ -441,16 +441,22 @@ testing.
 
 ## Performance
 
-Approximate memory usage: 9 MiB.
+Measured on an Ubuntu 24.04 VM with 4 Ice Lake vCPUs and 4 GB RAM. pg-status
+was pinned to **one vCPU**;  requests used localhost HTTP with keep-alive.
 
-Performance depends on the endpoint and response format. A plain-text
-`/master` response is the fastest, while the JSON returned by `/hosts` is the
-slowest:
+| Workload                           | Confirmed RPS | Worst p99 |
+|------------------------------------|--------------:|----------:|
+| `/master`                          |    **52,500** |   4.17 ms |
+| `/master` + `/most_sync_by_bytes`  |    **55,000** |   4.51 ms |
+| `/master` + `/replica`, fresh RYOW |    **52,500** |   4.50 ms |
 
-- 0.1 CPU core — approximately 1,600–2,000 requests/s
-- 1 CPU core — approximately 8,600–9,000 requests/s
+At these rates, pg-status used approximately **90–94% of one vCPU** and
+**10 MiB RSS**. With a **0.1-vCPU quota**, a mixed workload confirmed
+**3,000 RPS** at p99 ≤5 ms.
 
-See the [detailed performance reports](docs/performance.md).
+See the [full results](docs/performance.md) for all ten scenarios,
+CPU/RAM measurements, rare latency spikes and limitations, and the
+[benchmark guide](test/rps/README.md) to reproduce the measurements.
 
 ## Implementation details
 

@@ -1,4 +1,4 @@
-# -------- Build --------
+# Build
 FROM ubuntu:24.04 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -28,7 +28,7 @@ RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
     cmake --build build && \
     ctest --test-dir build --output-on-failure
 
-# -------- Package Archive --------
+# Package Archive
 FROM ubuntu:24.04 AS packager
 
 WORKDIR /archive
@@ -38,7 +38,6 @@ COPY LICENSE LICENSE
 COPY docker/ubuntu/package/shared-third-party-notices.txt THIRD-PARTY-NOTICES
 COPY docker/ubuntu/package/shared-readme.txt README
 
-# Create the archive.
 RUN apt-get update && apt-get install -y --no-install-recommends tar gzip && \
     rm -rf /var/lib/apt/lists/*
 
@@ -49,11 +48,11 @@ RUN architecture="$(dpkg --print-architecture)" && \
         THIRD-PARTY-NOTICES \
         README
 
-# -------- Export --------
+# Export
 FROM scratch AS export
 COPY --from=packager /pg-status_2.2.0_linux_*_shared.tar.gz /
 
-# -------- Run --------
+# Run
 FROM ubuntu:24.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive

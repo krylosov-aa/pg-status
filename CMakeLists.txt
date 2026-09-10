@@ -69,8 +69,7 @@ set(PG_STATUS_PKG_CONFIG_ARGN)
 if(DEFINED PKG_CONFIG_ARGN)
     set(PG_STATUS_PKG_CONFIG_ARGN "${PKG_CONFIG_ARGN}")
 endif()
-# PG_STATUS_STATIC_DEPENDENCIES is the single source of truth for --static;
-# remove a value cached by FindPkgConfig before applying the current profile.
+# Remove cached --static before applying PG_STATUS_STATIC_DEPENDENCIES.
 list(REMOVE_ITEM PG_STATUS_PKG_CONFIG_ARGN --static)
 
 if(PG_STATUS_STATIC_DEPENDENCIES)

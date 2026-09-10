@@ -1,4 +1,4 @@
-# -------- Build --------
+# Build
 FROM ubuntu:24.04 AS builder
 
 ARG CJSON_VERSION=1.7.19
@@ -22,7 +22,7 @@ WORKDIR /tmp
 
 RUN cp /usr/share/doc/libevent-dev/copyright /tmp/LICENSE-libevent
 
-# ---- cJSON ----
+# cJSON
 RUN curl -fSLO "https://github.com/DaveGamble/cJSON/archive/refs/tags/v${CJSON_VERSION}.tar.gz" && \
     echo "${CJSON_SHA256}  v${CJSON_VERSION}.tar.gz" | sha256sum -c - && \
     tar xf "v${CJSON_VERSION}.tar.gz" && \
@@ -36,7 +36,7 @@ RUN curl -fSLO "https://github.com/DaveGamble/cJSON/archive/refs/tags/v${CJSON_V
     cmake --build build --target install && \
     cp LICENSE /tmp/LICENSE-cJSON
 
-# ---- OpenSSL ----
+# OpenSSL
 RUN curl -fSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" && \
     echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | sha256sum -c - && \
     tar xf "openssl-${OPENSSL_VERSION}.tar.gz" && \
@@ -46,7 +46,7 @@ RUN curl -fSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
     make -j$(nproc) && make install_sw && \
     cp LICENSE.txt /tmp/LICENSE-OpenSSL
 
-# ---- libpq ----
+# libpq
 RUN curl -fSLO "https://ftp.postgresql.org/pub/source/v${POSTGRESQL_VERSION}/postgresql-${POSTGRESQL_VERSION}.tar.gz" && \
     echo "${POSTGRESQL_SHA256}  postgresql-${POSTGRESQL_VERSION}.tar.gz" | sha256sum -c - && \
     tar xf "postgresql-${POSTGRESQL_VERSION}.tar.gz" && \
@@ -64,10 +64,10 @@ RUN curl -fSLO "https://ftp.postgresql.org/pub/source/v${POSTGRESQL_VERSION}/pos
        /usr/local/include/postgresql/ && \
     cp COPYRIGHT /tmp/LICENSE-PostgreSQL
 
-# ---- zlib license ----
+# zlib license
 COPY docker/ubuntu/package/zlib-license.txt /tmp/LICENSE-zlib
 
-# ---- Build app ----
+# Build app
 WORKDIR /app
 
 COPY CMakeLists.txt .
@@ -93,7 +93,7 @@ RUN cmake -B build -G Ninja \
     cmake --build build && \
     ctest --test-dir build --output-on-failure
 
-# -------- Package Archive --------
+# Package Archive
 FROM ubuntu:24.04 AS packager
 
 RUN apt-get update && apt-get install -y --no-install-recommends tar gzip && \
@@ -119,11 +119,11 @@ RUN architecture="$(dpkg --print-architecture)" && \
         README \
         licenses/
 
-# -------- Export --------
+# Export
 FROM scratch AS export
 COPY --from=packager /pg-status_2.2.0_linux_*_static.tar.gz /
 
-# -------- Run --------
+# Run
 FROM ubuntu:24.04 AS runner
 
 ARG DEBIAN_FRONTEND=noninteractive

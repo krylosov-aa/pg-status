@@ -104,12 +104,18 @@ static void timestamp_now(char *buffer, const size_t capacity) {
 }
 
 static void assert_stopped_call_skips_formatting(void) {
+  // Arrange
   int touched = -1;
+
+  // Act
   pg_status_log(PG_STATUS_LOG_ERROR, "stopped", "%n", &touched);
+
+  // Assert
   support_assert_true(touched == -1, "stopped logger formatted a message");
 }
 
 static void queue_while_formatter_is_stalled(void) {
+  // Arrange
   pg_status_log(PG_STATUS_LOG_INFO, "hold", "stall the worker");
   lock_gate();
   while (!formatter_entered) {
@@ -123,11 +129,17 @@ static void queue_while_formatter_is_stalled(void) {
   char message[] = "original";
   timestamp_now(before, sizeof(before));
   errno = EDOM;
+
+  // Act
   pg_status_log_system_error(
     PG_STATUS_LOG_ERROR, component, EACCES, "value=%s", message
   );
+
+  // Assert
   support_assert_true(errno == EDOM, "enqueue changed caller errno");
   timestamp_now(after, sizeof(after));
+
+  // Act
   memset(component, 'x', sizeof(component) - 1);
   memset(message, 'x', sizeof(message) - 1);
 
@@ -141,10 +153,18 @@ static void queue_while_formatter_is_stalled(void) {
       break;
     }
   }
+
+  // Assert
   support_assert_true(full, "queue did not reject messages before formatting");
   int touched = -1;
+
+  // Act
   pg_status_log(PG_STATUS_LOG_ERROR, "reserved", "%n", &touched);
+
+  // Assert
   support_assert_true(touched == 0, "error reserve was not available");
+
+  // Act & Assert
   for (size_t i = 0; i < 1024; i++) {
     pg_status_log(PG_STATUS_LOG_ERROR, "fill", "fill error reserve");
   }
@@ -154,6 +174,7 @@ static void queue_while_formatter_is_stalled(void) {
     support_assert_true(touched == -1, "full queue still formatted a message");
   }
 
+  // Act
   // Ensure formatting happens later than the event's capture interval.
   const struct timespec delay = {.tv_nsec = 20000000};
   (void)nanosleep(&delay, nullptr);
@@ -164,6 +185,8 @@ static void queue_while_formatter_is_stalled(void) {
   pg_status_log_flush();
 
   lock_gate();
+
+  // Assert
   support_assert_true(snapshot_seen, "queued component was not copied");
   support_assert_contains(
     snapshot_message, "value=original: ", "queued message changed"
@@ -177,6 +200,8 @@ static void queue_while_formatter_is_stalled(void) {
       strcmp(snapshot_timestamp, after) <= 0,
     "timestamp reflects output time instead of event time"
   );
+
+  // Cleanup
   unlock_gate();
 }
 
@@ -184,14 +209,22 @@ int main(const int argc, char **argv) {
   if (argc != 2) {
     support_fail("expected text or json");
   }
+
+  // Arrange
   use_json = strcmp(argv[1], "json") == 0;
   caller = pthread_self();
   support_clear_environment("pg_status__log_level");
   support_set_environment("pg_status__log_format", argv[1]);
+
+  // Act & Assert
   assert_stopped_call_skips_formatting();
   pg_status_log_init();
   queue_while_formatter_is_stalled();
+
+  // Cleanup
   pg_status_log_shutdown();
+
+  // Act & Assert
   assert_stopped_call_skips_formatting();
   return 0;
 }

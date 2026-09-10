@@ -82,3 +82,5 @@ test/e2e/.idea/
 
 # Manual benchmark results
 /test/rps/results/
+/test/rps/pg-status-load
+!/test/rps/driver/go.mod

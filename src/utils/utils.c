@@ -1,7 +1,3 @@
-/**
- * General purpose utilities
- */
-
 #include "utils.h"
 
 #include <assert.h>
@@ -15,9 +11,6 @@
 
 #include "logger.h"
 
-/**
- * Copies a string. The result must be freed by the caller.
- */
 char *copy_string(const char *str) {
   assert(str);
   char *result = strdup(str);
@@ -28,9 +21,6 @@ char *copy_string(const char *str) {
   return result;
 }
 
-/**
- * Checks if strings are the same
- */
 bool is_equal_strings(const char *first, const char *second) {
   if (!first || !second) {
     return false;
@@ -38,10 +28,6 @@ bool is_equal_strings(const char *first, const char *second) {
   return strcmp(first, second) == 0;
 }
 
-/**
- * Forms a new string and substitutes arguments in printf style.
- * The result must be freed by the caller.
- */
 char *format_string(const char *format, ...) {
   va_list args;
   va_start(args, format);
@@ -58,9 +44,6 @@ char *format_string(const char *format, ...) {
   return string;
 }
 
-/**
- * Converts string to long
- */
 long str_to_long(const char *value) {
   if (!value) {
     pg_status_log_fatal("utils", "failed to convert null to long");
@@ -78,9 +61,6 @@ long str_to_long(const char *value) {
   return result;
 }
 
-/**
- * Converts string to unsigned long
- */
 unsigned long str_to_ulong(const char *value) {
   if (!value) {
     pg_status_log_fatal("utils", "failed to convert null to ulong");
@@ -101,9 +81,6 @@ unsigned long str_to_ulong(const char *value) {
   return result;
 }
 
-/**
- * Converts string to uint64_t
- */
 uint64_t str_to_ull(const char *value) {
   if (!value) {
     pg_status_log_fatal("utils", "failed to convert null to ull");
@@ -124,12 +101,6 @@ uint64_t str_to_ull(const char *value) {
   return result;
 }
 
-/**
- * Converts string to uint64_t without aborting on failure.
- * Returns true on success and writes the parsed value to *out.
- * Returns false on any malformed input: NULL/empty, leading '-',
- * non-numeric content, or overflow.
- */
 bool try_str_to_ull(const char *value, uint64_t *out) {
   if (!value || *value == '\0' || *value == '-') {
     return false;
@@ -148,13 +119,6 @@ bool try_str_to_ull(const char *value, uint64_t *out) {
   return true;
 }
 
-/**
- * Parses LSN "HEX/HEX" form into a 64-bit
- * integer (high 32 bits | low 32 bits). Returns true on success and
- * writes the result to *out. Returns false on any malformed input:
- * NULL/empty, missing or leading '/', non-hex content, overflow of
- * either half above 0xFFFFFFFF, or trailing garbage.
- */
 bool try_parse_lsn(const char *value, uint64_t *out) {
   if (
     !value || *value == '\0' || *value == '-' || *value == '+' || *value == '/'
@@ -193,19 +157,12 @@ bool try_parse_lsn(const char *value, uint64_t *out) {
   return true;
 }
 
-/**
- * Formats a 64-bit LSN value back to "HEX/HEX" form
- * The result must be freed by the caller.
- */
 char *format_lsn(const uint64_t lsn) {
   return format_string(
     "%lX/%lX", (unsigned long)(lsn >> 32), (unsigned long)(lsn & 0xFFFFFFFFULL)
   );
 }
 
-/**
- * Converts string to int
- */
 int str_to_int(const char *value) {
   const long result = str_to_long(value);
   if (result < INT_MIN || result > INT_MAX) {
@@ -214,9 +171,6 @@ int str_to_int(const char *value) {
   return (int)result;
 }
 
-/**
- * Converts string to int greater than or equal to zero
- */
 int str_to_int_greater_or_equal_zero(const char *value) {
   const int result = str_to_int(value);
   if (result < 0) {
@@ -227,9 +181,6 @@ int str_to_int_greater_or_equal_zero(const char *value) {
   return result;
 }
 
-/**
- * Converts string to unsigned int
- */
 unsigned int str_to_uint(const char *value) {
   const unsigned long result = str_to_ulong(value);
   if (result > UINT_MAX) {
@@ -238,9 +189,6 @@ unsigned int str_to_uint(const char *value) {
   return (unsigned int)result;
 }
 
-/**
- * Converts string to unsigned int 16
- */
 uint16_t str_to_uint16(const char *value) {
   const unsigned long result = str_to_ulong(value);
   if (result > UINT16_MAX) {
@@ -249,10 +197,6 @@ uint16_t str_to_uint16(const char *value) {
   return (uint16_t)result;
 }
 
-/**
- * Takes a value from the environment variables if it is set,
- * pastes it by the result pointer.
- */
 void replace_from_env(const char *env_name, const char **result) {
   assert(env_name);
   const char *env_val = getenv(env_name);
@@ -261,10 +205,6 @@ void replace_from_env(const char *env_name, const char **result) {
   }
 }
 
-/**
- * Takes a value from the environment variables if it is set,
- * pastes it by the result pointer.
- */
 void replace_from_env_uint(const char *env_name, unsigned int *result) {
   assert(env_name);
   const char *env_val = getenv(env_name);
@@ -273,10 +213,6 @@ void replace_from_env_uint(const char *env_name, unsigned int *result) {
   }
 }
 
-/**
- * Takes a value from the environment variables if it is set,
- * pastes it by the result pointer.
- */
 void replace_from_env_ull(const char *env_name, uint64_t *result) {
   assert(env_name);
   const char *env_val = getenv(env_name);
@@ -285,9 +221,6 @@ void replace_from_env_ull(const char *env_name, uint64_t *result) {
   }
 }
 
-/**
- * Creates a new json array object
- */
 cJSON *json_array(void) {
   cJSON *arr = cJSON_CreateArray();
   if (!arr) {
@@ -296,9 +229,6 @@ cJSON *json_array(void) {
   return arr;
 }
 
-/**
- * Creates a new json object
- */
 cJSON *json_object(void) {
   cJSON *arr = cJSON_CreateObject();
   if (!arr) {
@@ -307,9 +237,6 @@ cJSON *json_object(void) {
   return arr;
 }
 
-/**
- * Adds a new key and string value to json
- */
 void add_str_to_json_object(cJSON *obj, const char *key, const char *val) {
   assert(obj);
   assert(key);
@@ -319,9 +246,6 @@ void add_str_to_json_object(cJSON *obj, const char *key, const char *val) {
   }
 }
 
-/**
- * Adds a new key and nullable string value to json
- */
 void add_nullable_str_to_json_object(
   cJSON *json_obj, const char *name, const char *value
 ) {
@@ -332,9 +256,6 @@ void add_nullable_str_to_json_object(
   }
 }
 
-/**
- * Adds a new key with value null to json
- */
 void add_null_to_json_object(cJSON *obj, const char *key) {
   assert(obj);
   assert(key);
@@ -343,9 +264,6 @@ void add_null_to_json_object(cJSON *obj, const char *key) {
   }
 }
 
-/**
- * Adds a new key and bool value to json
- */
 void add_bool_to_json_object(cJSON *obj, const char *key, const bool val) {
   assert(obj);
   assert(key);
@@ -354,9 +272,6 @@ void add_bool_to_json_object(cJSON *obj, const char *key, const bool val) {
   }
 }
 
-/**
- * Adds a new key and uint64 value to json as a JSON number.
- */
 void add_uint64_to_json_object(
   cJSON *obj, const char *key, const uint64_t val
 ) {
@@ -367,10 +282,6 @@ void add_uint64_to_json_object(
   }
 }
 
-/**
- * Converts json to string.
- * The string must be freed by the caller.
- */
 char *json_to_str(cJSON *json) {
   assert(json);
   char *result = cJSON_PrintUnformatted(json);
@@ -381,9 +292,6 @@ char *json_to_str(cJSON *json) {
   return result;
 }
 
-/**
- * Monotonic time in milliseconds.
- */
 uint64_t monotonic_ms(void) {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);

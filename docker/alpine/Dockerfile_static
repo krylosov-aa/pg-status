@@ -1,4 +1,4 @@
-# -------- Build --------
+# Build
 FROM alpine:3.22 AS builder
 
 ARG CJSON_VERSION=1.7.19
@@ -17,7 +17,7 @@ RUN apk add --no-cache \
 
 WORKDIR /tmp
 
-# ---- cJSON ----
+# cJSON
 RUN curl -fSLO "https://github.com/DaveGamble/cJSON/archive/refs/tags/v${CJSON_VERSION}.tar.gz" && \
     echo "${CJSON_SHA256}  v${CJSON_VERSION}.tar.gz" | sha256sum -c - && \
     tar xf "v${CJSON_VERSION}.tar.gz" && \
@@ -30,7 +30,7 @@ RUN curl -fSLO "https://github.com/DaveGamble/cJSON/archive/refs/tags/v${CJSON_V
         -DCMAKE_BUILD_TYPE=Release . && \
     cmake --build build --target install
 
-# ---- libpq ----
+# libpq
 RUN curl -fSLO "https://ftp.postgresql.org/pub/source/v${POSTGRESQL_VERSION}/postgresql-${POSTGRESQL_VERSION}.tar.gz" && \
     echo "${POSTGRESQL_SHA256}  postgresql-${POSTGRESQL_VERSION}.tar.gz" | sha256sum -c - && \
     tar xf "postgresql-${POSTGRESQL_VERSION}.tar.gz" && \
@@ -72,12 +72,12 @@ RUN cmake -B build -G Ninja \
     cmake --build build && \
     ctest --test-dir build --output-on-failure
 
-# -------- Export --------
+# Export
 FROM scratch AS export
 COPY --from=builder /app/build/src/pg-status /pg-status
 
 
-# -------- Run --------
+# Run
 FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates

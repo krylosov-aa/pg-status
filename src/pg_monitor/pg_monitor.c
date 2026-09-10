@@ -159,14 +159,7 @@ static void process_poll_result(const struct pollfd *pfds) {
 }
 
 /**
- * Drives one iteration of the async poll loop:
- *   1. Process IDLE hosts.
- *   2. Build pollfd[].
- *   3. poll() until the earliest deadline (per-host iter_deadline_ms
- *      or next_poll_at_ms).
- *   4. Time out expired checks, then advance hosts whose fd became ready.
- *   5. Recompute the master index from the freshly published statuses.
- *
+ * Waits for socket activity or the earliest host deadline, then updates hosts.
  * Returns false if a stop signal was received, true otherwise.
  */
 static bool pump_one_iteration(void) {

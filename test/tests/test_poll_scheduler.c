@@ -101,9 +101,12 @@ static int prepare_poll(struct pollfd *pfds) {
 }
 
 static void test_period(void) {
+  // Arrange
   configure_hosts(1);
   MonitorHost *host = &monitor_host_list[0];
   const uint64_t durations[] = {20, 200, 900};
+
+  // Act & Assert
   for (size_t i = 0; i < sizeof(durations) / sizeof(durations[0]); i++) {
     const uint64_t expected_start = 10000 + (i * 1000);
     clock_ms = expected_start;
@@ -127,9 +130,12 @@ static void test_period(void) {
 }
 
 static void test_overrun(void) {
+  // Arrange
   configure_hosts(1);
   parameters.query_timeout_ms = 4000;
   MonitorHost *host = &monitor_host_list[0];
+
+  // Act & Assert
   start_and_timeout_hosts();
   clock_ms = 13500;
   finish_success(host);
@@ -151,9 +157,12 @@ static void test_overrun(void) {
 }
 
 static void test_failure_period(void) {
+  // Arrange
   configure_hosts(1);
   parameters.query_timeout_ms = 300;
   MonitorHost *host = &monitor_host_list[0];
+
+  // Act & Assert
   for (unsigned int i = 0; i < 3; i++) {
     clock_ms = 10000 + ((uint64_t)i * 1000);
     start_and_timeout_hosts();
@@ -173,7 +182,10 @@ static void test_failure_period(void) {
 }
 
 static void test_default_failure_timing(void) {
+  // Arrange
   configure_hosts(1);
+
+  // Act & Assert
   for (unsigned int i = 0; i < 3; i++) {
     (void)pump_one_iteration();
     support_assert_true(last_poll_timeout == 1000, "one timeout per second");
@@ -188,8 +200,11 @@ static void test_default_failure_timing(void) {
 }
 
 static void test_independent_hosts_and_warmup(void) {
+  // Arrange
   configure_hosts(2);
   parameters.query_timeout_ms = 3000;
+
+  // Act & Assert
   start_and_timeout_hosts();
   support_assert_true(
     !all_hosts_have_polled(), "starting checks is not warmup completion"
@@ -215,13 +230,18 @@ static void test_independent_hosts_and_warmup(void) {
 }
 
 static void test_deadline_before_event(void) {
+  // Arrange
   configure_hosts(1);
   start_and_timeout_hosts();
   struct pollfd pfds[MAX_HOSTS + 1];
   (void)prepare_poll(pfds);
   pfds[1].revents = POLLIN;
   clock_ms = 11000;
+
+  // Act
   process_poll_result(pfds);
+
+  // Assert
   support_assert_true(
     timeouts == 1 && advances == 0, "deadline wins even when socket is ready"
   );
@@ -232,8 +252,11 @@ static void test_deadline_before_event(void) {
 }
 
 static void test_fresh_clock(void) {
+  // Arrange
   configure_hosts(2);
   start_cost_ms = 100;
+
+  // Act & Assert
   (void)pump_one_iteration();
   support_assert_true(
     monitor_host_list[1].iter_started_at_ms == 10100,
@@ -262,7 +285,10 @@ static void test_fresh_clock(void) {
 }
 
 static void test_missing_socket(void) {
+  // Arrange
   configure_hosts(1);
+
+  // Act & Assert
   start_and_timeout_hosts();
   socket_fd = -1;
   struct pollfd pfds[MAX_HOSTS + 1];
@@ -276,10 +302,13 @@ static void test_missing_socket(void) {
 }
 
 static void test_wait_for_deadline(void) {
+  // Arrange
   configure_hosts(1);
   parameters.query_timeout_ms = 5000;
   start_and_timeout_hosts();
   struct pollfd pfds[MAX_HOSTS + 1];
+
+  // Act & Assert
   support_assert_true(
     prepare_poll(pfds) == 5000, "in-flight checks do not wake every sleep_ms"
   );
@@ -294,8 +323,13 @@ static void configure_environment(void) {
 }
 
 static void test_defaults(void) {
+  // Arrange
   configure_environment();
+
+  // Act
   set_parameters_from_env();
+
+  // Assert
   support_assert_true(
     parameters.sleep_ms == 1000 && parameters.query_timeout_ms == 1000 &&
       parameters.max_fails == 3,
@@ -304,11 +338,16 @@ static void test_defaults(void) {
 }
 
 static void test_custom_parameters(void) {
+  // Arrange
   configure_environment();
   support_set_environment("pg_status__sleep_ms", "200");
   support_set_environment("pg_status__query_timeout_ms", "3000");
   support_set_environment("pg_status__max_fails", "5");
+
+  // Act
   set_parameters_from_env();
+
+  // Assert
   support_assert_true(
     parameters.sleep_ms == 200 && parameters.query_timeout_ms == 3000 &&
       parameters.max_fails == 5,
@@ -317,22 +356,30 @@ static void test_custom_parameters(void) {
 }
 
 static void invalid_parameter(const char *name, const char *value) {
+  // Arrange
   configure_environment();
   support_set_environment(name, value);
   pg_status_log_init();
+
+  // Act
   set_parameters_from_env();
+
+  // Cleanup
   pg_status_log_shutdown();
 }
 
 static void test_zero_period(void) {
+  // Act
   invalid_parameter("pg_status__sleep_ms", "0");
 }
 
 static void test_zero_timeout(void) {
+  // Act
   invalid_parameter("pg_status__query_timeout_ms", "0");
 }
 
 static void test_overflow_timeout(void) {
+  // Act
   invalid_parameter("pg_status__query_timeout_ms", "18446744073709551615");
 }
 

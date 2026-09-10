@@ -7,13 +7,16 @@
 #include "pg_monitor.h"
 
 static void test_valid_ports(const bool per_host) {
+  // Arrange
   const char *expected_hosts[] = {"A", "B", "C"};
   const char *expected_ports[] = {"5432", "6432", "7432"};
   parameters.hosts = "A,B,C";
   parameters.port = per_host ? "5432,6432,7432" : "5432";
 
+  // Act
   init_monitor_host_list();
 
+  // Assert
   const size_t expected_count = sizeof(expected_hosts) /
                                 sizeof(expected_hosts[0]);
   support_assert_true(host_count == expected_count, "unexpected host count");
@@ -61,9 +64,14 @@ int main(const int argc, char **argv) {
   for (size_t i = 0; i < sizeof(invalid_cases) / sizeof(invalid_cases[0]);
        i++) {
     if (strcmp(argv[1], invalid_cases[i].name) == 0) {
+      // Arrange
       parameters.hosts = invalid_cases[i].hosts;
       parameters.port = invalid_cases[i].ports;
+
+      // Act
       init_monitor_host_list();
+
+      // Assert
       support_fail("invalid host/port configuration was accepted");
     }
   }

@@ -1,4 +1,4 @@
-# -------- Build --------
+# Build
 FROM alpine:3.22 AS builder
 
 RUN apk add --no-cache \
@@ -26,12 +26,12 @@ RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . && \
     cmake --build build && \
     ctest --test-dir build --output-on-failure
 
-# -------- Export --------
+# Export
 FROM scratch AS export
 COPY --from=builder /app/build/src/pg-status /pg-status
 
 
-# -------- Run --------
+# Run
 FROM alpine:3.22
 
 RUN apk add --no-cache \

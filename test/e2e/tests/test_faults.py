@@ -94,8 +94,13 @@ def test_healthy_host_progresses_while_another_database_is_frozen(
     observed: MonitorWaiter,
     wal: WalWriter,
 ) -> None:
+    # Arrange
     faults.pause_postgres("replica-2")
+
+    # Act
     minimum_lsn = wal.warm_up()
+
+    # Assert
     # Keep the failing database frozen for both assertions. A stale
     # snapshot is insufficient: the healthy nodes must observe new WAL.
     observed.lsn("pg-proxy-1", minimum_lsn)

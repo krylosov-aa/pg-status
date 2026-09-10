@@ -1,0 +1,2 @@
+1 /master primary
+1 /most_sync_by_bytes replica

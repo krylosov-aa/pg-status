@@ -139,26 +139,38 @@ static MonitorSnapshot replica_result(
 }
 
 static void test_latest_end_lsn(void) {
+  // Arrange
   configure_hosts("0/1000");
+
+  // Act
   const MonitorSnapshot snap = replica_result("0/1000", "0/1000", "0/3000");
+
+  // Assert
   support_assert_true(snap.status.alive && !snap.status.master, "live replica");
   support_assert_true(snap.lag_bytes == 8192, "include WAL not yet received");
   support_assert_true(snap.lag_ms == 9000, "preserve time lag");
   support_assert_true(snap.lsn == 0x1000, "LSN remains the replay position");
 
   const LagThresholds thresholds = {.max_lag_ms = 1000, .max_lag_bytes = 0};
+
+  // Assert
   support_assert_true(
     find_replica(is_sync_replica_by_time_or_bytes, &thresholds, "test") ==
       &monitor_host_list[0],
     "unreceived WAL must prevent a false zero-byte sync match"
   );
   const LagThresholds minimum = {.min_lsn = 0x3000};
+
+  // Assert
   support_assert_true(
     !is_alive_replica(snap, &monitor_host_list[1], &minimum),
     "advertised LSN must not satisfy a replay LSN constraint"
   );
 
+  // Act
   finish_iteration(&monitor_host_list[1], false, 2000);
+
+  // Assert
   const MonitorSnapshot failed = atomic_get_snapshot(&monitor_host_list[1]);
   support_assert_true(
     failed.status.possible_dead && failed.lag_bytes == 8192 &&
@@ -168,12 +180,19 @@ static void test_latest_end_lsn(void) {
 }
 
 static void test_latest_end_lsn_without_master(void) {
+  // Arrange
   configure_hosts(nullptr);
+
+  // Act
   const MonitorSnapshot snap = replica_result("0/1000", "0/1000", "0/3000");
+
+  // Assert
   support_assert_true(
     snap.lag_bytes == 8192, "receiver works without master poll"
   );
   const LagThresholds thresholds = {.max_lag_bytes = 0};
+
+  // Assert
   support_assert_true(
     find_replica(is_sync_replica_by_bytes, &thresholds, "test") == nullptr,
     "no byte-sync candidate while advertised WAL is missing"
@@ -181,50 +200,84 @@ static void test_latest_end_lsn_without_master(void) {
 }
 
 static void test_older_latest_end_lsn(void) {
+  // Arrange
   configure_hosts("0/5000");
+
+  // Act
   MonitorSnapshot snap = replica_result("0/3000", "0/1000", "0/2000");
+
+  // Assert
   support_assert_true(
     snap.lag_bytes == 16384, "master position still contributes"
   );
 
+  // Arrange
   configure_hosts("0/2000");
+
+  // Act
   snap = replica_result("0/5000", "0/1000", "0/3000");
+
+  // Assert
   support_assert_true(
     snap.lag_bytes == 16384, "received position still contributes"
   );
 }
 
 static void test_missing_latest_end_lsn(void) {
+  // Arrange
   // An absent receiver or statistics hidden from this user yields SQL NULL.
   configure_hosts("0/5000");
+
+  // Act
   MonitorSnapshot snap = replica_result("0/3000", "0/1000", nullptr);
+
+  // Assert
   support_assert_true(
     snap.status.alive && snap.lag_bytes == 16384, "NULL receiver with master"
   );
 
+  // Arrange
   configure_hosts(nullptr);
+
+  // Act
   snap = replica_result("0/3000", "0/1000", nullptr);
+
+  // Assert
   support_assert_true(
     snap.status.alive && snap.lag_bytes == 8192, "NULL receiver without master"
   );
 }
 
 static void test_replay_ahead_of_observations(void) {
+  // Arrange
   configure_hosts("0/1000");
+
+  // Act
   MonitorSnapshot snap = replica_result(nullptr, "0/2000", nullptr);
+
+  // Assert
   support_assert_true(
     snap.lag_bytes == 0, "missing receive LSN must not underflow"
   );
+
+  // Act
   snap = replica_result("0/1000", "0/3000", "0/2000");
+
+  // Assert
   support_assert_true(
     snap.lag_bytes == 0, "older WAL observations must not underflow"
   );
 }
 
 static void test_master_ignores_latest_end_lsn(void) {
+  // Arrange
   configure_hosts(nullptr);
   const char *values[] = {"f", "0/3000", "0/1000", "0/1000", "0", "0/5000"};
+
+  // Act
   publish_result(&monitor_host_list[0], values);
+
+  // Assert
   const MonitorSnapshot snap = atomic_get_snapshot(&monitor_host_list[0]);
   support_assert_true(snap.status.master && snap.status.alive, "master role");
   support_assert_true(
@@ -273,11 +326,16 @@ static void assert_failed_poll(const MonitorHost *host) {
 }
 
 static void run_permission_fallback_replica(void) {
+  // Arrange
   pg_status_log_init();
   pg_status_log_set_level(PG_STATUS_LOG_WARNING);
   MonitorHost *host = configure_permission_poll();
   poll_script.pause_after_result = true;
+
+  // Act
   read_step(host, 1010);
+
+  // Assert
   support_assert_true(
     host->iter_retry_without_wal_receiver && poll_script.queries_sent == 0 &&
       host->poll_state == HOST_POLL_QUERY_READ,
@@ -289,9 +347,12 @@ static void run_permission_fallback_replica(void) {
     "permission error alone does not change host health"
   );
 
+  // Act
   poll_script.busy = false;
   poll_script.pause_after_result = false;
   read_step(host, 1020);
+
+  // Assert
   support_assert_true(
     host->poll_state == HOST_POLL_QUERY_SEND &&
       host->iter_deadline_ms == 2000 && poll_script.queries_sent == 1 &&
@@ -299,9 +360,15 @@ static void run_permission_fallback_replica(void) {
         streaming_replication_query_without_wal_receiver,
     "retry without receiver keeps the original deadline"
   );
+
+  // Arrange
   const char *values[] = {"t", nullptr, "0/3000", "0/2000", "1234", nullptr};
   poll_script.result = make_poll_result(values);
+
+  // Act
   advance_host_poll(host, 1030);
+
+  // Assert
   const MonitorSnapshot snap = atomic_get_snapshot(host);
   support_assert_true(
     host->poll_state == HOST_POLL_IDLE && host->failed_connections == 0 &&
@@ -310,6 +377,7 @@ static void run_permission_fallback_replica(void) {
     "successful fallback publishes fresh replica measurements"
   );
 
+  // Act & Assert
   reset_iter_state(host, 1100);
   support_assert_true(send_query(host), "send next poll");
   support_assert_true(
@@ -331,11 +399,16 @@ static void run_permission_fallback_replica(void) {
     poll_script.last_query == streaming_replication_query,
     "a new connection retries receiver access"
   );
+
+  // Cleanup
   pg_status_log_shutdown();
 }
 
 static void test_permission_fallback_replica(void) {
+  // Act
   char *logs = support_capture_standard_error(run_permission_fallback_replica);
+
+  // Assert
   const char *warning =
     "WARNING monitor: PostgreSQL permission denied host=replica";
   support_assert_contains(logs, warning, "permission fallback emits a warning");
@@ -353,15 +426,22 @@ static void test_permission_fallback_replica(void) {
   support_assert_contains(
     logs, "pg_read_all_stats", "statistics visibility hint"
   );
+
+  // Cleanup
   free(logs);
 }
 
 static void test_permission_fallback_master(void) {
+  // Arrange
   MonitorHost *host = configure_permission_poll();
+
+  // Act
   read_step(host, 1010);
   const char *values[] = {"f", "0/9000", nullptr, nullptr, "0", nullptr};
   poll_script.result = make_poll_result(values);
   advance_host_poll(host, 1020);
+
+  // Assert
   const MonitorSnapshot snap = atomic_get_snapshot(host);
   support_assert_true(
     host->failed_connections == 0 && snap.status.alive && snap.status.master &&
@@ -372,20 +452,31 @@ static void test_permission_fallback_master(void) {
 }
 
 static void test_permission_fallback_failure(void) {
+  // Arrange
   MonitorHost *host = configure_permission_poll();
+
+  // Act
   read_step(host, 1010);
   queue_error("42501");
   advance_host_poll(host, 1020);
+
+  // Assert
   support_assert_true(poll_script.queries_sent == 1, "retry at most once");
   assert_failed_poll(host);
 }
 
 static void test_permission_fallback_unrelated_error(void) {
+  // Arrange
   const char *sqlstates[] = {"XX000", nullptr};
   for (size_t i = 0; i < sizeof(sqlstates) / sizeof(sqlstates[0]); i++) {
+    // Arrange
     MonitorHost *host = configure_permission_poll();
     poll_script.sqlstate = sqlstates[i];
+
+    // Act
     read_step(host, 1010);
+
+    // Assert
     support_assert_true(
       poll_script.queries_sent == 0, "do not retry other errors"
     );
@@ -394,16 +485,26 @@ static void test_permission_fallback_unrelated_error(void) {
 }
 
 static void test_permission_fallback_timeout(void) {
+  // Arrange
   MonitorHost *host = configure_permission_poll();
+
+  // Act
   read_step(host, 1010);
   timeout_host_poll(host, 2000);
+
+  // Assert
   assert_failed_poll(host);
 }
 
 static void test_permission_fallback_send_failure(void) {
+  // Arrange
   MonitorHost *host = configure_permission_poll();
   poll_script.send_ok = 0;
+
+  // Act
   read_step(host, 1010);
+
+  // Assert
   assert_failed_poll(host);
 }
 

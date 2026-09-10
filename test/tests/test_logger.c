@@ -161,9 +161,12 @@ static void init_json_logger(void) {
 }
 
 static void test_text_format_environment(void) {
+  // Arrange
   const char *formats[] = {"text", ""};
   for (size_t i = 0; i < sizeof(formats) / sizeof(formats[0]); i++) {
     support_set_environment("pg_status__log_format", formats[i]);
+
+    // Act & Assert
     test_message_format();
   }
 }
@@ -186,9 +189,14 @@ static void emit_json_messages(void) {
 }
 
 static void test_json_format(void) {
+  // Arrange
   init_json_logger();
+
+  // Act
   char *output = support_capture_standard_error(emit_json_messages);
   pg_status_log_shutdown();
+
+  // Assert
   static const char *levels[] = {"DEBUG", "INFO",  "WARNING",
                                  "ERROR", "ERROR", "ERROR"};
   size_t index = 0;
@@ -230,6 +238,8 @@ static void test_json_format(void) {
   support_assert_true(
     index == sizeof(levels) / sizeof(levels[0]), "missing JSON records"
   );
+
+  // Cleanup
   free(output);
 }
 
@@ -245,12 +255,16 @@ static void emit_escaped_long_message(void) {
 }
 
 static void test_json_truncation(void) {
+  // Arrange
   init_json_logger();
   const support_action_t emitters[] = {
     emit_long_message, emit_escaped_long_message
   };
   for (size_t i = 0; i < sizeof(emitters) / sizeof(emitters[0]); i++) {
+    // Act
     char *output = support_capture_standard_error(emitters[i]);
+
+    // Assert
     cJSON *record = parse_json_record(output);
     const cJSON *message = cJSON_GetObjectItemCaseSensitive(record, "message");
     support_assert_true(cJSON_IsString(message), "missing truncated message");
@@ -269,9 +283,13 @@ static void test_json_truncation(void) {
         "missing component truncation marker"
       );
     }
+
+    // Cleanup
     cJSON_Delete(record);
     free(output);
   }
+
+  // Cleanup
   pg_status_log_shutdown();
 }
 
@@ -284,11 +302,18 @@ static void emit_invalid_utf8(void) {
 }
 
 static void test_json_invalid_utf8(void) {
+  // Arrange
   init_json_logger();
+
+  // Act
   char *output = support_capture_standard_error(emit_invalid_utf8);
+
+  // Assert
   cJSON *record = parse_json_record(output);
   assert_json_string(record, "component", "�");
   assert_json_string(record, "message", "valid é 😀; invalid �� ��� ���� �");
+
+  // Cleanup
   cJSON_Delete(record);
   free(output);
   pg_status_log_shutdown();
@@ -316,19 +341,27 @@ static cJSON *format_json_test_entry(const PGStatusLogEntry *entry) {
 }
 
 static void test_json_escape_roundtrip(void) {
+  // Arrange
   char ascii[128];
   for (size_t i = 0; i < sizeof(ascii) - 1; i++) {
     ascii[i] = (char)(i + 1);
   }
   ascii[sizeof(ascii) - 1] = '\0';
   const PGStatusLogEntry entry = json_test_entry(ascii, ascii);
+
+  // Act
   cJSON *record = format_json_test_entry(&entry);
+
+  // Assert
   assert_json_string(record, "component", ascii);
   assert_json_string(record, "message", ascii);
+
+  // Cleanup
   cJSON_Delete(record);
 }
 
 static void test_json_unicode_boundaries(void) {
+  // Arrange
   static const struct {
     const char *input;
     const char *expected;
@@ -359,29 +392,43 @@ static void test_json_unicode_boundaries(void) {
     const PGStatusLogEntry entry = json_test_entry(
       cases[i].input, cases[i].input
     );
+
+    // Act
     cJSON *record = format_json_test_entry(&entry);
+
+    // Assert
     assert_json_string(record, "component", cases[i].expected);
     assert_json_string(record, "message", cases[i].expected);
+
+    // Cleanup
     cJSON_Delete(record);
   }
 }
 
 static void test_json_errno_boundaries(void) {
+  // Arrange
   const int errors[] = {0, INT_MIN, INT_MAX};
   for (size_t i = 0; i < sizeof(errors) / sizeof(errors[0]); i++) {
     PGStatusLogEntry entry = json_test_entry("monitor", "system error");
     entry.error_number = &errors[i];
+
+    // Act
     cJSON *record = format_json_test_entry(&entry);
+
+    // Assert
     const cJSON *error = cJSON_GetObjectItemCaseSensitive(record, "errno");
     support_assert_true(
       cJSON_IsNumber(error) && error->valuedouble == (double)errors[i],
       "JSON errno changed during serialization"
     );
+
+    // Cleanup
     cJSON_Delete(record);
   }
 }
 
 static void test_json_exact_capacity(void) {
+  // Arrange
   const PGStatusLogEntry entry = json_test_entry("monitor", "ready");
   char expected[256];
   const size_t length = pg_status_format_json(
@@ -392,6 +439,8 @@ static void test_json_exact_capacity(void) {
   }
   char line[256];
   memset(line, 'x', sizeof(line));
+
+  // Act & Assert
   support_assert_true(
     pg_status_format_json(line, length + 1, &entry) == length,
     "exactly fitting JSON was not serialized"
@@ -401,7 +450,10 @@ static void test_json_exact_capacity(void) {
     line[length + 1] == 'x', "write past exact buffer capacity"
   );
 
+  // Arrange
   memset(line, 'x', sizeof(line));
+
+  // Act & Assert
   support_assert_true(
     pg_status_format_json(line, length, &entry) == 0,
     "JSON fit without space for its terminator"
@@ -423,6 +475,7 @@ static void assert_json_truncated(const cJSON *object, const char *key) {
 }
 
 static void test_json_fitting_values_preserved(void) {
+  // Arrange
   char component[2801];
   memset(component, 'c', sizeof(component) - 1);
   component[sizeof(component) - 1] = '\0';
@@ -434,14 +487,20 @@ static void test_json_fitting_values_preserved(void) {
     json_test_entry("monitor", message),
   };
   for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
+    // Act
     cJSON *record = format_json_test_entry(&entries[i]);
+
+    // Assert
     assert_json_string(record, "message", entries[i].message);
     assert_json_string(record, "component", entries[i].component);
+
+    // Cleanup
     cJSON_Delete(record);
   }
 }
 
 static void test_json_retry_truncation(void) {
+  // Arrange
   char component[2001];
   memset(component, '\001', sizeof(component) - 1);
   component[sizeof(component) - 1] = '\0';
@@ -454,7 +513,10 @@ static void test_json_retry_truncation(void) {
     json_test_entry(component, message),
   };
   for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
+    // Act
     cJSON *record = format_json_test_entry(&entries[i]);
+
+    // Assert
     if (i == 0) {
       assert_json_truncated(record, "message");
       assert_json_string(record, "component", "monitor");
@@ -465,11 +527,14 @@ static void test_json_retry_truncation(void) {
       assert_json_string(record, "message", "...[truncated]");
       assert_json_truncated(record, "component");
     }
+
+    // Cleanup
     cJSON_Delete(record);
   }
 }
 
 static void test_json_utf8_truncation(void) {
+  // Arrange
   static const char character[] = "😀";
   char value[7201];
   for (size_t i = 0; i < sizeof(value) - 1; i += sizeof(character) - 1) {
@@ -481,7 +546,10 @@ static void test_json_utf8_truncation(void) {
     json_test_entry(value, "small"),
   };
   for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
+    // Act
     cJSON *record = format_json_test_entry(&entries[i]);
+
+    // Assert
     const char *key = i == 0 ? "message" : "component";
     assert_json_truncated(record, key);
     const cJSON *truncated = cJSON_GetObjectItemCaseSensitive(record, key);
@@ -494,20 +562,28 @@ static void test_json_utf8_truncation(void) {
       memcmp(truncated->valuestring, value, prefix_length) == 0,
       "UTF-8 prefix changed"
     );
+
+    // Cleanup
     cJSON_Delete(record);
   }
 }
 
 static void test_json_small_output_buffer(void) {
+  // Arrange
   char value[3001];
   memset(value, '\001', sizeof(value) - 1);
   value[sizeof(value) - 1] = '\0';
   const PGStatusLogEntry entry = json_test_entry(value, value);
   for (size_t capacity = 0; capacity <= 512; capacity++) {
+    // Arrange
     unsigned char storage[514];
     memset(storage, 0xa5, sizeof(storage));
     char *line = (char *)storage + 1;
+
+    // Act
     const size_t length = pg_status_format_json(line, capacity, &entry);
+
+    // Assert
     support_assert_true(
       storage[0] == 0xa5 && storage[capacity + 1] == 0xa5,
       "JSON formatter overran its output buffer"
@@ -581,7 +657,10 @@ static void test_invalid_level(void) {
 }
 
 static void test_invalid_format(void) {
+  // Arrange
   support_set_environment("pg_status__log_format", "yaml");
+
+  // Act
   pg_status_log_init();
 }
 
@@ -877,9 +956,14 @@ static void test_concurrent_messages(void) {
 }
 
 static void test_json_concurrent_messages(void) {
+  // Arrange
   init_json_logger();
+
+  // Act
   char *output = support_capture_standard_error(emit_concurrent_messages);
   pg_status_log_shutdown();
+
+  // Assert
   char *cursor = output;
   ConcurrentRecords records = {0};
   while (*cursor) {
@@ -899,6 +983,8 @@ static void test_json_concurrent_messages(void) {
     cJSON_Delete(record);
   }
   assert_concurrent_accounting(&records);
+
+  // Cleanup
   free(output);
 }
 
@@ -966,11 +1052,18 @@ static void test_shutdown_flushes(void) {
 }
 
 static void test_json_shutdown_flushes(void) {
+  // Arrange
   init_json_logger();
+
+  // Act
   char *output = support_capture_standard_error(emit_message_and_shutdown);
+
+  // Assert
   cJSON *record = parse_json_record(output);
   assert_json_string(record, "component", "shutdown");
   assert_json_string(record, "message", "last queued message");
+
+  // Cleanup
   cJSON_Delete(record);
   free(output);
 }
@@ -1066,6 +1159,8 @@ static void test_concurrent_lifecycle(void) {
     }
     pg_status_log_shutdown();
   }
+
+  // Cleanup
   atomic_store_explicit(
     &lifecycle_workers_should_stop, true, memory_order_relaxed
   );
@@ -1091,8 +1186,11 @@ static void test_concurrent_lifecycle(void) {
 }
 
 static void test_json_concurrent_lifecycle(void) {
+  // Arrange
   init_json_logger();
   pg_status_log_shutdown();
+
+  // Act & Assert
   test_concurrent_lifecycle();
 }
 
@@ -1112,6 +1210,8 @@ static void test_closed_output(void) {
   pg_status_log(PG_STATUS_LOG_INFO, "output", "closed pipe");
   pg_status_log_flush();
   pg_status_log_shutdown();
+
+  // Cleanup
   restore_standard_error(saved_stderr);
 
   // Assert
@@ -1129,6 +1229,8 @@ static void test_missing_standard_error(void) {
   pg_status_log(PG_STATUS_LOG_INFO, "output", "missing stderr");
   pg_status_log_flush();
   pg_status_log_shutdown();
+
+  // Cleanup
   restore_standard_error(saved_stderr);
 
   // Assert
@@ -1334,6 +1436,8 @@ static void test_output_backpressure_recovery(void) {
   const size_t output_length = read_pipe(
     output_pipe[0], output, sizeof(output)
   );
+
+  // Cleanup
   pg_status_log_shutdown();
   close(output_pipe[0]);
   restore_standard_error(saved_stderr);
@@ -1378,6 +1482,8 @@ static void check_output_backpressure_periodic_recovery(const bool json) {
   const size_t output_length = read_pipe(
     output_pipe[0], output, sizeof(output)
   );
+
+  // Cleanup
   pg_status_log_shutdown();
   close(output_pipe[0]);
   restore_standard_error(saved_stderr);
@@ -1402,11 +1508,15 @@ static void check_output_backpressure_periodic_recovery(const bool json) {
 }
 
 static void test_output_backpressure_periodic_recovery(void) {
+  // Act & Assert
   check_output_backpressure_periodic_recovery(false);
 }
 
 static void test_json_backpressure_recovery(void) {
+  // Arrange
   support_set_environment("pg_status__log_format", "json");
+
+  // Act & Assert
   check_output_backpressure_periodic_recovery(true);
 }
 
@@ -1473,10 +1583,13 @@ static void check_output_partial_write_recovery(const bool json) {
     support_fail("recovery exceeded capture buffer");
   }
   (void)read_pipe(output_socket[1], output + used, sizeof(output) - used);
+
+  // Cleanup
   pg_status_log_shutdown();
   close(output_socket[1]);
   restore_standard_error(saved_stderr);
 
+  // Assert
   support_assert_contains(
     record, "message after recovery", "output did not recover"
   );
@@ -1519,10 +1632,12 @@ static void check_output_partial_write_recovery(const bool json) {
 }
 
 static void test_output_partial_write_recovery(void) {
+  // Act & Assert
   check_output_partial_write_recovery(false);
 }
 
 static void test_json_partial_write_recovery(void) {
+  // Act & Assert
   check_output_partial_write_recovery(true);
 }
 
@@ -1672,6 +1787,7 @@ static void run_json_failure_child(void) {
 }
 
 static void test_json_failure_paths(void) {
+  // Arrange
   const char *cases[] = {
     "json_fatal_child", "json_invalid_level_child", "json_invalid_enum_child"
   };
@@ -1681,7 +1797,11 @@ static void test_json_failure_paths(void) {
   };
   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     json_failure_case = cases[i];
+
+    // Act
     char *output = support_capture_standard_error(run_json_failure_child);
+
+    // Assert
     char *cursor = output;
     if (i == 0) {
       cJSON *queued = parse_next_json_record(&cursor);
@@ -1695,6 +1815,8 @@ static void test_json_failure_paths(void) {
     support_assert_contains(
       message->valuestring, messages[i], "wrong fatal JSON message"
     );
+
+    // Cleanup
     cJSON_Delete(record);
     free(output);
   }

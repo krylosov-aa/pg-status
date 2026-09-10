@@ -35,7 +35,10 @@ static void configure_hosts(void) {
 }
 
 static void expect_master(int expected_index) {
+  // Act
   recompute_master_index();
+
+  // Assert
   support_assert_true(get_master_index() == expected_index, "master index");
   const MonitorHost *expected = expected_index >= 0
                                   ? &monitor_host_list[expected_index]
@@ -51,72 +54,129 @@ static void expect_master(int expected_index) {
 }
 
 static void test_healthy_priority(void) {
+  // Arrange
   configure_hosts();
   set_status(0, possible_master);
   set_status(1, healthy_master);
   set_status(2, healthy_master);
   save_master_index(0);
+
+  // Act & Assert
   expect_master(1);
+
+  // Arrange
   set_status(1, possible_master);
+
+  // Act & Assert
   expect_master(2);
+
+  // Arrange
   set_status(1, healthy_master);
+
+  // Act & Assert
   expect_master(1);
 }
 
 static void test_possible_priority(void) {
+  // Arrange
   configure_hosts();
   set_status(1, possible_master);
   set_status(2, possible_master);
+
+  // Act & Assert
   expect_master(1);
+
+  // Arrange
   save_master_index(2);
+
+  // Act & Assert
   expect_master(1);
 }
 
 static void test_selected_master_becomes_replica(void) {
+  // Arrange
   configure_hosts();
   set_status(0, possible_master);
   set_status(1, healthy_master);
+
+  // Act & Assert
   expect_master(1);
+
+  // Arrange
   set_status(1, replica);
+
+  // Act & Assert
   expect_master(0);
 }
 
 static void test_selected_master_becomes_dead(void) {
+  // Arrange
   configure_hosts();
   set_status(0, possible_master);
   set_status(1, healthy_master);
+
+  // Act & Assert
   expect_master(1);
+
+  // Arrange
   set_status(1, dead_host);
+
+  // Act & Assert
   expect_master(0);
+
+  // Arrange
   set_status(0, dead_host);
+
+  // Act & Assert
   expect_master(-1);
 }
 
 static void test_no_master(void) {
+  // Arrange
   configure_hosts();
   set_status(0, healthy_master);
+
+  // Act & Assert
   expect_master(0);
+
+  // Arrange
   set_status(0, replica);
   set_status(1, (MonitorStatus){.alive = true, .possible_dead = true});
   set_status(2, dead_host);
+
+  // Act & Assert
   expect_master(-1);
 }
 
 static void test_dead_master_flags(void) {
+  // Arrange
   configure_hosts();
   set_status(0, (MonitorStatus){.master = true});
   set_status(1, possible_master);
   set_status(2, (MonitorStatus){.master = true, .possible_dead = true});
+
+  // Act & Assert
   expect_master(1);
+
+  // Arrange
   set_status(1, replica);
+
+  // Act & Assert
   expect_master(-1);
 }
 
 static void test_empty_hosts(void) {
+  // Arrange
   configure_hosts();
   set_status(0, healthy_master);
+
+  // Act & Assert
   expect_master(0);
+
+  // Arrange
   host_count = 0;
+
+  // Act & Assert
   expect_master(-1);
 }
 

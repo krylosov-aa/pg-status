@@ -133,6 +133,7 @@ static void assert_monitor_routes(const uint16_t port, const bool ready) {
 }
 
 static void test_startup(const bool stop_during_warmup) {
+  // Arrange
   uint16_t first_port;
   uint16_t second_port;
   const int first_listener = create_listener(&first_port);
@@ -145,15 +146,22 @@ static void test_startup(const bool stop_during_warmup) {
   configure_monitor(ports);
 
   support_assert_true(!is_pg_monitor_ready(), "monitor initially ready");
+
+  // Act
   HTTPServer *server = start_pg_status_api("127.0.0.1", 0);
   const uint16_t api_port = http_server_port(server);
+
+  // Assert
   // The API must be usable even before monitor parameters/hosts are
   // initialized.
   assert_probes(api_port);
   assert_monitor_routes(api_port, false);
 
+  // Act
   const uint64_t started_at = monotonic_ms();
   start_pg_monitor();
+
+  // Assert
   support_assert_true(
     monotonic_ms() - started_at < 2000, "monitor startup blocked on polls"
   );
@@ -163,6 +171,7 @@ static void test_startup(const bool stop_during_warmup) {
   assert_monitor_routes(api_port, false);
 
   if (!stop_during_warmup) {
+    // Act
     close(first_connection);
     // Wait for the first host to publish its failed poll. The second remains
     // blocked, so a partial topology must not make the API ready.
@@ -173,17 +182,22 @@ static void test_startup(const bool stop_during_warmup) {
       monotonic_ms() < first_deadline) {
       pause_briefly();
     }
+
+    // Assert
     support_assert_true(
       atomic_load_explicit(&monitor_host_list[0].seq, memory_order_acquire) > 0,
       "first host did not publish its poll"
     );
     assert_monitor_routes(api_port, false);
 
+    // Act
     close(second_connection);
     const uint64_t ready_deadline = monotonic_ms() + 2000;
     while (!is_pg_monitor_ready() && monotonic_ms() < ready_deadline) {
       pause_briefly();
     }
+
+    // Assert
     support_assert_true(is_pg_monitor_ready(), "monitor did not become ready");
     // Completed failures still make the monitor ready, with normal 404s for
     // host selection and 200s for host status.
@@ -191,14 +205,19 @@ static void test_startup(const bool stop_during_warmup) {
     assert_monitor_routes(api_port, true);
   }
 
+  // Act
   const uint64_t stopped_at = monotonic_ms();
   stop_pg_monitor();
+
+  // Assert
   support_assert_true(
     monotonic_ms() - stopped_at < 2000, "monitor shutdown blocked on polls"
   );
   support_assert_true(!is_pg_monitor_ready(), "stopped monitor is ready");
   assert_probes(api_port);
   assert_monitor_routes(api_port, false);
+
+  // Cleanup
   stop_http_server(server);
   if (stop_during_warmup) {
     close(first_connection);

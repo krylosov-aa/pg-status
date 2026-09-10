@@ -22,7 +22,7 @@ unsigned int host_count = 0;
 MonitorHost monitor_host_list[MAX_HOSTS] = {0};
 
 /**
- * Just a master host index in the array to find it asap
+ * Current master index, or -1 when no master is known.
  */
 static atomic_int master_index = -1;
 
