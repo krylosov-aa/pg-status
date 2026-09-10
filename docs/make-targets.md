@@ -172,7 +172,7 @@ in the Dockerfiles, but **do not run the full audit**.
 | `build_static_executable` | Archive with a static executable and licenses in `out/static/`. |
 | `build_deb` | DEB package in `out/deb/`. |
 | `release-builds` | Sequentially builds the four images above and exports three packages. Use to obtain release files without a full audit. |
-| `build_push` | Builds Alpine/shared and **publishes** `<r>/pg-status:<v>` and `<r>/pg-status:latest`. Example: `make build_push r=my-registry/my-team v=2.2.0`. |
+| `build_push` | Builds Alpine/shared and **publishes** `<r>/pg-status:<v>` and `<r>/pg-status:latest`. Example: `make build_push r=my-registry/my-team v=2.3.0`. |
 
 `build_push` does not verify that an audit has already run; use it on source code
 that has passed the required checks. Other targets in this table do not publish

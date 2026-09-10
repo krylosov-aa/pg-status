@@ -1,4 +1,4 @@
-pg-status v2.2.0 (static build)
+pg-status v2.3.0 (static build)
 ===============================
 
 An HTTP service that reports the observed roles, availability and replication
