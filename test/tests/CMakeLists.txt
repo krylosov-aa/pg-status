@@ -143,7 +143,9 @@ target_include_directories(poll_scheduler_test PRIVATE "${PROJECT_BINARY_DIR}/sr
 foreach(TEST_CASE
         period overrun failure_period default_failure_timing
         independent_hosts_and_warmup deadline_before_event fresh_clock
-        missing_socket wait_for_deadline defaults custom_parameters)
+        missing_socket wait_for_deadline defaults custom_parameters
+        failure_logging failure_logging_debug recovery_logging
+        failure_logging_interval)
     add_test(NAME poll_scheduler.${TEST_CASE} COMMAND poll_scheduler_test ${TEST_CASE})
     set_tests_properties(poll_scheduler.${TEST_CASE} PROPERTIES
             TIMEOUT 15 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")

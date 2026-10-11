@@ -107,7 +107,7 @@ static PGresult *make_poll_result(const char *const values[6]) {
 
 static void publish_result(MonitorHost *host, const char *const values[6]) {
   PGresult *res = make_poll_result(values);
-  host->iter_data_ready = parse_result(host, res);
+  host->iter_data_ready = parse_result(host, res, 1000);
   support_assert_true(host->iter_data_ready, "parse poll result");
   finish_iteration(host, true, 1000);
   PQclear(res);
@@ -379,14 +379,14 @@ static void run_permission_fallback_replica(void) {
 
   // Act & Assert
   reset_iter_state(host, 1100);
-  support_assert_true(send_query(host), "send next poll");
+  support_assert_true(send_query(host, 1100), "send next poll");
   support_assert_true(
     poll_script.last_query == streaming_replication_query_without_wal_receiver,
     "next poll on this connection skips the receiver"
   );
   poll_script.drained = true;
   support_assert_true(
-    send_query(&monitor_host_list[0]), "send another host poll"
+    send_query(&monitor_host_list[0], 1100), "send another host poll"
   );
   support_assert_true(
     poll_script.last_query == streaming_replication_query,
@@ -394,7 +394,7 @@ static void run_permission_fallback_replica(void) {
   );
   close_conn(host);
   poll_script.drained = true;
-  support_assert_true(send_query(host), "send after reconnect");
+  support_assert_true(send_query(host, 1100), "send after reconnect");
   support_assert_true(
     poll_script.last_query == streaming_replication_query,
     "a new connection retries receiver access"

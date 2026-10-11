@@ -162,10 +162,27 @@ static void log_changes(
   }
 }
 
-static void log_postgres_error(const MonitorHost *host, const char *operation) {
+/** Share one error-log deadline across all failures of this host. */
+static PGStatusLogLevel poll_error_level(
+  MonitorHost *host, const uint64_t now_ms
+) {
+  if (now_ms < host->next_error_log_at_ms) {
+    return PG_STATUS_LOG_DEBUG;
+  }
+  // Saturate so that a huge interval cannot wrap the deadline into the past.
+  const uint64_t interval_ms = parameters.poll_error_log_interval_ms;
+  host->next_error_log_at_ms = interval_ms > UINT64_MAX - now_ms
+                                 ? UINT64_MAX
+                                 : now_ms + interval_ms;
+  return PG_STATUS_LOG_ERROR;
+}
+
+static void log_postgres_error(
+  MonitorHost *host, const char *operation, const uint64_t now_ms
+) {
   const char *error = host->conn ? PQerrorMessage(host->conn) : "out of memory";
   pg_status_log(
-    PG_STATUS_LOG_ERROR, "monitor",
+    poll_error_level(host, now_ms), "monitor",
     "PostgreSQL operation failed operation=%s host=%s error=%s", operation,
     host->host, error
   );
@@ -189,12 +206,12 @@ static MonitorStatus replica_status() {
   };
 }
 
-static bool send_query(const MonitorHost *host) {
+static bool send_query(MonitorHost *host, const uint64_t now_ms) {
   const char *query = host->wal_receiver_disabled
                         ? streaming_replication_query_without_wal_receiver
                         : streaming_replication_query;
   if (PQsendQuery(host->conn, query) == 0) {
-    log_postgres_error(host, "send_query");
+    log_postgres_error(host, "send_query", now_ms);
     return false;
   }
   return true;
@@ -260,15 +277,17 @@ static void close_conn_if_need(MonitorHost *host, const uint64_t now_ms) {
   }
 }
 
-static bool validate_sql_result(const MonitorHost *host, const PGresult *res) {
+static bool validate_sql_result(
+  MonitorHost *host, const PGresult *res, const uint64_t now_ms
+) {
   const ExecStatusType st = PQresultStatus(res);
   if (st != PGRES_TUPLES_OK && st != PGRES_COMMAND_OK) {
-    log_postgres_error(host, "validate_result");
+    log_postgres_error(host, "validate_result", now_ms);
     return false;
   }
   if (PQntuples(res) != 1) {
     pg_status_log(
-      PG_STATUS_LOG_ERROR, "monitor",
+      poll_error_level(host, now_ms), "monitor",
       "unexpected PostgreSQL result row count host=%s rows=%d", host->host,
       PQntuples(res)
     );
@@ -304,8 +323,10 @@ static void parse_master_result(MonitorHost *host, const PGresult *res) {
  * Parses the streaming-replication row into the host's staging fields.
  * Returns true on success, false on any error.
  */
-static bool parse_result(MonitorHost *host, const PGresult *res) {
-  const bool result_ok = validate_sql_result(host, res);
+static bool parse_result(
+  MonitorHost *host, const PGresult *res, const uint64_t now_ms
+) {
+  const bool result_ok = validate_sql_result(host, res, now_ms);
   if (!result_ok) {
     return false;
   }
@@ -343,6 +364,7 @@ static void finish_iteration(
 
   if (success && host->iter_data_ready) {
     host->failed_connections = 0;
+    host->next_error_log_at_ms = 0;
     new_status = host->iter_new_status;
     new_lag_ms = host->iter_new_lag_ms;
     new_lag_bytes = host->iter_new_lag_bytes;
@@ -387,9 +409,9 @@ static void finish_iteration(
   poll_state_idle(host, now_ms);
 }
 
-static bool consume_input(const MonitorHost *host) {
+static bool consume_input(MonitorHost *host, const uint64_t now_ms) {
   if (PQconsumeInput(host->conn) == 0) {
-    log_postgres_error(host, "consume_input");
+    log_postgres_error(host, "consume_input", now_ms);
     return false;
   }
   return true;
@@ -427,7 +449,7 @@ static bool retry_without_wal_receiver(MonitorHost *host, const PGresult *res) {
  * suspend waiting on POLLIN.
  */
 static void read_step(MonitorHost *host, const uint64_t now_ms) {
-  const bool consumed = consume_input(host);
+  const bool consumed = consume_input(host, now_ms);
   if (!consumed) {
     finish_iteration(host, false, now_ms);
     return;
@@ -440,7 +462,7 @@ static void read_step(MonitorHost *host, const uint64_t now_ms) {
         // libpq requires draining the previous query through NULL before
         // sending another one. Keep the original iteration deadline.
         host->iter_retry_without_wal_receiver = false;
-        if (!send_query(host)) {
+        if (!send_query(host, now_ms)) {
           finish_iteration(host, false, now_ms);
           return;
         }
@@ -454,7 +476,7 @@ static void read_step(MonitorHost *host, const uint64_t now_ms) {
       !host->iter_data_ready && !host->iter_retry_without_wal_receiver &&
       !retry_without_wal_receiver(host, res)
     ) {
-      host->iter_data_ready = parse_result(host, res);
+      host->iter_data_ready = parse_result(host, res, now_ms);
     }
     PQclear(res);
   }
@@ -482,15 +504,15 @@ static void flush_step(MonitorHost *host, const uint64_t now_ms) {
       host->poll_events = POLLOUT;
       return;
     case FLUSH_ERROR:
-      log_postgres_error(host, "flush");
+      log_postgres_error(host, "flush", now_ms);
       finish_iteration(host, false, now_ms);
       return;
   }
 }
 
-static bool pq_set_non_blocking(MonitorHost *host) {
+static bool pq_set_non_blocking(MonitorHost *host, const uint64_t now_ms) {
   if (PQsetnonblocking(host->conn, 1) != 0) {
-    log_postgres_error(host, "set_non_blocking");
+    log_postgres_error(host, "set_non_blocking", now_ms);
     return false;
   }
   return true;
@@ -512,13 +534,13 @@ static void advance_connecting(MonitorHost *host, const uint64_t now_ms) {
     case PGRES_POLLING_OK:
       host->connected_at_ms = now_ms;
 
-      const bool set = pq_set_non_blocking(host);
+      const bool set = pq_set_non_blocking(host, now_ms);
       if (!set) {
         finish_iteration(host, false, now_ms);
         return;
       }
 
-      const bool query_sent = send_query(host);
+      const bool query_sent = send_query(host, now_ms);
       if (!query_sent) {
         finish_iteration(host, false, now_ms);
         return;
@@ -530,16 +552,16 @@ static void advance_connecting(MonitorHost *host, const uint64_t now_ms) {
     case PGRES_POLLING_ACTIVE:
     case PGRES_POLLING_FAILED:
     default:
-      log_postgres_error(host, "connect");
+      log_postgres_error(host, "connect", now_ms);
       finish_iteration(host, false, now_ms);
       return;
   }
 }
 
-static bool start_connect(MonitorHost *host) {
+static bool start_connect(MonitorHost *host, const uint64_t now_ms) {
   host->conn = pg_connection_start(host);
   if (host->conn == nullptr || PQstatus(host->conn) == CONNECTION_BAD) {
-    log_postgres_error(host, "connect_start");
+    log_postgres_error(host, "connect_start", now_ms);
     return false;
   }
   return true;
@@ -563,7 +585,7 @@ void start_host_poll(MonitorHost *host, const uint64_t now_ms) {
   close_conn_if_need(host, now_ms);
 
   if (host->conn == nullptr) {
-    const bool started = start_connect(host);
+    const bool started = start_connect(host, now_ms);
     if (started) {
       poll_state_connecting(host);
     } else {
@@ -572,7 +594,7 @@ void start_host_poll(MonitorHost *host, const uint64_t now_ms) {
     return;
   }
 
-  const bool query_sent = send_query(host);
+  const bool query_sent = send_query(host, now_ms);
   if (!query_sent) {
     finish_iteration(host, false, now_ms);
     return;
@@ -599,7 +621,7 @@ void advance_host_poll(MonitorHost *host, const uint64_t now_ms) {
 
 void timeout_host_poll(MonitorHost *host, const uint64_t now_ms) {
   pg_status_log(
-    PG_STATUS_LOG_ERROR, "monitor",
+    poll_error_level(host, now_ms), "monitor",
     "PostgreSQL poll timed out host=%s timeout_ms=%llu", host->host,
     (unsigned long long)parameters.query_timeout_ms
   );

@@ -84,3 +84,5 @@ test/e2e/.idea/
 /test/rps/results/
 /test/rps/pg-status-load
 !/test/rps/driver/go.mod
+
+.DS_Store

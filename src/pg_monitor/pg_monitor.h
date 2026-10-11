@@ -76,6 +76,11 @@ typedef struct {
   // Hard deadline for a single poll iteration (connect + send + read) in ms.
   // On expiry the connection is closed and failed_connections is incremented.
   uint64_t query_timeout_ms;
+
+  // Minimum interval in ms between ERROR records about continuing poll
+  // failures of the same host; failures in between are logged at DEBUG.
+  // 0 logs every failure at ERROR.
+  uint64_t poll_error_log_interval_ms;
 } MonitorParameters;
 
 /**
@@ -170,15 +175,16 @@ typedef struct {
   _Atomic MonitorStatus status;     // protected by seq
 
   // writer-private async-poll state
-  struct pg_conn *conn;         // reused PGconn, or NULL when disconnected
-  HostPollState poll_state;     // current phase of the state machine
-  short poll_events;            // events to wait for on PQsocket(conn)
-  uint64_t next_poll_at_ms;     // monotonic deadline to start next iteration
-  uint64_t iter_started_at_ms;  // monotonic start of current/last iteration
-  uint64_t iter_deadline_ms;    // monotonic deadline for current iteration
-  uint64_t connected_at_ms;     // monotonic time of last successful connect
-  int pollfd_slot;              // transient index into the main-loop pollfd[]
-  bool wal_receiver_disabled;   // permission fallback, reset on disconnect
+  struct pg_conn *conn;           // reused PGconn, or NULL when disconnected
+  HostPollState poll_state;       // current phase of the state machine
+  short poll_events;              // events to wait for on PQsocket(conn)
+  uint64_t next_poll_at_ms;       // monotonic deadline to start next iteration
+  uint64_t iter_started_at_ms;    // monotonic start of current/last iteration
+  uint64_t iter_deadline_ms;      // monotonic deadline for current iteration
+  uint64_t connected_at_ms;       // monotonic time of last successful connect
+  uint64_t next_error_log_at_ms;  // per-host error limit; reset on poll success
+  int pollfd_slot;                // transient index into the main-loop pollfd[]
+  bool wal_receiver_disabled;     // permission fallback, reset on disconnect
   bool iter_retry_without_wal_receiver;  // drain results before retrying
 
   // Staging area for the current iteration. Populated once the result row

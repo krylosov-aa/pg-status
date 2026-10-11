@@ -335,6 +335,11 @@ Configure pg-status using the following environment variables:
 - `pg_status__conn_max_age_ms` — Maximum age, in milliseconds, of a reused
   PostgreSQL connection. Older connections are closed after the current
   iteration and reopened for the next one. Default: `300000` (5 minutes).
+- `pg_status__poll_error_log_interval_ms` — Minimum interval, in
+  milliseconds, between `error` records about continuing PostgreSQL poll
+  failures of the same host; failures in between are logged at `debug`. The
+  first failure after a successful poll is always logged at `error`. `0` logs
+  every failure at `error`. Default: `60000` (1 minute).
 - `pg_status__sync_max_lag_ms` — Maximum time lag, in milliseconds, for a
   replica to be considered time-synchronous. Default: `1000`.
 - `pg_status__sync_max_lag_bytes` — Maximum WAL lag, in bytes, for a replica
@@ -601,8 +606,15 @@ while preserving valid JSON. Host names, states, and lag values remain in
 
 The default `info` level reports startup, shutdown, role changes, availability
 changes, and transitions across the global `pg_status__sync_max_lag_*`
-thresholds. PostgreSQL operation failures are logged at `error`. Detailed polling
-progress and replica-to-master fallback decisions are available at `debug`.
+thresholds. For each host, the first PostgreSQL poll failure is logged at
+`error`; continuing failures are logged at `error` at most once per
+`pg_status__poll_error_log_interval_ms` (1 minute by default), with the
+current operation and error. This limit also covers timeouts and
+invalid results, even when the failure reason changes. Intermediate failures
+are available at `debug`. A fully successful poll resets the limit and logs
+recovery at `info` through the host's availability transition. Polling frequency
+is unaffected. Detailed polling progress and replica-to-master fallback
+decisions are also available at `debug`.
 
 pg-status never logs PostgreSQL passwords or complete connection strings. Log
 collection, storage, and rotation are delegated to the process supervisor,

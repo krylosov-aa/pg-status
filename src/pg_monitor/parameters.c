@@ -36,6 +36,7 @@ MonitorParameters parameters = {
   .sync_max_lag_bytes = 1000000,  // 1 mb
   .conn_max_age_ms = 300000,      // 5 minutes
   .query_timeout_ms = 1000,
+  .poll_error_log_interval_ms = 60000,  // 1 minute
 };
 
 static bool is_valid_environment_name(const char *name) {
@@ -144,6 +145,10 @@ void set_parameters_from_env(void) {
   );
   replace_from_env_ull(
     "pg_status__query_timeout_ms", &parameters.query_timeout_ms
+  );
+  replace_from_env_ull(
+    "pg_status__poll_error_log_interval_ms",
+    &parameters.poll_error_log_interval_ms
   );
   set_locality();
   set_sleep();
