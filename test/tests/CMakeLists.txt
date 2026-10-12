@@ -142,7 +142,10 @@ target_link_libraries(poll_scheduler_test PRIVATE
 target_include_directories(poll_scheduler_test PRIVATE "${PROJECT_BINARY_DIR}/src/pg_monitor")
 foreach(TEST_CASE
         period overrun failure_period default_failure_timing
-        independent_hosts_and_warmup deadline_before_event fresh_clock
+        independent_hosts_and_warmup deadline_before_event
+        stall_does_not_fail_ready_host stall_is_not_charged
+        own_stall_is_not_charged failed_start_after_stall
+        advance_stall_is_not_charged fresh_clock
         missing_socket wait_for_deadline defaults custom_parameters
         failure_logging failure_logging_debug recovery_logging
         failure_logging_interval)

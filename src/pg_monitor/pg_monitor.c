@@ -69,6 +69,30 @@ static bool all_hosts_have_polled(void) {
 }
 
 /**
+ * Excludes the time the loop was blocked inside libpq on behalf of `caller`
+ * from check timing. libpq resolves host names synchronously when it starts a
+ * connection and when GSSAPI builds the server principal; without this, one
+ * slow DNS answer would be charged to every check in flight, failing hosts
+ * whose responses are already waiting.
+ */
+static void exclude_stall(MonitorHost *caller, const uint64_t stall_ms) {
+  if (stall_ms == 0) {
+    return;
+  }
+  for (unsigned int i = 0; i < host_count; i++) {
+    MonitorHost *host = &monitor_host_list[i];
+    if (host->poll_state != HOST_POLL_IDLE) {
+      host->iter_deadline_ms += stall_ms;
+    }
+  }
+  if (caller->poll_state == HOST_POLL_IDLE) {
+    // The check ended inside the call, e.g. a failed lookup. Without waiting,
+    // the next check could stall again at once and monopolize the loop.
+    caller->next_poll_at_ms += stall_ms;
+  }
+}
+
+/**
  * Starts any IDLE host whose next_poll_at_ms has elapsed; time out
  * any non-IDLE host whose iter_deadline_ms has passed.
  */
@@ -79,6 +103,7 @@ static void start_and_timeout_hosts(void) {
     if (host->poll_state == HOST_POLL_IDLE) {
       if (now_ms >= host->next_poll_at_ms) {
         start_host_poll(host, now_ms);
+        exclude_stall(host, monotonic_ms() - now_ms);
       }
     } else if (now_ms >= host->iter_deadline_ms) {
       timeout_host_poll(host, now_ms);
@@ -154,6 +179,7 @@ static void process_poll_result(const struct pollfd *pfds) {
       timeout_host_poll(host, now_ms);
     } else if (host->pollfd_slot >= 0 && pfds[host->pollfd_slot].revents != 0) {
       advance_host_poll(host, now_ms);
+      exclude_stall(host, monotonic_ms() - now_ms);
     }
   }
 }

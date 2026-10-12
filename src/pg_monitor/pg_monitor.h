@@ -75,6 +75,7 @@ typedef struct {
 
   // Hard deadline for a single poll iteration (connect + send + read) in ms.
   // On expiry the connection is closed and failed_connections is incremented.
+  // Time the loop is blocked inside libpq (host name lookups) is excluded.
   uint64_t query_timeout_ms;
 
   // Minimum interval in ms between ERROR records about continuing poll

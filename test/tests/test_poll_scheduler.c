@@ -12,6 +12,7 @@
 
 static uint64_t clock_ms;
 static uint64_t start_cost_ms;
+static bool start_fails;
 static uint64_t advance_cost_ms;
 static unsigned int starts[MAX_HOSTS];
 static unsigned int advances;
@@ -29,8 +30,13 @@ static void scripted_start(MonitorHost *host, const uint64_t now_ms) {
   );
   starts[(size_t)(host - monitor_host_list)]++;
   reset_iter_state(host, now_ms);
-  poll_state_query_read(host);
+  // Like libpq resolving a host name, the start blocks the whole loop.
   clock_ms += start_cost_ms;
+  if (start_fails) {
+    finish_iteration(host, false, now_ms);
+  } else {
+    poll_state_query_read(host);
+  }
 }
 
 static void finish_success(MonitorHost *host) {
@@ -252,37 +258,131 @@ static void test_deadline_before_event(void) {
   );
 }
 
+/** Starts host 0 at 10000, then host 1 at 10500 with a blocking start. */
+static void stall_while_host_in_flight(const uint64_t stall_ms) {
+  configure_hosts(2);
+  monitor_host_list[1].next_poll_at_ms = 10500;
+  start_and_timeout_hosts();
+  clock_ms = 10500;
+  start_cost_ms = stall_ms;
+  start_and_timeout_hosts();
+}
+
+static void test_stall_does_not_fail_ready_host(void) {
+  // Arrange: host 1's start blocks the loop past host 0's deadline
+  stall_while_host_in_flight(1000);
+  struct pollfd pfds[MAX_HOSTS + 1];
+  (void)prepare_poll(pfds);
+  pfds[1].revents = POLLIN;
+
+  // Act
+  process_poll_result(pfds);
+
+  // Assert
+  support_assert_true(
+    advances == 1 && timeouts == 0, "ready response is read after a stall"
+  );
+  support_assert_true(
+    monitor_host_list[0].failed_connections == 0,
+    "loop stall is not a failure of a host whose response is ready"
+  );
+}
+
+static void test_stall_is_not_charged(void) {
+  // Arrange: host 0 waits for more I/O, e.g. the next handshake step
+  stall_while_host_in_flight(1000);
+  struct pollfd pfds[MAX_HOSTS + 1];
+
+  // Act & Assert
+  support_assert_true(
+    prepare_poll(pfds) == 500, "in-flight check keeps its unblocked time"
+  );
+  process_poll_result(pfds);
+  support_assert_true(timeouts == 0, "loop stall does not time out checks");
+  clock_ms = 12000;
+  process_poll_result(pfds);
+  support_assert_true(
+    timeouts == 1, "deadline still bounds the unblocked time"
+  );
+}
+
+static void test_own_stall_is_not_charged(void) {
+  // Arrange
+  configure_hosts(1);
+  start_cost_ms = 1500;
+
+  // Act
+  start_and_timeout_hosts();
+
+  // Assert
+  support_assert_true(
+    monitor_host_list[0].iter_started_at_ms == 10000,
+    "period stays anchored to the start"
+  );
+  struct pollfd pfds[MAX_HOSTS + 1];
+  support_assert_true(
+    prepare_poll(pfds) == 1000, "own lookup time is not charged"
+  );
+}
+
+static void test_failed_start_after_stall(void) {
+  // Arrange: the start blocks for 5 s, then fails (e.g. DNS timeout)
+  configure_hosts(1);
+  start_cost_ms = 5000;
+  start_fails = true;
+
+  // Act
+  start_and_timeout_hosts();
+
+  // Assert
+  support_assert_true(
+    monitor_host_list[0].failed_connections == 1, "failed start is counted"
+  );
+  struct pollfd pfds[MAX_HOSTS + 1];
+  support_assert_true(
+    prepare_poll(pfds) == 1000,
+    "retry a full period after the blocked start, not back-to-back"
+  );
+}
+
+static void test_advance_stall_is_not_charged(void) {
+  // Arrange: processing host 0's event blocks the loop (GSSAPI lookup)
+  configure_hosts(2);
+  start_and_timeout_hosts();
+  struct pollfd pfds[MAX_HOSTS + 1];
+  (void)prepare_poll(pfds);
+  pfds[1].revents = POLLIN;
+  advance_cost_ms = 1500;
+
+  // Act
+  process_poll_result(pfds);
+
+  // Assert
+  support_assert_true(
+    advances == 1 && timeouts == 0, "processing stall does not time out checks"
+  );
+  support_assert_true(
+    prepare_poll(pfds) == 1000, "in-flight check keeps its unblocked time"
+  );
+}
+
 static void test_fresh_clock(void) {
   // Arrange
   configure_hosts(2);
   start_cost_ms = 100;
 
-  // Act & Assert
+  // Act
   (void)pump_one_iteration();
+
+  // Assert
   support_assert_true(
     monitor_host_list[1].iter_started_at_ms == 10100,
     "each host gets its actual start time"
   );
   support_assert_true(
-    last_poll_timeout == 800, "recompute remaining time after starting hosts"
+    last_poll_timeout == 1000, "recompute remaining time after starting hosts"
   );
-  support_assert_true(
-    timeouts == 1, "later-started host keeps its remaining time"
-  );
-
-  clock_ms = 11050;
-  start_cost_ms = 0;
-  start_and_timeout_hosts();
-  struct pollfd pfds[MAX_HOSTS + 1];
-  (void)prepare_poll(pfds);
-  pfds[1].revents = POLLIN;
-  pfds[2].revents = POLLIN;
-  advance_cost_ms = 100;
-  process_poll_result(pfds);
-  support_assert_true(
-    advances == 1 && timeouts == 2,
-    "refresh time between processing host events"
-  );
+  support_assert_true(timeouts == 2, "start time is charged to neither check");
 }
 
 static void test_missing_socket(void) {
@@ -593,6 +693,11 @@ int main(const int argc, char **argv) {
     {"default_failure_timing", test_default_failure_timing},
     {"independent_hosts_and_warmup", test_independent_hosts_and_warmup},
     {"deadline_before_event", test_deadline_before_event},
+    {"stall_does_not_fail_ready_host", test_stall_does_not_fail_ready_host},
+    {"stall_is_not_charged", test_stall_is_not_charged},
+    {"own_stall_is_not_charged", test_own_stall_is_not_charged},
+    {"failed_start_after_stall", test_failed_start_after_stall},
+    {"advance_stall_is_not_charged", test_advance_stall_is_not_charged},
     {"fresh_clock", test_fresh_clock},
     {"missing_socket", test_missing_socket},
     {"wait_for_deadline", test_wait_for_deadline},

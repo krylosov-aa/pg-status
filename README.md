@@ -330,8 +330,9 @@ Configure pg-status using the following environment variables:
   it finishes. Must be greater than `0`.
 - `pg_status__query_timeout_ms` — Hard deadline, in milliseconds, for one poll
   iteration (connect, send, and read). When an iteration times out, its
-  connection is closed and the host's failure counter is incremented.
-  Default: `1000`. Must be greater than `0`; may exceed `sleep_ms`.
+  connection is closed and the host's failure counter is incremented. DNS
+  resolution time is not counted. Default: `1000`. Must be greater than `0`;
+  may exceed `sleep_ms`.
 - `pg_status__conn_max_age_ms` — Maximum age, in milliseconds, of a reused
   PostgreSQL connection. Older connections are closed after the current
   iteration and reopened for the next one. Default: `300000` (5 minutes).
@@ -485,7 +486,8 @@ closed and the host's failure counter is incremented.
 
 Waiting for a slow or unresponsive host's socket does not block updates for
 the other hosts. DNS resolution during connection setup can still block
-inside libpq and delay the monitoring loop, including deadline handling.
+inside libpq and delay checks of all hosts, but it does not count toward their
+deadlines: a slow DNS response alone does not fail a check.
 
 ### Byte lag
 
