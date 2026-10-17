@@ -25,7 +25,10 @@ PostgreSQL servers. The HTTP server starts immediately, without waiting for
 PostgreSQL checks. `/live` and `/version` are available immediately. `/ready`
 and all host-information endpoints return HTTP 503 until the initial status
 check of every configured host has completed, successfully or with an error
-or timeout. After that, they serve the current monitoring state.
+or timeout. After that, they serve the current monitoring state. Initial
+connections [take turns](#connection-reuse), so with dozens of hosts
+readiness can take several seconds; size readiness probe timeouts
+accordingly.
 
 ### API
 
@@ -327,15 +330,21 @@ Configure pg-status using the following environment variables:
 - `pg_status__sleep_ms` — Target period, in milliseconds, between the starts
   of consecutive checks of each host. Default: `1000`. Checks never overlap;
   if a check takes longer than the period, the next starts immediately after
-  it finishes. Must be greater than `0`.
+  it finishes. While a master is selected, some dead hosts are checked less
+  often, up to 8 seconds apart or once per period if it is longer; see
+  [Reaction speed](#reaction-speed-to-host-unavailability). Must be greater
+  than `0`.
 - `pg_status__query_timeout_ms` — Hard deadline, in milliseconds, for one poll
   iteration (connect, send, and read). When an iteration times out, its
   connection is closed and the host's failure counter is incremented. DNS
-  resolution time is not counted. Default: `1000`. Must be greater than `0`;
-  may exceed `sleep_ms`.
+  resolution time and waiting for a turn to connect are not counted.
+  Default: `1000`. Must be greater than `0`; may exceed `sleep_ms`.
 - `pg_status__conn_max_age_ms` — Maximum age, in milliseconds, of a reused
-  PostgreSQL connection. Older connections are closed after the current
-  iteration and reopened for the next one. Default: `300000` (5 minutes).
+  PostgreSQL connection. An older connection is replaced when no other
+  connection is being opened or waiting to open; until then it keeps serving
+  checks. Host names are resolved only when connecting: if a host entry is a
+  proxy, pooler, or DNS alias that can switch servers while existing sessions
+  stay open, lower this value. Default: `3600000` (1 hour).
 - `pg_status__poll_error_log_interval_ms` — Minimum interval, in
   milliseconds, between `error` records about continuing PostgreSQL poll
   failures of the same host; failures in between are logged at `debug`. The
@@ -475,6 +484,10 @@ has an independent polling cycle: each check is scheduled
 the host counts toward this period, on both success and failure. If a check
 overruns the period, the next starts immediately after it finishes; missed
 periods do not accumulate, and checks of the same host never overlap.
+Two exceptions limit the CPU spent on connections: a check that needs a new
+connection may wait for [its turn](#connection-reuse), and, while a master is
+selected, some dead hosts are checked
+[less often](#reaction-speed-to-host-unavailability).
 
 For example, with a 1000 ms period and a 200 ms check, the remaining wait is
 800 ms. This scheduling rule replaces the previous delay-after-completion
@@ -509,7 +522,7 @@ For more complete measurements, the monitoring user needs `pg_read_all_stats`
 
 If receiver statistics are unavailable, polling continues using other WAL
 positions. Permission errors produce a warning; access is retried after
-reconnection.
+5 minutes on the same connection, or sooner after a reconnection.
 
 ### Connection reuse
 
@@ -522,6 +535,24 @@ To prevent stale connections from persisting indefinitely, for example after
 intermediate NAT state expires or server-side cleanup occurs, each connection
 is recycled when its age exceeds `pg_status__conn_max_age_ms`. Connections are
 also closed and reopened after any query error or socket-level failure.
+
+Opening a connection is the most CPU-intensive part of polling: TLS and
+SCRAM authentication cost far more than a status query. Under a small CPU
+quota, several setups at once can use up the quota that the HTTP thread
+shares and delay responses. Therefore new connections take turns:
+
+- only one connection negotiates TLS or authenticates at a time, for at most
+  1 second. The turn is taken only after TCP connects, so unreachable hosts
+  do not hold up the others;
+- after a setup that reached a TLS handshake or password authentication, the
+  next one waits 100 ms;
+- connection starts are spaced by
+  `min(pg_status__sleep_ms / number of hosts, 250 ms)`.
+
+With fast setup, each host still gets about one connection attempt per
+period; under a small CPU quota, turns take longer. An aged connection keeps
+serving checks until no other connection is waiting for a turn, so recycling
+never delays a check.
 
 ### Consistency
 
@@ -556,7 +587,11 @@ sleep_ms + query_timeout_ms
 The initial `sleep_ms` allows for an outage just after a successful check.
 With the defaults (1000 ms period, 1000 ms timeout, 3 failures), detection
 takes up to roughly 4 seconds. Immediate connection errors can be detected
-sooner; DNS stalls or delays in the monitoring thread can extend this time.
+sooner; DNS stalls, [connection turns](#connection-reuse) when several hosts
+fail at once, or delays in the monitoring thread can extend this time. For
+example, if four servers accept TCP connections but never complete session
+setup, each attempt holds the turn for the full second, and detection with
+the defaults takes about 9 seconds instead of 4.
 
 After the first failed check, but before the failure count reaches
 `pg_status__max_fails`, the host is marked as possibly dead. This state affects
@@ -575,6 +610,21 @@ last known values. A failed check does not make a lagging replica appear
 synchronous. Once the host is marked dead, it is excluded from selection,
 and the HTTP API returns `null` for its lag and LSN fields. A successful check
 updates the measurements and clears the failure counter and possibly dead state.
+
+Every check of a dead host opens a new connection. If the attempt fails after
+a TLS handshake or password authentication, for example at a connection
+pooler whose PostgreSQL is down, it costs as much CPU as a successful
+connection. While a master is selected, such hosts are checked less often:
+the period doubles with each such failure, up to 8 seconds (2, 4, then
+8 seconds with the defaults), or `pg_status__sleep_ms` if that is longer. A
+recovered host may then be noticed up to 8 seconds later. Hosts that fail
+earlier, for example with a refused TCP connection or a DNS error, are still
+checked every `pg_status__sleep_ms`.
+
+While no master is selected, every dead host is checked every
+`pg_status__sleep_ms`, because any of them may bring the master back. Under a
+small CPU quota, these attempts can delay HTTP responses until a master is
+found. Failure detection is unaffected in both cases.
 
 ### Split-brain
 

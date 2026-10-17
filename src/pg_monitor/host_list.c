@@ -44,18 +44,25 @@ static void init_monitor_host(
   monitor_host->dc = nullptr;
   monitor_host->geo = nullptr;
   monitor_host->failed_connections = 0;
+  monitor_host->handshake_failures = 0;
 
   monitor_host->conn = nullptr;
   monitor_host->poll_state = HOST_POLL_IDLE;
   monitor_host->poll_events = 0;
   monitor_host->next_poll_at_ms = 0;
+  monitor_host->backoff_ms = 0;
   monitor_host->iter_started_at_ms = 0;
   monitor_host->iter_deadline_ms = 0;
+  monitor_host->session_setup_hold_until_ms = 0;
+  monitor_host->session_setup_wait_started_at_ms = 0;
   monitor_host->connected_at_ms = 0;
   monitor_host->next_error_log_at_ms = 0;
   monitor_host->pollfd_slot = -1;
   monitor_host->wal_receiver_disabled = false;
+  monitor_host->wal_receiver_retry_at_ms = 0;
   monitor_host->iter_retry_without_wal_receiver = false;
+  monitor_host->iter_opened_connection = false;
+  monitor_host->iter_tls_started = false;
   monitor_host->iter_data_ready = false;
   monitor_host->iter_new_status = (MonitorStatus){
     .alive = false, .master = false, .possible_dead = false

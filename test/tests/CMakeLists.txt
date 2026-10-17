@@ -122,6 +122,7 @@ foreach(TEST_CASE
         master_ignores_latest_end_lsn
         permission_fallback_replica
         permission_fallback_master
+        permission_fallback_expires
         permission_fallback_failure
         permission_fallback_unrelated_error
         permission_fallback_timeout
@@ -166,6 +167,39 @@ foreach(TEST_CASE zero_period zero_timeout overflow_timeout)
             "-DEXPECTED_OUTPUT=${EXPECTED_OUTPUT}"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/support/expect_failure.cmake)
     set_tests_properties(poll_scheduler.${TEST_CASE} PROPERTIES
+            TIMEOUT 15 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")
+endforeach()
+
+add_executable(connection_pacing_test test_connection_pacing.c)
+target_link_libraries(connection_pacing_test PRIVATE
+        common_warnings common_support pg_monitor utils logging
+        pg_status_libpq Threads::Threads)
+target_include_directories(connection_pacing_test PRIVATE "${PROJECT_BINARY_DIR}/src/pg_monitor")
+foreach(TEST_CASE
+        startup_connections_are_spaced connect_interval
+        slow_lookup_keeps_spacing connection_turn_snapshot
+        failed_start_takes_no_turn
+        ready_tcp_setups_take_turns queued_setups_resume_in_queue_order
+        ready_socket_queues_behind_waiting_one
+        new_connection_waits_behind_ready_socket setup_hold_starts_after_dns
+        queued_setup_survives_hung_predecessor queued_setup_proceeds_after_hold
+        stall_preserves_setup_hold_and_wait immediate_setup_success_keeps_pause
+        session_setup_holds_turn pause_follows_session_setup_only
+        hung_setup_does_not_jump_the_queue hung_setup_holds_turn_briefly
+        late_wakeups_do_not_add_up
+        refused_tcp_fails_during_setup_hold reconnect_releases_hold
+        hung_setup_without_handshake_adds_no_pause
+        connect_completing_at_start_holds_turn
+        aged_connection_replaced_when_turn_free
+        broken_connection_goes_before_recycle
+        aged_connection_keeps_serving_until_turn_free
+        failed_hosts_reconnect_spaced dead_hosts_retry_less_often
+        dead_hosts_without_master_keep_period lost_master_cancels_backoff
+        unreachable_dead_hosts_keep_period dead_host_period
+        reused_connection_failure_is_cheap missing_password_is_cheap
+        tls_only_rejection_is_costly tls_handshake_failure_is_costly)
+    add_test(NAME connection_pacing.${TEST_CASE} COMMAND connection_pacing_test ${TEST_CASE})
+    set_tests_properties(connection_pacing.${TEST_CASE} PROPERTIES
             TIMEOUT 15 ENVIRONMENT "${PG_STATUS_TEST_ENVIRONMENT}")
 endforeach()
 

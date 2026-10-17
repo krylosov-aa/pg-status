@@ -33,7 +33,9 @@ static int stop_pipe[2] = {-1, -1};
  * Picks the current master by scanning hosts in declared order:
  * first fully-alive master wins, then the first possible_dead master.
  * Dead hosts and replicas are excluded. Always publish the selected index,
- * or -1 when no candidate exists, replacing any previous selection.
+ * or -1 when no candidate exists, replacing any previous selection. Without
+ * a master, dead hosts are checked every sleep_ms again: any of them may be
+ * the one that brings it back.
  */
 static void recompute_master_index(void) {
   int master_i = -1;
@@ -52,7 +54,11 @@ static void recompute_master_index(void) {
     }
   }
 
-  save_master_index(master_i != -1 ? master_i : possible_master);
+  const int selected = master_i != -1 ? master_i : possible_master;
+  save_master_index(selected);
+  if (selected == -1) {
+    cancel_dead_host_backoff();
+  }
 }
 
 /**
@@ -73,7 +79,8 @@ static bool all_hosts_have_polled(void) {
  * from check timing. libpq resolves host names synchronously when it starts a
  * connection and when GSSAPI builds the server principal; without this, one
  * slow DNS answer would be charged to every check in flight, failing hosts
- * whose responses are already waiting.
+ * whose responses are already waiting, and would use up the spacing before
+ * the next connection while the stalled one has not yet begun its handshake.
  */
 static void exclude_stall(MonitorHost *caller, const uint64_t stall_ms) {
   if (stall_ms == 0) {
@@ -81,10 +88,15 @@ static void exclude_stall(MonitorHost *caller, const uint64_t stall_ms) {
   }
   for (unsigned int i = 0; i < host_count; i++) {
     MonitorHost *host = &monitor_host_list[i];
-    if (host->poll_state != HOST_POLL_IDLE) {
+    if (
+      host->poll_state != HOST_POLL_IDLE &&
+      host->poll_state != HOST_POLL_SESSION_WAIT
+    ) {
+      // SESSION_WAIT accounts for its entire wait when it resumes.
       host->iter_deadline_ms += stall_ms;
     }
   }
+  postpone_connection_turn(stall_ms);
   if (caller->poll_state == HOST_POLL_IDLE) {
     // The check ended inside the call, e.g. a failed lookup. Without waiting,
     // the next check could stall again at once and monopolize the loop.
@@ -93,22 +105,52 @@ static void exclude_stall(MonitorHost *caller, const uint64_t stall_ms) {
 }
 
 /**
- * Starts any IDLE host whose next_poll_at_ms has elapsed; time out
- * any non-IDLE host whose iter_deadline_ms has passed.
+ * Resumes queued session setups while the turn is free, starting with the
+ * socket that became ready first, whatever its place in the host list. A
+ * resumed setup takes the turn; one that fails at once frees it for the
+ * next.
+ */
+static void resume_session_setups(void) {
+  for (;;) {
+    const ConnectionTurn turn = connection_turn();
+    MonitorHost *host = turn.first_session_waiter;
+    const uint64_t now_ms = monotonic_ms();
+    if (host == nullptr || now_ms < turn.session_setup_due_at_ms) {
+      return;
+    }
+    advance_host_poll(host, now_ms);
+    exclude_stall(host, monotonic_ms() - now_ms);
+  }
+}
+
+/**
+ * Starts checks when due and times out active checks whose iter_deadline_ms
+ * has passed, then resumes queued session setups. They go last so that a
+ * setup timing out after its handshake leaves its pause before the next;
+ * no new connection can start ahead of them in the meantime. The connection
+ * turn is snapshotted once and again after every change, so the pass stays
+ * linear in the number of hosts.
  */
 static void start_and_timeout_hosts(void) {
+  ConnectionTurn turn = connection_turn();
   for (unsigned int i = 0; i < host_count; i++) {
     MonitorHost *host = &monitor_host_list[i];
     const uint64_t now_ms = monotonic_ms();
     if (host->poll_state == HOST_POLL_IDLE) {
-      if (now_ms >= host->next_poll_at_ms) {
+      if (now_ms >= host_poll_due_at_ms(host, &turn)) {
         start_host_poll(host, now_ms);
         exclude_stall(host, monotonic_ms() - now_ms);
+        turn = connection_turn();
       }
-    } else if (now_ms >= host->iter_deadline_ms) {
+    } else if (
+      host->poll_state != HOST_POLL_SESSION_WAIT &&
+      now_ms >= host->iter_deadline_ms
+    ) {
       timeout_host_poll(host, now_ms);
+      turn = connection_turn();
     }
   }
+  resume_session_setups();
 }
 
 /**
@@ -123,14 +165,24 @@ static int build_poll_fd(
   pfds[0] = stop_pipe_slot;
 
   uint64_t soonest_wake = UINT64_MAX;
+  const ConnectionTurn turn = connection_turn();
 
   int n_pfds = 1;
   for (unsigned int i = 0; i < host_count; i++) {
     MonitorHost *host = &monitor_host_list[i];
 
     if (host->poll_state == HOST_POLL_IDLE) {
-      if (host->next_poll_at_ms < soonest_wake) {
-        soonest_wake = host->next_poll_at_ms;
+      const uint64_t due_at_ms = host_poll_due_at_ms(host, &turn);
+      if (due_at_ms < soonest_wake) {
+        soonest_wake = due_at_ms;
+      }
+      host->pollfd_slot = -1;
+      continue;
+    }
+
+    if (host->poll_state == HOST_POLL_SESSION_WAIT) {
+      if (turn.session_setup_due_at_ms < soonest_wake) {
+        soonest_wake = turn.session_setup_due_at_ms;
       }
       host->pollfd_slot = -1;
       continue;
@@ -170,7 +222,10 @@ static void process_poll_result(const struct pollfd *pfds) {
   for (unsigned int i = 0; i < host_count; i++) {
     MonitorHost *host = &monitor_host_list[i];
 
-    if (host->poll_state == HOST_POLL_IDLE) {
+    if (
+      host->poll_state == HOST_POLL_IDLE ||
+      host->poll_state == HOST_POLL_SESSION_WAIT
+    ) {
       continue;
     }
 

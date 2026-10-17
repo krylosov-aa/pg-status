@@ -63,19 +63,24 @@ typedef struct {
   uint64_t sync_max_lag_bytes;
 
   // Target period between starts of checks of the same host, in ms (> 0).
+  // While a master is known, lengthened up to 8 s for dead hosts whose
+  // connection attempts fail after a TLS handshake or password
+  // authentication.
   int sleep_ms;
 
   // After this number of failed checks in a row, the host is considered dead.
   unsigned int max_fails;
 
-  // Maximum age of a reused PGconn in ms. When the current connection is
-  // older than this, it is closed at the end of the current iteration and
-  // the next iteration reconnects.
+  // Maximum age of a reused PGconn in ms. An older connection is replaced
+  // by the first check that finds the connection turn free and no host with
+  // a missing or broken connection due before it; until then it keeps
+  // serving checks.
   uint64_t conn_max_age_ms;
 
   // Hard deadline for a single poll iteration (connect + send + read) in ms.
   // On expiry the connection is closed and failed_connections is incremented.
   // Time the loop is blocked inside libpq (host name lookups) is excluded.
+  // A ready TCP socket's wait for a session setup turn is also excluded.
   uint64_t query_timeout_ms;
 
   // Minimum interval in ms between ERROR records about continuing poll
@@ -142,10 +147,11 @@ struct pg_conn;
  * Phase of the per-host async poll state machine.
  */
 typedef enum {
-  HOST_POLL_IDLE = 0,    // nothing in flight
-  HOST_POLL_CONNECTING,  // PQconnectStart issued
-  HOST_POLL_QUERY_SEND,  // PQsendQuery issued
-  HOST_POLL_QUERY_READ,  // reading the result
+  HOST_POLL_IDLE = 0,      // nothing in flight
+  HOST_POLL_CONNECTING,    // PQconnectStart issued
+  HOST_POLL_SESSION_WAIT,  // TCP socket ready; waiting for a TLS/auth turn
+  HOST_POLL_QUERY_SEND,    // PQsendQuery issued
+  HOST_POLL_QUERY_READ,    // reading the result
 } HostPollState;
 
 /**
@@ -174,14 +180,24 @@ typedef struct {
   _Atomic uint64_t lsn;             // protected by seq
   unsigned int failed_connections;  // writer-private
   _Atomic MonitorStatus status;     // protected by seq
+  // writer-private: failed checks in a row whose connection attempt did a
+  // TLS handshake or password authentication, saturating
+  uint16_t handshake_failures;
 
   // writer-private async-poll state
-  struct pg_conn *conn;           // reused PGconn, or NULL when disconnected
-  HostPollState poll_state;       // current phase of the state machine
-  short poll_events;              // events to wait for on PQsocket(conn)
-  uint64_t next_poll_at_ms;       // monotonic deadline to start next iteration
-  uint64_t iter_started_at_ms;    // monotonic start of current/last iteration
-  uint64_t iter_deadline_ms;      // monotonic deadline for current iteration
+  // monotonic time at which the permission fallback below expires
+  uint64_t wal_receiver_retry_at_ms;
+  struct pg_conn *conn;         // reused PGconn, or NULL when disconnected
+  HostPollState poll_state;     // current phase of the state machine
+  short poll_events;            // events to wait for on PQsocket(conn)
+  bool iter_opened_connection;  // the current check opened a new connection
+  bool iter_tls_started;        // TLS was seen in progress during this check
+  uint64_t next_poll_at_ms;     // monotonic deadline to start next iteration
+  uint64_t backoff_ms;          // part of next_poll_at_ms added for a dead host
+  uint64_t iter_started_at_ms;  // monotonic start of current/last iteration
+  uint64_t iter_deadline_ms;    // monotonic deadline for current iteration
+  uint64_t session_setup_hold_until_ms;       // 0 until TLS/auth starts
+  uint64_t session_setup_wait_started_at_ms;  // SESSION_WAIT queue order
   uint64_t connected_at_ms;       // monotonic time of last successful connect
   uint64_t next_error_log_at_ms;  // per-host error limit; reset on poll success
   int pollfd_slot;                // transient index into the main-loop pollfd[]
@@ -362,20 +378,82 @@ const MonitorHost *find_most_sync_replica_by_bytes(
 // Host checking utils
 
 /**
+ * Snapshot of the connection turn. New connections take turns: one starts
+ * only when no other has been negotiating TLS or authenticating for less
+ * than 1 s of unblocked loop time, 100 ms after the end of the previous
+ * setup that reached a TLS handshake or password authentication, and
+ * min(sleep_ms / host_count, 250 ms) after the previous one started. Hosts
+ * whose connection is missing or broken take turns in the order their
+ * checks became due. Ready TCP sockets begin TLS or authentication in the
+ * order they became ready, before any new connection starts.
+ */
+typedef struct {
+  // earliest time a ready TCP connection may begin TLS or authentication
+  uint64_t session_setup_due_at_ms;
+  // earliest time a new connection may start; UINT64_MAX while a ready TCP
+  // socket waits for its turn
+  uint64_t connect_at_ms;
+  // IDLE host whose connection is missing or broken and whose check became
+  // due first, or NULL
+  const MonitorHost *first_waiting;
+  // SESSION_WAIT host whose TCP connection became ready first, or NULL
+  MonitorHost *first_session_waiter;
+} ConnectionTurn;
+
+/**
+ * Takes the snapshot in one pass over the hosts. It is valid until a host
+ * starts a check, resumes a queued session setup, times out, or the loop
+ * is blocked inside libpq; the polling loop takes it once per pass and
+ * again after each of those, so scheduling every host costs constant time.
+ */
+ConnectionTurn connection_turn(void);
+
+/**
+ * Returns the monotonic time at which the next check of an IDLE host is due
+ * given the current `turn`. A host with a working connection is due at its
+ * scheduled time, even if the connection is aged. A host whose connection
+ * is missing or broken is due once its scheduled time has come and the
+ * turn is free; while another host goes first, the due time is unknown and
+ * UINT64_MAX is returned.
+ */
+uint64_t host_poll_due_at_ms(
+  const MonitorHost *host, const ConnectionTurn *turn
+);
+
+/**
+ * Moves the next connection turn later by `stall_ms`, the time the loop was
+ * blocked inside libpq, so that the spacing between connection starts counts
+ * from when the blocking call returned. Also shifts session setup holds
+ * and the pause after setup. A free turn stays free.
+ */
+void postpone_connection_turn(uint64_t stall_ms);
+
+/**
+ * Removes the longer period of dead hosts from their next checks, so that
+ * each is checked once per sleep_ms again. Called while no master is known:
+ * any dead host may be the one that brings it back.
+ */
+void cancel_dead_host_backoff(void);
+
+/**
  * Kicks off a new poll iteration for `host`: opens the connection if needed
- * (or reuses the existing one, recycling it if older than conn_max_age_ms),
- * fires PQsendQuery, and sets the iteration deadline. After the call the
- * host is in CONNECTING or QUERY_SEND state and ready to be added to a
- * poll() fd set.
+ * (or reuses the existing one, recycling it if older than conn_max_age_ms
+ * and a connection turn is free), fires PQsendQuery, and sets the
+ * iteration deadline. After the call the host is in CONNECTING or QUERY_SEND
+ * state and ready to be added to a poll() fd set.
  */
 void start_host_poll(MonitorHost *host, uint64_t now_ms);
 
 /**
  * Drives the per-host state machine in response to `revents` from
- * poll(). On completion (success or any error), the host returns to IDLE and
+ * poll(), or when a SESSION_WAIT host's turn becomes due. On completion
+ * (success or any error), the host returns to IDLE and
  * its shared state (`status`, `lag_ms`, `lag_bytes`, `lsn`) is updated via the
- * seqlock. The next check is due at the previous start plus `sleep_ms`,
- * or immediately if that time has already passed. Checks never overlap.
+ * seqlock. The next check is due at the previous start plus `sleep_ms`
+ * (while a master is known, doubled per failure after a TLS handshake or
+ * password authentication for a dead host, up to 8 s), or immediately if
+ * that time has already passed.
+ * Checks never overlap.
  */
 void advance_host_poll(MonitorHost *host, uint64_t now_ms);
 

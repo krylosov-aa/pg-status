@@ -451,6 +451,33 @@ static void test_permission_fallback_master(void) {
   );
 }
 
+static void test_permission_fallback_expires(void) {
+  // Arrange: the fallback starts at 1010 ms on a connection that stays open.
+  MonitorHost *host = configure_permission_poll();
+  read_step(host, 1010);
+  const char *values[] = {"t", nullptr, "0/3000", "0/2000", "1234", nullptr};
+  poll_script.result = make_poll_result(values);
+  advance_host_poll(host, 1020);
+  support_assert_true(
+    host->poll_state == HOST_POLL_IDLE && host->failed_connections == 0,
+    "fallback poll succeeds"
+  );
+
+  // Act & Assert
+  poll_script.drained = true;
+  support_assert_true(send_query(host, 301009), "send poll before expiry");
+  support_assert_true(
+    poll_script.last_query == streaming_replication_query_without_wal_receiver,
+    "receiver statistics stay skipped for five minutes"
+  );
+  poll_script.drained = true;
+  support_assert_true(send_query(host, 301010), "send poll after expiry");
+  support_assert_true(
+    poll_script.last_query == streaming_replication_query,
+    "receiver statistics are retried without a reconnect"
+  );
+}
+
 static void test_permission_fallback_failure(void) {
   // Arrange
   MonitorHost *host = configure_permission_poll();
@@ -524,6 +551,7 @@ int main(const int argc, char **argv) {
     {"master_ignores_latest_end_lsn", test_master_ignores_latest_end_lsn},
     {"permission_fallback_replica", test_permission_fallback_replica},
     {"permission_fallback_master", test_permission_fallback_master},
+    {"permission_fallback_expires", test_permission_fallback_expires},
     {"permission_fallback_failure", test_permission_fallback_failure},
     {"permission_fallback_unrelated_error",
      test_permission_fallback_unrelated_error},

@@ -34,7 +34,7 @@ MonitorParameters parameters = {
   .max_fails = 3,
   .sync_max_lag_ms = 1000,
   .sync_max_lag_bytes = 1000000,  // 1 mb
-  .conn_max_age_ms = 300000,      // 5 minutes
+  .conn_max_age_ms = 3600000,     // 1 hour
   .query_timeout_ms = 1000,
   .poll_error_log_interval_ms = 60000,  // 1 minute
 };
