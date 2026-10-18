@@ -406,11 +406,11 @@ The full query is tried again after 5 minutes or after a reconnection.
 
 Available installation options:
 
-- [Debian package](https://github.com/krylosov-aa/pg-status/releases/download/2.3.2/pg-status_2.3.2_amd64.deb)
+- [Debian package](https://github.com/krylosov-aa/pg-status/releases/download/2.4.0/pg-status_2.4.0_amd64.deb)
 - [Docker Hub image](https://hub.docker.com/r/krylosovaa/pg-status)
 - [Docker build configurations](docker)
-- [Statically linked binary](https://github.com/krylosov-aa/pg-status/releases/download/2.3.2/pg-status_2.3.2_linux_amd64_static.tar.gz)
-- [Dynamically linked binary](https://github.com/krylosov-aa/pg-status/releases/download/2.3.2/pg-status_2.3.2_linux_amd64_shared.tar.gz)
+- [Statically linked binary](https://github.com/krylosov-aa/pg-status/releases/download/2.4.0/pg-status_2.4.0_linux_amd64_static.tar.gz)
+- [Dynamically linked binary](https://github.com/krylosov-aa/pg-status/releases/download/2.4.0/pg-status_2.4.0_linux_amd64_shared.tar.gz)
 
 For more information, see the [installation guide](docs/installation.md).
 

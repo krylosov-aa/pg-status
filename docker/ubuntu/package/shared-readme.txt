@@ -1,4 +1,4 @@
-pg-status v2.3.2
+pg-status v2.4.0
 ================
 
 An HTTP service that reports the observed roles, availability and replication
