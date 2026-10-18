@@ -2481,6 +2481,49 @@ static void test_master_switch_hosts(void) {
   fixture_pg_status_stop(&api);
 }
 
+static void test_replica_timeline(void) {
+  // Arrange: "abandoned" stays on timeline 1, past the write that the
+  // client made on timeline 2; "following" has replayed it there.
+  TestHost abandoned = fixture_pg_status_replica_host(
+    "abandoned", 50, 0, 0x900
+  );
+  abandoned.snapshot.timeline = 1;
+  TestHost following = fixture_pg_status_replica_host(
+    "following", 50, 0, 0x450
+  );
+  following.snapshot.timeline = 2;
+  const TestHost hosts[] = {
+    fixture_pg_status_master_host("master"), abandoned, following
+  };
+  PgStatusApiFixture api = fixture_pg_status_start(
+    hosts, sizeof(hosts) / sizeof(hosts[0]), 0
+  );
+  const struct {
+    const char *path;
+    const char *host;
+  } cases[] = {
+    {"/replica?min_lsn=0/450&timeline=2", "following"},
+    {"/sync_by_bytes?min_lsn=0/450&timeline=2", "following"},
+    {"/most_sync_by_bytes?min_lsn=0/450&timeline=2", "following"},
+    {"/replica?min_lsn=0/800&timeline=2", "master"},
+    {"/replica?timeline=1", "abandoned"},
+    {"/sync_by_time?timeline=3", "master"},
+  };
+
+  // All rows exercise the same timeline filter.
+  for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    // Act
+    TestHTTPResponse response = http_test_get(api.port, cases[i].path, nullptr);
+
+    // Assert
+    fixture_pg_status_expect_text(&response, 200, cases[i].host);
+
+    // Cleanup
+    http_test_response_free(&response);
+  }
+  fixture_pg_status_stop(&api);
+}
+
 static void test_invalid_parameters(void) {
   // Arrange
   const TestHost hosts[] = {
@@ -2501,6 +2544,20 @@ static void test_invalid_parameters(void) {
     {"/sync_by_time_or_bytes?lag_bytes=1x", "Invalid lag_bytes"},
     {"/sync_by_time_and_bytes?min_lsn=invalid", "Invalid min_lsn"},
     {"/most_sync_by_bytes?min_lsn=100", "Invalid min_lsn"},
+    // '+' decodes to a space; strtoull() would wrap " -1" to 2^64 - 1 and
+    // lift the threshold.
+    {"/sync_by_time?lag_ms=+-1", "Invalid lag_ms"},
+    {"/sync_by_time?lag_ms=%20-1", "Invalid lag_ms"},
+    {"/replica?lag_bytes=%09-5", "Invalid lag_bytes"},
+    {"/replica?lag_ms=%2B5", "Invalid lag_ms"},
+    {"/replica?min_lsn=+0/450", "Invalid min_lsn"},
+    {"/replica?min_lsn=0x0/450", "Invalid min_lsn"},
+    {"/replica?timeline=0", "Invalid timeline"},
+    {"/replica?timeline=-1", "Invalid timeline"},
+    {"/replica?timeline=+2", "Invalid timeline"},
+    {"/sync_by_bytes?timeline=4294967296", "Invalid timeline"},
+    {"/most_sync_by_bytes?timeline=0x2", "Invalid timeline"},
+    {"/sync_by_time?min_lsn=0/450&timeline=", "Invalid timeline"},
   };
 
   // All rows exercise the same parameter-validation contract.
@@ -2616,6 +2673,7 @@ static const struct {
   {"master_switch_master", test_master_switch_master},
   {"master_switch_replica", test_master_switch_replica},
   {"master_switch_hosts", test_master_switch_hosts},
+  {"replica_timeline", test_replica_timeline},
   {"invalid_parameters", test_invalid_parameters},
 };
 

@@ -37,6 +37,7 @@ MonitorSnapshot atomic_get_snapshot(const MonitorHost *host) {
       &host->lag_bytes, memory_order_relaxed
     );
     snap.lsn = atomic_load_explicit(&host->lsn, memory_order_relaxed);
+    snap.timeline = atomic_load_explicit(&host->timeline, memory_order_relaxed);
     // Keep all snapshot loads before the final sequence validation.
     atomic_thread_fence(memory_order_acquire);
     const uint64_t seq2 = atomic_load_explicit(
@@ -67,6 +68,22 @@ const MonitorHost *find_host_by_name(const char *host) {
   return nullptr;
 }
 
+/**
+ * True when the master is known to be on a later timeline than `timeline`:
+ * the selected one, or while none is selected, the one selected last, as
+ * its loss changes nothing about that. Timelines only grow, so a write on
+ * `timeline` predates a failover: a replica still on it may be left on the
+ * abandoned history, frozen, and one on the master's timeline may lack the
+ * write if it came after the switch. No replica can vouch for it then.
+ */
+static bool master_is_past_timeline(const uint32_t timeline) {
+  const MonitorHost *master = get_master_monitor_host();
+  const uint32_t master_timeline = master != nullptr
+                                     ? atomic_get_snapshot(master).timeline
+                                     : get_reference_master_timeline();
+  return master_timeline > timeline;
+}
+
 bool is_alive_replica(
   const MonitorSnapshot snap, const MonitorHost *host, const void *ctx
 ) {
@@ -75,7 +92,23 @@ bool is_alive_replica(
   }
   if (ctx) {
     const LagThresholds *thresholds = ctx;
-    if (thresholds->min_lsn != 0 && snap.lsn < thresholds->min_lsn) {
+    // A position on another timeline than the client's, or without one, than
+    // the master's, may be past min_lsn without the write it stands for.
+    // The client's timeline is the direct evidence: it holds even before
+    // pg-status selects a new master, and an unknown one does not match it.
+    // Once the selected master is past it, it vouches for no replica.
+    if (
+      thresholds->timeline != 0 &&
+      (snap.timeline != thresholds->timeline ||
+       master_is_past_timeline(thresholds->timeline))
+    ) {
+      return false;
+    }
+    if (
+      thresholds->min_lsn != 0 &&
+      ((thresholds->timeline == 0 && snap.status.timeline_mismatch) ||
+       snap.lsn < thresholds->min_lsn)
+    ) {
       return false;
     }
   }
@@ -297,13 +330,15 @@ const MonitorHost *find_most_sync_replica_by_bytes(
       continue;
     }
 
+    // An unknown lag is UINT64_MAX: without a limit, a replica that has
+    // one still matches and is taken when no other has a known lag.
     if (snap.status.possible_dead) {
-      if (snap.lag_bytes < best_possible_lag) {
+      if (best_possible == nullptr || snap.lag_bytes < best_possible_lag) {
         best_possible_lag = snap.lag_bytes;
         best_possible = mon_host;
       }
     } else {
-      if (snap.lag_bytes < best_alive_lag) {
+      if (best_alive == nullptr || snap.lag_bytes < best_alive_lag) {
         best_alive_lag = snap.lag_bytes;
         best_alive = mon_host;
       }

@@ -415,6 +415,108 @@ static void test_wait_for_deadline(void) {
   );
 }
 
+/**
+ * Makes host 0 the selected master with a check in progress until a late
+ * deadline, and host 1 a replica whose result is read and waits for it.
+ */
+static MonitorHost *wait_for_master(void) {
+  configure_hosts(2);
+  MonitorHost *master = &monitor_host_list[0];
+  publish_monitor_snapshot(
+    master, (MonitorSnapshot){.status = master_status()}
+  );
+  save_master_index(0);
+  reset_iter_state(master, clock_ms);
+  master->iter_deadline_ms = clock_ms + 5000;
+  poll_state_query_read(master);
+  MonitorHost *replica = &monitor_host_list[1];
+  reset_iter_state(replica, clock_ms);
+  replica->iter_data_ready = true;
+  replica->iter_new_status = replica_status();
+  // The last commit is old, so the master's check may bound the time lag.
+  replica->iter_commit_age_ms = 60000;
+  replica->iter_observed_at_ms = clock_ms;
+  replica->poll_state = HOST_POLL_MASTER_WAIT;
+  return replica;
+}
+
+static void test_master_wait_ends_at_deadline(void) {
+  // Arrange
+  MonitorHost *replica = wait_for_master();
+  struct pollfd pfds[MAX_HOSTS + 1];
+  int timeout_ms;
+
+  // Act
+  const int count = build_poll_fd(clock_ms, pfds, &timeout_ms);
+
+  // Assert
+  support_assert_true(
+    count == 2 && replica->pollfd_slot == -1,
+    "a waiting replica's socket stays out of poll()"
+  );
+  support_assert_true(timeout_ms == 1000, "wake at the replica's deadline");
+
+  // Act: the loop sleeps until the deadline and then handles its sockets.
+  (void)pump_one_iteration();
+
+  // Assert
+  support_assert_true(
+    clock_ms == 11000 && replica->poll_state == HOST_POLL_MASTER_WAIT &&
+      timeouts == 0,
+    "socket handling does not time out a waiting replica"
+  );
+
+  // Act
+  (void)pump_one_iteration();
+
+  // Assert
+  const MonitorSnapshot snap = atomic_get_snapshot(replica);
+  support_assert_true(
+    replica->poll_state == HOST_POLL_IDLE && timeouts == 0 &&
+      replica->failed_connections == 0 && snap.status.alive &&
+      !snap.status.possible_dead,
+    "the deadline ends the replica's check without a failure"
+  );
+}
+
+static void test_master_wait_ends_before_next_check(void) {
+  // Arrange: the replica's deadline is past its next check.
+  MonitorHost *replica = wait_for_master();
+  replica->iter_deadline_ms = clock_ms + 5000;
+  struct pollfd pfds[MAX_HOSTS + 1];
+
+  // Act
+  const int timeout_ms = prepare_poll(pfds);
+  (void)pump_one_iteration();
+  (void)pump_one_iteration();
+
+  // Assert
+  support_assert_true(
+    timeout_ms == 1000, "wake when the replica's next check is due"
+  );
+  support_assert_true(
+    clock_ms == 11000 && replica->poll_state == HOST_POLL_IDLE &&
+      replica->next_poll_at_ms == 11000 && timeouts == 0,
+    "a hanging master check does not delay the replica's next check"
+  );
+}
+
+static void test_master_change_ends_wait(void) {
+  // Arrange
+  MonitorHost *replica = wait_for_master();
+
+  // Act
+  save_master_index(-1);
+  start_and_timeout_hosts();
+
+  // Assert
+  support_assert_true(
+    replica->poll_state == HOST_POLL_IDLE && timeouts == 0 &&
+      atomic_get_snapshot(replica).status.alive,
+    "without the selected master, the replica stops waiting"
+  );
+}
+
 static void fail_with_result(
   MonitorHost *host, const ExecStatusType status, const uint64_t now_ms
 ) {
@@ -701,6 +803,10 @@ int main(const int argc, char **argv) {
     {"fresh_clock", test_fresh_clock},
     {"missing_socket", test_missing_socket},
     {"wait_for_deadline", test_wait_for_deadline},
+    {"master_wait_ends_at_deadline", test_master_wait_ends_at_deadline},
+    {"master_wait_ends_before_next_check",
+     test_master_wait_ends_before_next_check},
+    {"master_change_ends_wait", test_master_change_ends_wait},
     {"failure_logging", test_failure_logging},
     {"failure_logging_debug", test_failure_logging_debug},
     {"recovery_logging", test_recovery_logging},

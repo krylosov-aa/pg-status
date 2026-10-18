@@ -221,6 +221,8 @@ $ curl 'http://localhost:8000/sync_by_bytes?lag_bytes=10000'
 
 This lets a single application use strict guarantees for critical queries and relaxed ones for analytics.
 
+Keep in mind how `lag_ms` is measured: it is the age of the last commit the replica has replayed, as of its last check, and while the master writes nothing it is bounded by the time since the start of the master's latest check, which is less than the polling period (see [Time lag](../README.md#time-lag)). A threshold below the interval between commits, or below the polling period on a master without writes, can exclude a replica that has in fact caught up, and the master is returned instead. For an exact guarantee, use `min_lsn` (below).
+
 **Important note:** if no suitable replica exists, any of these endpoints will return the master as a fallback. Application code always receives a host — it just may sometimes be the master instead of a replica.
 
 
@@ -238,20 +240,24 @@ After a write to the master, the replica doesn't receive the data instantaneousl
 PostgreSQL knows the exact position in the transaction log (WAL LSN) up to which each replica has replayed data. pg-status polls this position and keeps it in memory.
 
 The pattern:
-1. After writing to the master, obtain the LSN of that transaction via `pg_current_wal_lsn()`
+1. After the write has been committed, obtain the master's WAL position via `pg_current_wal_insert_lsn()`, and its timeline. Read them after COMMIT returns, not inside the transaction: before COMMIT, the position does not cover the commit record, and a replica that has replayed through it may not see the write yet
 2. Pass this LSN to pg-status in the next read request
 3. pg-status returns only the replica that has already replayed data up to that position
 
 ```bash
-# After writing to the master, get the LSN:
-# SELECT pg_current_wal_lsn(); → '0/3000060'
+# After the commit has returned, get the LSN and the timeline:
+# SELECT pg_current_wal_insert_lsn(),
+#        ('x' || substr(pg_walfile_name(pg_current_wal_insert_lsn()), 1, 8))::bit(32)::bigint;
+# → '0/3000060', 2
 
-# Next read — only from a replica that has already replayed '0/3000060'
-$ curl 'http://localhost:8000/replica?min_lsn=0/3000060'
+# Next read — only from a replica on timeline 2 that has already replayed '0/3000060'
+$ curl 'http://localhost:8000/replica?min_lsn=0/3000060&timeline=2'
 host-2
 ```
 
 If no replica has caught up to the required position yet — the master is returned as a fallback. This is the correct behavior: it's better to read from the master than to show stale data.
+
+`pg_current_wal_insert_lsn()` is at or past the end of the commit record on any connection to the same master, also with `synchronous_commit = off`. `pg_current_wal_lsn()` returns the write position instead, which covers the commit only if it was synchronous. The timeline guards against failovers: a replica left on the history the new master abandoned can be past the LSN of a write made on the new master without having that write. pg-status excludes such a replica once it has selected the new master, and with `timeline` also before that, when the application found the new master on its own (see [LSN query parameter](../README.md#lsn-query-parameter-read-your-writes)).
 
 
 ## Python Integration
@@ -375,22 +381,22 @@ async def get_order_list(user_id: int) -> list[Order]:
 
 For RYOW you need to pass the LSN to the client after a write, and at the next read use it to select a replica. It's convenient to organize this through two middlewares.
 
-The main advantage of this approach is that it works automatically for the entire application at once. Wire up the middleware once and every request that actually changed data automatically gets an LSN in the response cookie. No need to think about this when writing each new handler, no need to manually call `pg_current_wal_lsn()` in business logic. The key word is "actually changed": `pg_current_xact_id_if_assigned()` returns NULL for read-only transactions, so the cookie is only updated where there were actual writes — SELECT queries are not affected.
+The main advantage of this approach is that it works automatically for the entire application at once. Wire up the middleware once and every request that actually changed data automatically gets an LSN in the response cookie. No need to think about this when writing each new handler, no need to manually call `pg_current_wal_insert_lsn()` in business logic. The key word is "actually changed": `pg_current_xact_id_if_assigned()` returns NULL for read-only transactions, so the cookie is only updated where there were actual writes — SELECT queries are not affected.
 
-One non-obvious detail is `_LsnHolder`. Since `save_current_lsn_if_there_writes` is called from the `before_commit` hook and can't return a value to `lsn_cookie_middleware` directly, shared mutable state is needed: `lsn_cookie_middleware` puts an `_LsnHolder` into a `ContextVar`, and `save_current_lsn_if_there_writes` retrieves the same object and writes the LSN into it.
+One non-obvious detail is when the LSN is read. The `before_commit` hook runs before the commit record exists, so an LSN read there may not cover the write. `mark_if_there_writes` only remembers the master that is about to commit a write; `lsn_cookie_middleware` reads the LSN after `call_next` returns, when the session middleware inside it has committed. Since the hook can't return a value to `lsn_cookie_middleware` directly, shared mutable state is needed: `lsn_cookie_middleware` puts an `_LsnHolder` into a `ContextVar`, and `mark_if_there_writes` retrieves the same object and records the master's engine in it.
 
 ```python
 # read_own_writes.py
 from contextvars import ContextVar
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
 
 class _LsnHolder:
-    value: str | None = None
+    engine: AsyncEngine | None = None  # master that committed a write
 
 
 _request_lsn: ContextVar[_LsnHolder] = ContextVar("_request_lsn")
@@ -400,17 +406,13 @@ def get_request_lsn() -> _LsnHolder:
     return _request_lsn.get()
 
 
-async def save_current_lsn_if_there_writes(session: AsyncSession) -> None:
-    """Called before commit — saves the LSN if there was a write"""
-    result = await session.execute(
-        text(
-            "SELECT pg_current_wal_lsn()::text "
-            "WHERE pg_current_xact_id_if_assigned() IS NOT NULL"
-        )
+async def mark_if_there_writes(session: AsyncSession) -> None:
+    """Called before commit — remembers the master if there was a write"""
+    wrote = await session.scalar(
+        text("SELECT pg_current_xact_id_if_assigned() IS NOT NULL")
     )
-    lsn = result.scalar()
-    if lsn:
-        get_request_lsn().value = lsn
+    if wrote:
+        get_request_lsn().engine = session.bind
 
 
 async def lsn_cookie_middleware(
@@ -419,13 +421,27 @@ async def lsn_cookie_middleware(
     # Initialize the holder at the start of each request
     _request_lsn.set(_LsnHolder())
 
+    # The session middleware runs inside this one: when call_next returns,
+    # the transaction has been committed
     response = await call_next(request)
 
-    # If this request had a write — send the LSN to the client via cookie
+    # If this request had a write — read the LSN and the timeline only now,
+    # after the commit, and send them to the client via cookie
     lsn_holder = get_request_lsn()
-    if lsn_holder.value:
+    if lsn_holder.engine is not None:
+        async with lsn_holder.engine.connect() as connection:
+            row = (
+                await connection.execute(
+                    text(
+                        "SELECT pg_current_wal_insert_lsn()::text, "
+                        "('x' || substr(pg_walfile_name("
+                        "pg_current_wal_insert_lsn()), 1, 8))"
+                        "::bit(32)::bigint"
+                    )
+                )
+            ).one()
         response.headers["Set-Cookie"] = (
-            f"X-WAL-LSN={lsn_holder.value}; Path=/; SameSite=Lax; Secure"
+            f"X-WAL-LSN={row[1]}/{row[0]}; Path=/; SameSite=Lax; Secure"
         )
     return response
 ```
@@ -440,12 +456,12 @@ from context_async_sqlalchemy.fastapi_utils import (
 from starlette.middleware.base import BaseHTTPMiddleware
 from read_own_writes import (
     lsn_cookie_middleware,
-    save_current_lsn_if_there_writes,
+    mark_if_there_writes,
 )
 
 add_fastapi_http_db_session_middleware(
     app,
-    before_commit=save_current_lsn_if_there_writes,  # captures LSN before commit
+    before_commit=mark_if_there_writes,  # remembers the master of a write
 )
 app.add_middleware(
     BaseHTTPMiddleware, dispatch=lsn_cookie_middleware
@@ -456,14 +472,22 @@ On the read side — extract the LSN from the cookie and pass it to pg-status:
 
 ```python
 async def replica_session_ryow(request: Request) -> AsyncSession:
-    min_lsn = request.cookies.get("X-WAL-LSN")
-    replica_host = await get_replica_host(min_lsn=min_lsn)
+    # The cookie holds "timeline/LSN", e.g. "2/0/3000060"
+    position = request.cookies.get("X-WAL-LSN")
+    timeline, _, min_lsn = position.partition("/") if position else ("", "", "")
+    replica_host = await get_replica_host(
+        min_lsn=min_lsn or None, timeline=timeline or None
+    )
     return await db_session(_connections[replica_host])
 ```
 
 ```python
-async def get_replica_host(min_lsn: str | None = None) -> str:
+async def get_replica_host(
+    min_lsn: str | None = None, timeline: str | None = None
+) -> str:
     params = {"min_lsn": min_lsn} if min_lsn else {}
+    if timeline:
+        params["timeline"] = timeline
     async with aiohttp.ClientSession() as client:
         async with client.get(
             f"{PG_STATUS_URL}/most_sync_by_bytes", params=params
@@ -472,7 +496,7 @@ async def get_replica_host(min_lsn: str | None = None) -> str:
             return await response.text()
 ```
 
-The full flow: write request → LSN captured before commit → `X-WAL-LSN` cookie set in response → client sends it in the next request → server reads the cookie and passes `min_lsn` to pg-status → only the replica that has already replayed the required WAL position is returned, or the master if no replica has caught up yet.
+The full flow: write request → commit → LSN and timeline read after the commit → `X-WAL-LSN` cookie set in response → client sends it in the next request → server reads the cookie and passes `min_lsn` and `timeline` to pg-status → only a replica on that timeline that has already replayed the required WAL position is returned, or the master if no replica has caught up yet.
 
 #### Where to Store the LSN
 

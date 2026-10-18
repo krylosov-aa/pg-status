@@ -141,9 +141,10 @@ PostgreSQL runs natively, without Docker, on `127.0.0.1`, `127.0.0.2` and
 `127.0.0.3`, port 5432. Each instance has 64 MiB shared buffers; fsync,
 synchronous_commit and full_page_writes remain enabled. A separate writer
 targets 100 committed updates/s throughout the tests, keeping WAL and
-replication active. This also keeps time-lag routes meaningful: on an idle
-database, the last replayed transaction timestamp ages even when no WAL
-remains to replay.
+replication active. When these measurements were taken, `lag_ms` came only
+from the last replayed transaction timestamp, which ages on an idle database
+even when no WAL remains to replay; the writer kept time-lag routes
+meaningful.
 
 The guest reports CPUs 0/1 and 2/3 as SMT siblings. pg-status has a single
 HTTP event loop; adding vCPUs alone does not parallelize request handling.

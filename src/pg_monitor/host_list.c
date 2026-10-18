@@ -27,10 +27,22 @@ MonitorHost monitor_host_list[MAX_HOSTS] = {0};
 static atomic_int master_index = -1;
 
 /**
- * Atomically gets the current master position in the array
+ * Atomically gets the current master position in the array. Acquire pairs
+ * with the release in save_master_index(): a reader that sees a master also
+ * sees the replica states published before it was selected.
  */
 int get_master_index(void) {
-  return atomic_load_explicit(&master_index, memory_order_relaxed);
+  return atomic_load_explicit(&master_index, memory_order_acquire);
+}
+
+/**
+ * Timeline of the reference master: the selected one, or while none is
+ * selected, the one selected last; 0 before any.
+ */
+static _Atomic uint32_t reference_master_timeline = 0;
+
+uint32_t get_reference_master_timeline(void) {
+  return atomic_load_explicit(&reference_master_timeline, memory_order_acquire);
 }
 
 /**
@@ -58,9 +70,9 @@ static void init_monitor_host(
   monitor_host->connected_at_ms = 0;
   monitor_host->next_error_log_at_ms = 0;
   monitor_host->pollfd_slot = -1;
-  monitor_host->wal_receiver_disabled = false;
-  monitor_host->wal_receiver_retry_at_ms = 0;
-  monitor_host->iter_retry_without_wal_receiver = false;
+  monitor_host->query_fallback = 0;
+  monitor_host->query_fallback_expires_at_ms = 0;
+  monitor_host->iter_retry_with_query_fallback = false;
   monitor_host->iter_opened_connection = false;
   monitor_host->iter_tls_started = false;
   monitor_host->iter_data_ready = false;
@@ -80,6 +92,7 @@ static void init_monitor_host(
   atomic_store_explicit(&monitor_host->lag_ms, 0, memory_order_relaxed);
   atomic_store_explicit(&monitor_host->lag_bytes, 0, memory_order_relaxed);
   atomic_store_explicit(&monitor_host->lsn, 0, memory_order_relaxed);
+  atomic_store_explicit(&monitor_host->timeline, 0, memory_order_relaxed);
 }
 
 static bool locality_values_are_complete(const char *values) {
@@ -229,7 +242,13 @@ void init_monitor_host_list(void) {
  * Atomically saves the current master's host
  */
 void save_master_index(const int i) {
-  atomic_store_explicit(&master_index, i, memory_order_relaxed);
+  atomic_store_explicit(&master_index, i, memory_order_release);
+}
+
+void save_reference_master_timeline(const uint32_t timeline) {
+  atomic_store_explicit(
+    &reference_master_timeline, timeline, memory_order_release
+  );
 }
 
 void publish_monitor_snapshot(
@@ -243,6 +262,9 @@ void publish_monitor_snapshot(
     &host->lag_bytes, snapshot.lag_bytes, memory_order_release
   );
   atomic_store_explicit(&host->lsn, snapshot.lsn, memory_order_release);
+  atomic_store_explicit(
+    &host->timeline, snapshot.timeline, memory_order_release
+  );
   atomic_store_explicit(&host->status, snapshot.status, memory_order_release);
   // Publish the complete snapshot by restoring an even sequence number.
   atomic_fetch_add_explicit(&host->seq, 1, memory_order_release);

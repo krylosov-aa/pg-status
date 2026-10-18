@@ -7,3 +7,9 @@ static const char streaming_replication_query[] = {
 static const char streaming_replication_query_without_wal_receiver[] = {
   @PG_STATUS_STREAMING_REPLICATION_QUERY_WITHOUT_WAL_RECEIVER_BYTES@ '\0',
 };
+
+/* Generated from
+ * streaming_replication_query_without_wal_receiver_and_control_file.sql. */
+static const char streaming_replication_query_without_wal_receiver_and_control_file[] = {
+  @PG_STATUS_STREAMING_REPLICATION_QUERY_WITHOUT_WAL_RECEIVER_AND_CONTROL_FILE_BYTES@ '\0',
+};

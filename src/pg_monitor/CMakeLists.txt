@@ -9,7 +9,8 @@ add_library(pg_monitor
 
 foreach(QUERY_NAME
         streaming_replication_query
-        streaming_replication_query_without_wal_receiver)
+        streaming_replication_query_without_wal_receiver
+        streaming_replication_query_without_wal_receiver_and_control_file)
     set_property(
             DIRECTORY APPEND
             PROPERTY CMAKE_CONFIGURE_DEPENDS

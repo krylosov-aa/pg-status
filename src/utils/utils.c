@@ -44,9 +44,30 @@ char *format_string(const char *format, ...) {
   return string;
 }
 
+/**
+ * True when `value` is one or more ASCII decimal digits and nothing else.
+ * strtol() and strtoull() also accept leading white space and a sign, and
+ * strtoull() negates a value after '-' modulo 2^64, so inputs are checked
+ * before them.
+ */
+static bool is_decimal_digits(const char *value) {
+  if (*value == '\0') {
+    return false;
+  }
+  for (const char *c = value; *c != '\0'; c++) {
+    if (*c < '0' || *c > '9') {
+      return false;
+    }
+  }
+  return true;
+}
+
 long str_to_long(const char *value) {
   if (!value) {
     pg_status_log_fatal("utils", "failed to convert null to long");
+  }
+  if (!is_decimal_digits(*value == '-' ? value + 1 : value)) {
+    pg_status_log_fatal("utils", "failed to convert '%s' to long", value);
   }
 
   char *end_ptr = nullptr;
@@ -65,7 +86,7 @@ unsigned long str_to_ulong(const char *value) {
   if (!value) {
     pg_status_log_fatal("utils", "failed to convert null to ulong");
   }
-  if (*value == '\0' || *value == '-') {
+  if (!is_decimal_digits(value)) {
     pg_status_log_fatal("utils", "failed to convert '%s' to ulong", value);
   }
 
@@ -85,7 +106,7 @@ uint64_t str_to_ull(const char *value) {
   if (!value) {
     pg_status_log_fatal("utils", "failed to convert null to ull");
   }
-  if (*value == '\0' || *value == '-') {
+  if (!is_decimal_digits(value)) {
     pg_status_log_fatal("utils", "failed to convert '%s' to ull", value);
   }
 
@@ -102,7 +123,7 @@ uint64_t str_to_ull(const char *value) {
 }
 
 bool try_str_to_ull(const char *value, uint64_t *out) {
-  if (!value || *value == '\0' || *value == '-') {
+  if (!value || !is_decimal_digits(value)) {
     return false;
   }
 
@@ -119,40 +140,34 @@ bool try_str_to_ull(const char *value, uint64_t *out) {
   return true;
 }
 
+/** Number of hexadecimal digits in each half of an LSN, as in pg_lsn. */
+enum { MAX_LSN_HALF_DIGITS = 8 };
+
+static const char HEX_DIGITS[] = "0123456789abcdefABCDEF";
+
 bool try_parse_lsn(const char *value, uint64_t *out) {
+  if (!value) {
+    return false;
+  }
+  // Each half is 1 to 8 hexadecimal digits and nothing else, as pg_lsn
+  // accepts; no white space, sign or prefix.
+  const size_t hi_length = strspn(value, HEX_DIGITS);
   if (
-    !value || *value == '\0' || *value == '-' || *value == '+' || *value == '/'
+    hi_length == 0 || hi_length > MAX_LSN_HALF_DIGITS || value[hi_length] != '/'
+  ) {
+    return false;
+  }
+  const char *lo_start = value + hi_length + 1;
+  const size_t lo_length = strspn(lo_start, HEX_DIGITS);
+  if (
+    lo_length == 0 || lo_length > MAX_LSN_HALF_DIGITS ||
+    lo_start[lo_length] != '\0'
   ) {
     return false;
   }
 
-  const char *slash = strchr(value, '/');
-  if (!slash) {
-    return false;
-  }
-
-  char *end_ptr = nullptr;
-  errno = 0;
-  const unsigned long long hi = strtoull(value, &end_ptr, 16);
-  if (end_ptr != slash || errno == ERANGE || hi > 0xFFFFFFFFULL) {
-    return false;
-  }
-
-  const char *lo_start = slash + 1;
-  if (*lo_start == '\0' || *lo_start == '-' || *lo_start == '+') {
-    return false;
-  }
-
-  errno = 0;
-  end_ptr = nullptr;
-  const unsigned long long lo = strtoull(lo_start, &end_ptr, 16);
-  if (
-    end_ptr == lo_start || *end_ptr != '\0' || errno == ERANGE ||
-    lo > 0xFFFFFFFFULL
-  ) {
-    return false;
-  }
-
+  const unsigned long long hi = strtoull(value, nullptr, 16);
+  const unsigned long long lo = strtoull(lo_start, nullptr, 16);
   *out = ((uint64_t)hi << 32) | (uint64_t)lo;
   return true;
 }

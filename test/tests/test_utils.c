@@ -113,6 +113,21 @@ static void test_str_to_ull_overflow(void) {
   (void)str_to_ull("18446744073709551616");
 }
 
+static void test_str_to_ull_signed_after_space(void) {
+  // Arrange & Act
+  (void)str_to_ull(" -1");
+}
+
+static void test_str_to_ulong_signed_after_space(void) {
+  // Arrange & Act
+  (void)str_to_ulong(" -1");
+}
+
+static void test_str_to_long_space(void) {
+  // Arrange & Act
+  (void)str_to_long(" 5");
+}
+
 static void test_try_str_to_ull_valid(void) {
   // Arrange
   uint64_t result = 0;
@@ -128,7 +143,20 @@ static void test_try_str_to_ull_valid(void) {
 static void test_try_str_to_ull_invalid(void) {
   // Arrange
   const char *invalid_values[] = {
-    nullptr, "", "-1", "text", "1x", "18446744073709551616",
+    nullptr,
+    "",
+    "-1",
+    "text",
+    "1x",
+    "18446744073709551616",
+    // strtoull() skips white space and negates after '-' modulo 2^64.
+    " -1",
+    "\t-1",
+    "\n-18446744073709551615",
+    " 1",
+    "+1",
+    " +1",
+    "1 ",
   };
 
   // Act & Assert: all rows exercise the same malformed-input contract.
@@ -169,6 +197,10 @@ static void test_try_parse_lsn_invalid(void) {
     "0/+1",        "xyz/0",
     "0/xyz",       "100000000/0",
     "0/100000000", "0/0/trailing",
+    " 1/0",        "0/ 1",
+    "0x1/0",       "1/0x0",
+    " -1/0",       "0/ -1",
+    "1/0 ",        "000000001/0",
   };
 
   // Act & Assert: all rows exercise the same malformed-LSN contract.
@@ -458,6 +490,9 @@ static const struct {
   {"str_to_long", test_str_to_long},
   {"str_to_long_null", test_str_to_long_null},
   {"str_to_long_invalid", test_str_to_long_invalid},
+  {"str_to_long_space", test_str_to_long_space},
+  {"str_to_ulong_signed_after_space", test_str_to_ulong_signed_after_space},
+  {"str_to_ull_signed_after_space", test_str_to_ull_signed_after_space},
   {"str_to_ulong", test_str_to_ulong},
   {"str_to_ulong_null", test_str_to_ulong_null},
   {"str_to_ulong_negative", test_str_to_ulong_negative},

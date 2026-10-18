@@ -120,9 +120,44 @@ foreach(TEST_CASE
         missing_latest_end_lsn
         replay_ahead_of_observations
         master_ignores_latest_end_lsn
+        idle_master_bounds_time_lag
+        commit_time_lag_below_bound
+        lagging_replica_keeps_commit_time_lag
+        unusable_master_check_keeps_commit_time_lag
+        idle_master_keeps_time_sync
+        unwritten_master_wal_keeps_commit_time_lag
+        replica_waits_for_master_check
+        master_check_with_new_wal_ends_wait
+        failed_master_check_ends_wait
+        master_wait_ends_at_deadline
+        replica_waits_only_when_master_check_helps
+        replica_waits_for_due_master_check
+        master_check_that_does_not_start_ends_wait
+        replica_ahead_of_master_keeps_commit_time_lag
+        replica_ahead_waits_for_next_master_check
+        selected_master_is_byte_lag_reference
+        byte_lag_unknown_without_reference
+        unknown_commit_age
+        replica_on_other_timeline
+        replica_on_other_timeline_does_not_wait
+        failover_marks_replica_at_once
+        failover_during_replica_check
+        failover_logging
+        client_timeline
+        client_timeline_before_failover
+        lost_master_stays_timeline_reference
+        client_timeline_after_master_lost
+        timeline_logging
+        replica_clock_behind_master
+        later_master_check_keeps_byte_lag
+        diverged_replica_stops_waiting
+        replica_does_not_wait_for_unhealthy_master
+        master_wait_ends_before_next_check
+        replica_with_recent_commit_does_not_wait
         permission_fallback_replica
         permission_fallback_master
         permission_fallback_expires
+        permission_fallback_control_file
         permission_fallback_failure
         permission_fallback_unrelated_error
         permission_fallback_timeout
@@ -147,7 +182,9 @@ foreach(TEST_CASE
         stall_does_not_fail_ready_host stall_is_not_charged
         own_stall_is_not_charged failed_start_after_stall
         advance_stall_is_not_charged fresh_clock
-        missing_socket wait_for_deadline defaults custom_parameters
+        missing_socket wait_for_deadline master_wait_ends_at_deadline
+        master_wait_ends_before_next_check master_change_ends_wait defaults
+        custom_parameters
         failure_logging failure_logging_debug recovery_logging
         failure_logging_interval)
     add_test(NAME poll_scheduler.${TEST_CASE} COMMAND poll_scheduler_test ${TEST_CASE})
@@ -220,7 +257,9 @@ foreach(TEST_CASE
         selected_master_becomes_dead
         no_master
         dead_master_flags
-        empty_hosts)
+        empty_hosts
+        failover_marks_replica_on_other_timeline
+        failover_marks_possible_dead_replica)
     add_test(NAME master_selection.${TEST_CASE} COMMAND master_selection_test ${TEST_CASE})
     set_tests_properties(
             master_selection.${TEST_CASE}
@@ -433,6 +472,15 @@ add_utils_failure_test(str_to_long_invalid "failed to convert '42x' to long")
 add_utils_failure_test(str_to_ulong_null "failed to convert null to ulong")
 add_utils_failure_test(str_to_ulong_negative "failed to convert '-1' to ulong")
 add_utils_failure_test(str_to_ull_null "failed to convert null to ull")
+add_utils_failure_test(str_to_long_space "failed to convert ' 5' to long")
+add_utils_failure_test(
+        str_to_ulong_signed_after_space
+        "failed to convert ' -1' to ulong"
+)
+add_utils_failure_test(
+        str_to_ull_signed_after_space
+        "failed to convert ' -1' to ull"
+)
 add_utils_failure_test(
         str_to_ull_overflow
         "failed to convert '18446744073709551616' to ull"
@@ -611,6 +659,7 @@ set(PG_STATUS_API_TEST_CASES
         master_switch_master
         master_switch_replica
         master_switch_hosts
+        replica_timeline
         invalid_parameters
 )
 

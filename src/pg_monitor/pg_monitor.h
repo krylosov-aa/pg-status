@@ -81,6 +81,9 @@ typedef struct {
   // On expiry the connection is closed and failed_connections is incremented.
   // Time the loop is blocked inside libpq (host name lookups) is excluded.
   // A ready TCP socket's wait for a session setup turn is also excluded.
+  // A replica whose result is read but waits for the master's check ends
+  // its check successfully at this deadline, or earlier when its next
+  // check is due.
   uint64_t query_timeout_ms;
 
   // Minimum interval in ms between ERROR records about continuing poll
@@ -130,12 +133,23 @@ extern unsigned int host_count;
 int get_master_index(void);
 
 /**
+ * Timeline of the master selected last, also after it is lost, as of its
+ * latest check; 0 if unknown or before any master has been selected.
+ */
+uint32_t get_reference_master_timeline(void);
+
+/**
  * Host status flags. Small enough to be loaded atomically as a whole.
  */
 typedef struct {
   bool master : 1;
   bool alive : 1;
   bool possible_dead : 1;
+  // A replica whose known timeline differs from the master's: its WAL
+  // positions may belong to another history, so they meet no min_lsn, its
+  // byte lag is unknown, and no master check bounds its time lag. Set as
+  // soon as such a master is selected, not only at the replica's next check.
+  bool timeline_mismatch : 1;
 } MonitorStatus;
 
 /**
@@ -152,19 +166,24 @@ typedef enum {
   HOST_POLL_SESSION_WAIT,  // TCP socket ready; waiting for a TLS/auth turn
   HOST_POLL_QUERY_SEND,    // PQsendQuery issued
   HOST_POLL_QUERY_READ,    // reading the result
+  HOST_POLL_MASTER_WAIT,   // replica result read; waiting for the master check
 } HostPollState;
 
 /**
  * Host configuration and observed state.
  *
  * The polling thread is the sole writer. Readers use atomic_get_snapshot()
- * to read {status, lag_ms, lag_bytes, lsn} from the same poll, both for host
- * selection and JSON responses. Single-field accessors do not provide this
- * consistency across fields.
+ * to read {status, lag_ms, lag_bytes, lsn, timeline} from the same poll,
+ * both for host selection and JSON responses. Single-field accessors do not
+ * provide this consistency across fields.
  *
  * lsn is pg_last_wal_replay_lsn() on a replica and pg_current_wal_lsn() on a
  * master, as of the last successful poll. Failed polls preserve the lags
  * and LSN; the HTTP API hides these measurements once the host is dead.
+ * lag_ms and lag_bytes are UINT64_MAX when they cannot be measured: such a
+ * lag meets no threshold except UINT64_MAX, which stands for no limit.
+ * timeline is the master's timeline on a master and the latest one a
+ * replica is known to be on, 0 if unknown, as of the same poll.
  *
  * The writer sets seq to odd before updating the snapshot and to even after
  * publication. Readers retry if seq is odd or changes during their read.
@@ -180,13 +199,16 @@ typedef struct {
   _Atomic uint64_t lsn;             // protected by seq
   unsigned int failed_connections;  // writer-private
   _Atomic MonitorStatus status;     // protected by seq
+  // permission fallback: polling query variant, 0 for the full query;
+  // reset on disconnect
+  uint8_t query_fallback;
   // writer-private: failed checks in a row whose connection attempt did a
   // TLS handshake or password authentication, saturating
   uint16_t handshake_failures;
 
   // writer-private async-poll state
-  // monotonic time at which the permission fallback below expires
-  uint64_t wal_receiver_retry_at_ms;
+  // monotonic time at which the permission fallback above expires
+  uint64_t query_fallback_expires_at_ms;
   struct pg_conn *conn;         // reused PGconn, or NULL when disconnected
   HostPollState poll_state;     // current phase of the state machine
   short poll_events;            // events to wait for on PQsocket(conn)
@@ -194,6 +216,23 @@ typedef struct {
   bool iter_tls_started;        // TLS was seen in progress during this check
   uint64_t next_poll_at_ms;     // monotonic deadline to start next iteration
   uint64_t backoff_ms;          // part of next_poll_at_ms added for a dead host
+
+  // writer-private: the host's latest successful check as a master, the
+  // reference for the lags of replicas while it is the selected master
+  uint64_t master_wal_lsn;                  // pg_current_wal_lsn()
+  uint64_t master_wal_check_started_at_ms;  // the position was read no earlier
+  // writer-private: the host's clock minus the monotonic clock of pg-status
+  // at its latest successful check, and the largest possible error of it
+  int64_t clock_offset_ms;
+  uint64_t clock_offset_error_ms;
+  // writer-private: the age of the last replayed commit at the host's latest
+  // successful check as a replica, which its published state comes from;
+  // UINT64_MAX if unknown. replica_timeline is from the same check.
+  uint64_t replica_commit_age_ms;
+  uint32_t master_timeline;     // 0 if unknown
+  bool has_master_wal;          // the fields above hold a master check
+  bool master_wal_unwritten;    // inserted WAL was not written yet
+  bool has_clock_offset;        // clock_offset_ms holds a measurement
   uint64_t iter_started_at_ms;  // monotonic start of current/last iteration
   uint64_t iter_deadline_ms;    // monotonic deadline for current iteration
   uint64_t session_setup_hold_until_ms;       // 0 until TLS/auth starts
@@ -201,16 +240,33 @@ typedef struct {
   uint64_t connected_at_ms;       // monotonic time of last successful connect
   uint64_t next_error_log_at_ms;  // per-host error limit; reset on poll success
   int pollfd_slot;                // transient index into the main-loop pollfd[]
-  bool wal_receiver_disabled;     // permission fallback, reset on disconnect
-  bool iter_retry_without_wal_receiver;  // drain results before retrying
+  bool iter_retry_with_query_fallback;  // drain results before retrying
 
   // Staging area for the current iteration. Populated once the result row
   // is parsed; published to {status, lag_ms, lag_bytes, lsn} on success.
+  // The lags of a replica are computed from the rest when its check ends.
   bool iter_data_ready;
   MonitorStatus iter_new_status;
+  bool iter_upstream_known;  // receiver running or upstream end known
   uint64_t iter_new_lag_ms;
   uint64_t iter_new_lag_bytes;
   uint64_t iter_new_lsn;
+  uint64_t iter_commit_age_ms;     // age of the last replayed commit
+  uint64_t iter_receiver_end_lsn;  // latest WAL received or reported upstream
+  uint64_t iter_query_sent_at_ms;  // monotonic time the query was sent
+  uint64_t iter_observed_at_ms;    // monotonic time the result was read
+  // time lag bound as of when the result was read, or UINT64_MAX
+  uint64_t iter_time_lag_bound_ms;
+  // the reference master's position and timeline when the result was read;
+  // a position of 0, InvalidXLogRecPtr, if there was no reference master
+  uint64_t iter_master_lsn;
+  uint32_t iter_master_timeline;
+  uint32_t iter_timeline;  // latest known timeline, 0 if unknown
+
+  // writer-private: the timeline at the host's latest successful check as a
+  // replica, 0 if unknown; see replica_commit_age_ms
+  uint32_t replica_timeline;
+  _Atomic uint32_t timeline;  // protected by seq
 } MonitorHost;
 
 /**
@@ -221,6 +277,7 @@ typedef struct {
   uint64_t lag_ms;
   uint64_t lag_bytes;
   uint64_t lsn;
+  uint32_t timeline;
 } MonitorSnapshot;
 
 /**
@@ -237,6 +294,12 @@ void init_monitor_host_list(void);
  * Atomically saves the current master index in the host array.
  */
 void save_master_index(int i);
+
+/**
+ * Publishes the timeline of the reference master before the selection it
+ * comes with, so that a reader that sees the selection also sees it.
+ */
+void save_reference_master_timeline(uint32_t timeline);
 
 // Lookup utils
 
@@ -261,9 +324,9 @@ uint64_t atomic_get_lag_ms(const MonitorHost *host);
 uint64_t atomic_get_lag_bytes(const MonitorHost *host);
 
 /**
- * Returns a consistent snapshot of {status, lag_ms, lag_bytes, lsn} via the
- * seqlock on host->seq. May spin briefly if the writer is mid-update,
- * but never blocks the writer.
+ * Returns a consistent snapshot of {status, lag_ms, lag_bytes, lsn, timeline}
+ * via the seqlock on host->seq. May spin briefly if the writer is
+ * mid-update, but never blocks the writer.
  */
 MonitorSnapshot atomic_get_snapshot(const MonitorHost *host);
 
@@ -353,11 +416,19 @@ bool is_sync_replica_by_time_and_bytes(
  * A value of 0 means no LSN constraint (the field is unused). This is
  * the read-your-writes primitive — clients pass the master's LSN from
  * just after their write.
+ *
+ * `timeline` is an optional history filter: when non-zero, a candidate
+ * replica must be known to be on this timeline, the master's when the
+ * client wrote, and the selected master must not be on a later one. It then
+ * replaces the comparison with the selected master's timeline for
+ * `min_lsn`, so it holds even before pg-status has selected a new master
+ * after a failover.
  */
 typedef struct {
   uint64_t max_lag_ms;
   uint64_t max_lag_bytes;
   uint64_t min_lsn;
+  uint32_t timeline;
 } LagThresholds;
 
 /**
@@ -436,6 +507,40 @@ void postpone_connection_turn(uint64_t stall_ms);
 void cancel_dead_host_backoff(void);
 
 /**
+ * Republishes the state of each live replica whose latest successful check
+ * found it on another timeline than the reference master's: `master`, the
+ * one about to be selected, or if it is nullptr, the last one that was
+ * selected. Such a replica meets no min_lsn, its byte lag is unknown, and
+ * its time lag is the commit age alone. Called before the master is
+ * selected, so that after a failover a replica left on the abandoned
+ * timeline is excluded by the time a client can see the new master, rather
+ * than at the replica's next check, which ends the mark if the timelines
+ * match by then. `master` also becomes the reference for the lags of
+ * replicas at once, so that if it is lost before any replica check ends,
+ * the reference stays on it rather than on the master before it. The
+ * reference's timeline is published for requests that pass a timeline.
+ */
+void mark_replicas_on_other_timelines(const MonitorHost *master);
+
+/**
+ * Ends the checks of replicas waiting in MASTER_WAIT once no check of the
+ * selected master they could wait for may bound their time lag further, or
+ * at master_wait_ends_at_ms(). A replica that has replayed all WAL known to
+ * pg-status waits for a check of the master whose last check succeeded:
+ * one in progress or due when its result arrives, or the next one when the
+ * replica is ahead of the master's latest WAL position. The time lag is
+ * then bounded with the master's newer WAL position.
+ */
+void finish_master_waits(uint64_t now_ms);
+
+/**
+ * Returns the time at which a replica in MASTER_WAIT stops waiting: its
+ * deadline, or when its next check is due, whichever is earlier, so that a
+ * slow or hanging master never delays the replica's next check.
+ */
+uint64_t master_wait_ends_at_ms(const MonitorHost *host);
+
+/**
  * Kicks off a new poll iteration for `host`: opens the connection if needed
  * (or reuses the existing one, recycling it if older than conn_max_age_ms
  * and a connection turn is free), fires PQsendQuery, and sets the
@@ -446,10 +551,13 @@ void start_host_poll(MonitorHost *host, uint64_t now_ms);
 
 /**
  * Drives the per-host state machine in response to `revents` from
- * poll(), or when a SESSION_WAIT host's turn becomes due. On completion
+ * poll(), or when a SESSION_WAIT host's turn becomes due. A replica whose
+ * result is read may move to MASTER_WAIT to wait for a check of the
+ * selected master; see finish_master_waits(). On completion
  * (success or any error), the host returns to IDLE and
- * its shared state (`status`, `lag_ms`, `lag_bytes`, `lsn`) is updated via the
- * seqlock. The next check is due at the previous start plus `sleep_ms`
+ * its shared state (`status`, `lag_ms`, `lag_bytes`, `lsn`, `timeline`) is
+ * updated via the seqlock. The next check is due at the previous start plus
+ * `sleep_ms`
  * (while a master is known, doubled per failure after a TLS handshake or
  * password authentication for a dead host, up to 8 s), or immediately if
  * that time has already passed.

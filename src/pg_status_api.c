@@ -34,6 +34,17 @@ static void add_host_to_json(cJSON *json_obj, const MonitorHost *host) {
   add_nullable_str_to_json_object(json_obj, "geo", host ? host->geo : nullptr);
 }
 
+/** Adds a lag, or null when it cannot be measured (UINT64_MAX). */
+static void add_lag_to_json_object(
+  cJSON *json_obj, const char *key, const uint64_t lag
+) {
+  if (lag == UINT64_MAX) {
+    add_null_to_json_object(json_obj, key);
+  } else {
+    add_uint64_to_json_object(json_obj, key, lag);
+  }
+}
+
 static void add_host_status_to_json(
   cJSON *json_obj, const MonitorSnapshot snap
 ) {
@@ -41,12 +52,12 @@ static void add_host_status_to_json(
   add_bool_to_json_object(json_obj, "alive", snap.status.alive);
   add_bool_to_json_object(json_obj, "possible_dead", snap.status.possible_dead);
   if (snap.status.alive) {
-    add_uint64_to_json_object(json_obj, "lag_ms", snap.lag_ms);
+    add_lag_to_json_object(json_obj, "lag_ms", snap.lag_ms);
     add_bool_to_json_object(
       json_obj, "sync_by_time", snap.lag_ms <= parameters.sync_max_lag_ms
     );
 
-    add_uint64_to_json_object(json_obj, "lag_bytes", snap.lag_bytes);
+    add_lag_to_json_object(json_obj, "lag_bytes", snap.lag_bytes);
     add_bool_to_json_object(
       json_obj, "sync_by_bytes", snap.lag_bytes <= parameters.sync_max_lag_bytes
     );
@@ -112,6 +123,25 @@ static LagThresholds lag_thresholds_by_parameters(void) {
   };
 }
 
+/**
+ * Parses the optional `timeline` parameter: a PostgreSQL timeline ID, from 1
+ * to 4294967295. An absent parameter leaves *out unchanged.
+ */
+static bool parse_timeline(const HTTPRequest *request, uint32_t *out) {
+  const char *raw = http_request_get_query_param(request, "timeline");
+  if (!raw) {
+    return true;
+  }
+  uint64_t timeline = 0;
+  if (
+    !try_str_to_ull(raw, &timeline) || timeline == 0 || timeline > UINT32_MAX
+  ) {
+    return false;
+  }
+  *out = (uint32_t)timeline;
+  return true;
+}
+
 static bool parse_lag_thresholds(
   LagThresholds *thresholds, const HTTPRequest *request, HTTPResponse *response
 ) {
@@ -125,6 +155,10 @@ static bool parse_lag_thresholds(
   }
   if (!parse_get_param_lsn(request, "min_lsn", &thresholds->min_lsn)) {
     bad_request(response, "{\"error_text\": \"Invalid min_lsn\"}");
+    return false;
+  }
+  if (!parse_timeline(request, &thresholds->timeline)) {
+    bad_request(response, "{\"error_text\": \"Invalid timeline\"}");
     return false;
   }
   return true;

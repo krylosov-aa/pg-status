@@ -35,7 +35,7 @@ def main():
             "INSERT INTO bench_ryow(payload) VALUES ('visible') RETURNING id"
         )
         row = primary.fetchone()[0]
-        primary.execute("SELECT pg_current_wal_lsn()")
+        primary.execute("SELECT pg_current_wal_insert_lsn()")
         return row, primary.fetchone()[0]
 
     def read(row, lsn):

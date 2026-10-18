@@ -33,9 +33,11 @@ static int stop_pipe[2] = {-1, -1};
  * Picks the current master by scanning hosts in declared order:
  * first fully-alive master wins, then the first possible_dead master.
  * Dead hosts and replicas are excluded. Always publish the selected index,
- * or -1 when no candidate exists, replacing any previous selection. Without
- * a master, dead hosts are checked every sleep_ms again: any of them may be
- * the one that brings it back.
+ * or -1 when no candidate exists, replacing any previous selection. Replicas
+ * last seen on another timeline than the master's are marked first, so that
+ * a client that sees the new master after a failover no longer sees them as
+ * usable. Without a master, dead hosts are checked every sleep_ms again: any
+ * of them may be the one that brings it back.
  */
 static void recompute_master_index(void) {
   int master_i = -1;
@@ -55,6 +57,11 @@ static void recompute_master_index(void) {
   }
 
   const int selected = master_i != -1 ? master_i : possible_master;
+  // Before the selection is published: in between, a client could take the
+  // new master and still find a replica it makes unusable unmarked.
+  mark_replicas_on_other_timelines(
+    selected == -1 ? nullptr : &monitor_host_list[selected]
+  );
   save_master_index(selected);
   if (selected == -1) {
     cancel_dead_host_backoff();
@@ -125,11 +132,12 @@ static void resume_session_setups(void) {
 
 /**
  * Starts checks when due and times out active checks whose iter_deadline_ms
- * has passed, then resumes queued session setups. They go last so that a
- * setup timing out after its handshake leaves its pause before the next;
- * no new connection can start ahead of them in the meantime. The connection
- * turn is snapshotted once and again after every change, so the pass stays
- * linear in the number of hosts.
+ * has passed, ends the waits of replicas for the master's check, then
+ * resumes queued session setups. They go last so that a setup timing out
+ * after its handshake leaves its pause before the next; no new connection
+ * can start ahead of them in the meantime. The connection turn is
+ * snapshotted once and again after every change, so the pass stays linear
+ * in the number of hosts.
  */
 static void start_and_timeout_hosts(void) {
   ConnectionTurn turn = connection_turn();
@@ -144,12 +152,15 @@ static void start_and_timeout_hosts(void) {
       }
     } else if (
       host->poll_state != HOST_POLL_SESSION_WAIT &&
+      host->poll_state != HOST_POLL_MASTER_WAIT &&
       now_ms >= host->iter_deadline_ms
     ) {
       timeout_host_poll(host, now_ms);
       turn = connection_turn();
     }
   }
+  // Also after a change of the selected master, which can end a wait.
+  finish_master_waits(monotonic_ms());
   resume_session_setups();
 }
 
@@ -183,6 +194,17 @@ static int build_poll_fd(
     if (host->poll_state == HOST_POLL_SESSION_WAIT) {
       if (turn.session_setup_due_at_ms < soonest_wake) {
         soonest_wake = turn.session_setup_due_at_ms;
+      }
+      host->pollfd_slot = -1;
+      continue;
+    }
+
+    if (host->poll_state == HOST_POLL_MASTER_WAIT) {
+      // The master's check wakes the loop through its socket or its due
+      // time.
+      const uint64_t wait_ends_at_ms = master_wait_ends_at_ms(host);
+      if (wait_ends_at_ms < soonest_wake) {
+        soonest_wake = wait_ends_at_ms;
       }
       host->pollfd_slot = -1;
       continue;
@@ -224,7 +246,8 @@ static void process_poll_result(const struct pollfd *pfds) {
 
     if (
       host->poll_state == HOST_POLL_IDLE ||
-      host->poll_state == HOST_POLL_SESSION_WAIT
+      host->poll_state == HOST_POLL_SESSION_WAIT ||
+      host->poll_state == HOST_POLL_MASTER_WAIT
     ) {
       continue;
     }

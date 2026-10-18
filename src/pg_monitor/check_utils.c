@@ -6,6 +6,7 @@
 #include <poll.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "connection.h"
 #include "logger.h"
@@ -44,6 +45,37 @@ static uint64_t max_ms(const uint64_t a, const uint64_t b) {
 }
 
 /**
+ * Selects the shorter of two durations
+ */
+static uint64_t min_ms(const uint64_t a, const uint64_t b) {
+  return a < b ? a : b;
+}
+
+/**
+ * Time from `from_ms` to `to_ms`, or 0 if `to_ms` is not later
+ */
+static uint64_t elapsed_ms(const uint64_t from_ms, const uint64_t to_ms) {
+  return to_ms > from_ms ? to_ms - from_ms : 0;
+}
+
+/** A lag as text for the log: its value, or "unknown". */
+typedef struct {
+  char text[24];
+} LagText;
+
+static LagText lag_text(const uint64_t lag) {
+  LagText result;
+  if (lag == UINT64_MAX) {
+    (void)snprintf(result.text, sizeof(result.text), "unknown");
+  } else {
+    (void)snprintf(
+      result.text, sizeof(result.text), "%llu", (unsigned long long)lag
+    );
+  }
+  return result;
+}
+
+/**
  * Logs changes in the lag-in-time classification.
  */
 static void log_time_lag_changes(
@@ -54,8 +86,8 @@ static void log_time_lag_changes(
       pg_status_log(
         PG_STATUS_LOG_INFO, "monitor",
         "replica synchronization changed host=%s dimension=time "
-        "synchronous=false lag_ms=%llu threshold_ms=%llu",
-        host->host, (unsigned long long)new_lag_ms,
+        "synchronous=false lag_ms=%s threshold_ms=%llu",
+        host->host, lag_text(new_lag_ms).text,
         (unsigned long long)parameters.sync_max_lag_ms
       );
     }
@@ -64,8 +96,8 @@ static void log_time_lag_changes(
       pg_status_log(
         PG_STATUS_LOG_INFO, "monitor",
         "replica synchronization changed host=%s dimension=time "
-        "synchronous=true lag_ms=%llu threshold_ms=%llu",
-        host->host, (unsigned long long)new_lag_ms,
+        "synchronous=true lag_ms=%s threshold_ms=%llu",
+        host->host, lag_text(new_lag_ms).text,
         (unsigned long long)parameters.sync_max_lag_ms
       );
     }
@@ -84,8 +116,8 @@ static void log_bytes_lag_changes(
       pg_status_log(
         PG_STATUS_LOG_INFO, "monitor",
         "replica synchronization changed host=%s dimension=bytes "
-        "synchronous=false lag_bytes=%llu threshold_bytes=%llu",
-        host->host, (unsigned long long)new_lag_bytes,
+        "synchronous=false lag_bytes=%s threshold_bytes=%llu",
+        host->host, lag_text(new_lag_bytes).text,
         (unsigned long long)parameters.sync_max_lag_bytes
       );
     }
@@ -94,8 +126,8 @@ static void log_bytes_lag_changes(
       pg_status_log(
         PG_STATUS_LOG_INFO, "monitor",
         "replica synchronization changed host=%s dimension=bytes "
-        "synchronous=true lag_bytes=%llu threshold_bytes=%llu",
-        host->host, (unsigned long long)new_lag_bytes,
+        "synchronous=true lag_bytes=%s threshold_bytes=%llu",
+        host->host, lag_text(new_lag_bytes).text,
         (unsigned long long)parameters.sync_max_lag_bytes
       );
     }
@@ -169,6 +201,34 @@ static void log_changes(
   }
 }
 
+/**
+ * Logs when a replica's known timeline starts or stops differing from the
+ * reference master's.
+ */
+static void log_timeline_changes(
+  const MonitorHost *host, const MonitorStatus new_status,
+  const MonitorStatus status, const uint32_t timeline,
+  const uint32_t master_timeline
+) {
+  if (new_status.timeline_mismatch == status.timeline_mismatch) {
+    return;
+  }
+  if (new_status.timeline_mismatch) {
+    pg_status_log(
+      PG_STATUS_LOG_WARNING, "monitor",
+      "replica timeline differs from master host=%s timeline=%u "
+      "master_timeline=%u; byte lag is unknown and min_lsn is not met",
+      host->host, (unsigned int)timeline, (unsigned int)master_timeline
+    );
+    return;
+  }
+  pg_status_log(
+    PG_STATUS_LOG_INFO, "monitor",
+    "replica timeline no longer differs from master host=%s timeline=%u",
+    host->host, (unsigned int)timeline
+  );
+}
+
 /** Share one error-log deadline across all failures of this host. */
 static PGStatusLogLevel poll_error_level(
   MonitorHost *host, const uint64_t now_ms
@@ -214,23 +274,44 @@ static MonitorStatus replica_status() {
 }
 
 /**
- * How long a host is polled without WAL receiver statistics after a
- * permission error before they are tried again on the same connection, so
- * granted privileges take effect without waiting for a reconnect.
+ * How long a host is polled with a fallback query after a permission error
+ * before the full query is tried again on the same connection, so granted
+ * privileges take effect without waiting for a reconnect.
  */
-enum { WAL_RECEIVER_RETRY_MS = 300000 };
+enum { QUERY_FALLBACK_MS = 300000 };
+
+/**
+ * Variants of the polling query, in the order they are tried after
+ * permission errors. Each leaves out more of the objects that may be denied:
+ * first the WAL receiver statistics, then also the control file functions,
+ * which are what shows the timeline of a replica without the statistics.
+ */
+enum {
+  QUERY_FULL = 0,
+  QUERY_WITHOUT_WAL_RECEIVER = 1,
+  QUERY_WITHOUT_WAL_RECEIVER_AND_CONTROL_FILE = 2,
+};
+
+static const char *const poll_queries[] = {
+  [QUERY_FULL] = streaming_replication_query,
+  [QUERY_WITHOUT_WAL_RECEIVER] =
+    streaming_replication_query_without_wal_receiver,
+  [QUERY_WITHOUT_WAL_RECEIVER_AND_CONTROL_FILE] =
+    streaming_replication_query_without_wal_receiver_and_control_file,
+};
 
 static bool send_query(MonitorHost *host, const uint64_t now_ms) {
-  if (host->wal_receiver_disabled && now_ms >= host->wal_receiver_retry_at_ms) {
-    host->wal_receiver_disabled = false;
+  if (
+    host->query_fallback != QUERY_FULL &&
+    now_ms >= host->query_fallback_expires_at_ms
+  ) {
+    host->query_fallback = QUERY_FULL;
   }
-  const char *query = host->wal_receiver_disabled
-                        ? streaming_replication_query_without_wal_receiver
-                        : streaming_replication_query;
-  if (PQsendQuery(host->conn, query) == 0) {
+  if (PQsendQuery(host->conn, poll_queries[host->query_fallback]) == 0) {
     log_postgres_error(host, "send_query", now_ms);
     return false;
   }
+  host->iter_query_sent_at_ms = now_ms;
   return true;
 }
 
@@ -294,7 +375,7 @@ static void poll_state_idle(MonitorHost *host, const uint64_t now_ms) {
   host->poll_events = 0;
   host->iter_deadline_ms = 0;
   host->iter_data_ready = false;
-  host->iter_retry_without_wal_receiver = false;
+  host->iter_retry_with_query_fallback = false;
   const uint64_t normal_at_ms = max_ms(
     host->iter_started_at_ms + (uint64_t)parameters.sleep_ms, now_ms
   );
@@ -316,12 +397,29 @@ void cancel_dead_host_backoff(void) {
 }
 
 /**
- * Last observed master LSN. Used to compute the byte lag of replicas
- * whose iteration completes in a different order than the master's.
- * Lives in writer-only memory; with a single writer thread, no
- * synchronization is needed.
+ * Host whose latest check as a master is the reference for the lags of
+ * replicas: the selected master, or while none is selected, the last one
+ * that was, so that a master outage keeps the position known before it.
+ * Writer-only memory.
  */
-static uint64_t master_lsn = 0;
+static const MonitorHost *reference_master_host = nullptr;
+
+static const MonitorHost *reference_master(void) {
+  const MonitorHost *master = get_master_monitor_host();
+  if (master != nullptr && master->has_master_wal) {
+    reference_master_host = master;
+  }
+  return reference_master_host;
+}
+
+/**
+ * True when both timelines are known and differ: WAL positions on them may
+ * belong to different histories, as after a failover that leaves a replica
+ * on the history the new master abandoned.
+ */
+static bool timelines_differ(const uint32_t a, const uint32_t b) {
+  return a != 0 && b != 0 && a != b;
+}
 
 /**
  * Earliest monotonic time at which the next new connection may start.
@@ -546,8 +644,8 @@ static void close_conn(MonitorHost *host) {
   host->connected_at_ms = 0;
   host->session_setup_hold_until_ms = 0;
   host->session_setup_wait_started_at_ms = 0;
-  host->wal_receiver_disabled = false;
-  host->iter_retry_without_wal_receiver = false;
+  host->query_fallback = QUERY_FULL;
+  host->iter_retry_with_query_fallback = false;
 }
 
 /**
@@ -600,25 +698,248 @@ static bool validate_sql_result(
   return true;
 }
 
-static void parse_replica_result(MonitorHost *host, const PGresult *res) {
-  const uint64_t replica_received_lsn = parse_lsn(PQgetvalue(res, 0, 2));
-  const uint64_t replica_lsn = parse_lsn(PQgetvalue(res, 0, 3));
-  const uint64_t receiver_latest_end_lsn = parse_lsn(PQgetvalue(res, 0, 5));
-  const uint64_t known_end_lsn = max_lsn(
-    master_lsn, max_lsn(replica_received_lsn, receiver_latest_end_lsn)
+/**
+ * The selected master, other than `replica`, if its last check succeeded;
+ * otherwise nullptr.
+ */
+static const MonitorHost *usable_master(const MonitorHost *replica) {
+  const MonitorHost *master = get_master_monitor_host();
+  if (master == nullptr || master == replica) {
+    return nullptr;
+  }
+  const MonitorStatus status = atomic_get_status(master);
+  if (!status.alive || !status.master || status.possible_dead) {
+    return nullptr;
+  }
+  return master;
+}
+
+/**
+ * Upper bound of the time lag of `replica` that does not depend on commits:
+ * pg_last_xact_replay_timestamp() changes only when a commit or abort is
+ * replayed, so while the master commits nothing, the time lag of a replica
+ * that has nothing to replay keeps growing. A replica that has replayed
+ * exactly the master's WAL position from its last check, and has received
+ * nothing beyond it, had all of the master's data from when that check
+ * started, as of when its result was read; if that check started later, all
+ * of it. This holds only if the master had written all WAL it had inserted,
+ * and only for a position of the selected master whose last check
+ * succeeded: after a failure, a role change, or with another master, it may
+ * belong to another WAL history. A replica position past the master's does
+ * not count either: a replica left on the history abandoned at a failover
+ * can be ahead of the new master, without the new master's data. Nor does a
+ * replica known to be on another timeline, which may match the position by
+ * coincidence.
+ * Returns UINT64_MAX when there is no bound.
+ */
+static uint64_t time_lag_bound_ms(const MonitorHost *replica) {
+  const MonitorHost *master = usable_master(replica);
+  if (
+    master == nullptr || !master->has_master_wal ||
+    master->master_wal_unwritten ||
+    timelines_differ(replica->iter_timeline, master->master_timeline) ||
+    replica->iter_new_lsn != master->master_wal_lsn ||
+    replica->iter_receiver_end_lsn > master->master_wal_lsn
+  ) {
+    return UINT64_MAX;
+  }
+  return elapsed_ms(
+    master->master_wal_check_started_at_ms, replica->iter_observed_at_ms
   );
-  host->iter_new_lag_ms = str_to_ull(PQgetvalue(res, 0, 4));
-  host->iter_new_lag_bytes = known_end_lsn > replica_lsn
-                               ? known_end_lsn - replica_lsn
-                               : 0;
-  host->iter_new_lsn = replica_lsn;
+}
+
+/**
+ * Time lag of a replica from its result: the age of the last replayed
+ * commit, bounded by the master's check that was the latest when the result
+ * was read, or by the latest one now, whichever bound is smaller.
+ */
+static uint64_t measured_time_lag_ms(const MonitorHost *host) {
+  return min_ms(
+    host->iter_commit_age_ms,
+    min_ms(host->iter_time_lag_bound_ms, time_lag_bound_ms(host))
+  );
+}
+
+/**
+ * Computes the lags of a replica from its result and the latest check of
+ * the reference master, which may have ended after the replica's result was
+ * read. The byte lag counts the master's position from that check only if
+ * the check started before the result was read. A check that started later,
+ * such as one the replica waited for, read a position that may include WAL
+ * written after the result; the position known when the result was read
+ * counts instead. The byte lag is unknown without any upstream position to
+ * compare with: no master has been seen, the WAL receiver is not running,
+ * and no upstream WAL end is known; the replica's own received position
+ * shows only what it has, not what it lacks. On another timeline than the
+ * master's, either the one whose position counts or the reference master
+ * now, the byte lag is unknown, and the time lag is the commit age alone.
+ * Returns the master's timeline the replica was compared with, 0 if none.
+ */
+static uint32_t measure_replica_lags(MonitorHost *host) {
+  const uint64_t replica_lsn = host->iter_new_lsn;
+  const MonitorHost *reference = reference_master();
+  bool has_master_wal = host->iter_master_lsn != 0;
+  uint64_t master_end_lsn = host->iter_master_lsn;
+  uint32_t master_timeline = host->iter_master_timeline;
+  if (
+    reference != nullptr &&
+    reference->master_wal_check_started_at_ms < host->iter_observed_at_ms
+  ) {
+    has_master_wal = true;
+    master_end_lsn = reference->master_wal_lsn;
+    master_timeline = reference->master_timeline;
+  }
+  // A master selected since the result was read may be on another timeline
+  // even if the position that counts is not.
+  if (
+    reference != nullptr &&
+    timelines_differ(host->iter_timeline, reference->master_timeline)
+  ) {
+    master_timeline = reference->master_timeline;
+  }
+  host->iter_new_status.timeline_mismatch = timelines_differ(
+    host->iter_timeline, master_timeline
+  );
+
+  if (
+    host->iter_new_status.timeline_mismatch ||
+    (!has_master_wal && !host->iter_upstream_known)
+  ) {
+    host->iter_new_lag_bytes = UINT64_MAX;
+  } else {
+    const uint64_t known_end_lsn = max_lsn(
+      has_master_wal ? master_end_lsn : 0, host->iter_receiver_end_lsn
+    );
+    host->iter_new_lag_bytes = known_end_lsn > replica_lsn
+                                 ? known_end_lsn - replica_lsn
+                                 : 0;
+  }
+  host->iter_new_lag_ms = host->iter_new_status.timeline_mismatch
+                            ? host->iter_commit_age_ms
+                            : measured_time_lag_ms(host);
+  return master_timeline;
+}
+
+/** Parses a bigint that may be negative. */
+static bool try_parse_signed_ms(const char *value, int64_t *out) {
+  if (value == nullptr) {
+    return false;
+  }
+  const bool negative = *value == '-';
+  uint64_t magnitude = 0;
+  if (
+    !try_str_to_ull(negative ? value + 1 : value, &magnitude) ||
+    magnitude > (uint64_t)INT64_MAX
+  ) {
+    return false;
+  }
+  *out = negative ? -(int64_t)magnitude : (int64_t)magnitude;
+  return true;
+}
+
+/** Parses the host's timeline; 0 if unknown. */
+static uint32_t parse_timeline(const PGresult *res) {
+  uint64_t timeline = 0;
+  if (
+    !try_str_to_ull(PQgetvalue(res, 0, 7), &timeline) || timeline > UINT32_MAX
+  ) {
+    return 0;
+  }
+  return (uint32_t)timeline;
+}
+
+/**
+ * Measures the host's clock against the monotonic clock of pg-status. The
+ * server read its clock, now(), between sending the query and reading the
+ * result, so the middle of that round trip is off by at most half of it;
+ * 2 ms more cover the rounding of both clocks to milliseconds.
+ */
+static void measure_clock_offset(
+  MonitorHost *host, const PGresult *res, const uint64_t now_ms
+) {
+  host->has_clock_offset = false;
+  uint64_t server_now_ms = 0;
+  const uint64_t sent_at_ms = host->iter_query_sent_at_ms;
+  if (
+    sent_at_ms == 0 || sent_at_ms > now_ms ||
+    !try_str_to_ull(PQgetvalue(res, 0, 9), &server_now_ms) ||
+    server_now_ms > (uint64_t)INT64_MAX
+  ) {
+    return;
+  }
+  const uint64_t round_trip_ms = now_ms - sent_at_ms;
+  const uint64_t middle_ms = sent_at_ms + (round_trip_ms / 2);
+  host->clock_offset_ms = (int64_t)server_now_ms - (int64_t)middle_ms;
+  host->clock_offset_error_ms = round_trip_ms - (round_trip_ms / 2) + 2;
+  host->has_clock_offset = true;
+}
+
+/**
+ * Age of the last commit or abort the replica has replayed, or UINT64_MAX
+ * if it has replayed none since it started: then nothing shows how old its
+ * data is. The age is computed with the replica's clock against the commit
+ * time on the clock of the master. When the replica's clock is behind the
+ * reference master's by more than the error of measuring both, the excess
+ * is added, so that the age is not understated. A replica clock that is
+ * ahead is left alone: an overstated age is the safe error.
+ */
+static uint64_t commit_age_ms(
+  const MonitorHost *host, const PGresult *res, const MonitorHost *reference
+) {
+  int64_t age_ms = 0;
+  if (
+    PQgetisnull(res, 0, 4) ||
+    !try_parse_signed_ms(PQgetvalue(res, 0, 4), &age_ms)
+  ) {
+    return UINT64_MAX;
+  }
+  if (
+    reference != nullptr && reference != host && reference->has_clock_offset &&
+    host->has_clock_offset
+  ) {
+    const int64_t behind_ms = reference->clock_offset_ms -
+                              host->clock_offset_ms;
+    const uint64_t error_ms = reference->clock_offset_error_ms +
+                              host->clock_offset_error_ms;
+    if (behind_ms > 0 && (uint64_t)behind_ms > error_ms) {
+      age_ms += behind_ms - (int64_t)error_ms;
+    }
+  }
+  return age_ms > 0 ? (uint64_t)age_ms : 0;
+}
+
+static void parse_replica_result(
+  MonitorHost *host, const PGresult *res, const uint64_t now_ms
+) {
+  const uint64_t replica_received_lsn = parse_lsn(PQgetvalue(res, 0, 2));
+  const uint64_t receiver_latest_end_lsn = parse_lsn(PQgetvalue(res, 0, 5));
+  host->iter_new_lsn = parse_lsn(PQgetvalue(res, 0, 3));
+  host->iter_receiver_end_lsn = max_lsn(
+    replica_received_lsn, receiver_latest_end_lsn
+  );
+  host->iter_upstream_known = is_t(PQgetvalue(res, 0, 8)) ||
+                              receiver_latest_end_lsn != 0;
+  host->iter_timeline = parse_timeline(res);
+  host->iter_observed_at_ms = now_ms;
+  const MonitorHost *reference = reference_master();
+  host->iter_master_lsn = reference != nullptr ? reference->master_wal_lsn : 0;
+  host->iter_master_timeline = reference != nullptr ? reference->master_timeline
+                                                    : 0;
+  host->iter_commit_age_ms = commit_age_ms(host, res, reference);
   host->iter_new_status = replica_status();
+  // The bound stays valid whatever later master checks show, even new WAL
+  // or a failure: the replica had the data of the check it is based on.
+  host->iter_time_lag_bound_ms = time_lag_bound_ms(host);
 }
 
 static void parse_master_result(MonitorHost *host, const PGresult *res) {
-  master_lsn = parse_lsn(PQgetvalue(res, 0, 1));
+  host->master_wal_lsn = parse_lsn(PQgetvalue(res, 0, 1));
+  host->master_wal_unwritten = is_t(PQgetvalue(res, 0, 6));
+  host->master_timeline = parse_timeline(res);
+  host->master_wal_check_started_at_ms = host->iter_started_at_ms;
+  host->has_master_wal = true;
   host->iter_new_status = master_status();
-  host->iter_new_lsn = master_lsn;
+  host->iter_new_lsn = host->master_wal_lsn;
   host->iter_new_lag_ms = 0;
   host->iter_new_lag_bytes = 0;
 }
@@ -635,9 +956,10 @@ static bool parse_result(
     return false;
   }
 
+  measure_clock_offset(host, res, now_ms);
   const bool is_replica = is_t(PQgetvalue(res, 0, 0));
   if (is_replica) {
-    parse_replica_result(host, res);
+    parse_replica_result(host, res, now_ms);
   } else {
     parse_master_result(host, res);
   }
@@ -652,7 +974,7 @@ static bool parse_result(
  * Always returns the host to IDLE and schedules the next iteration
  * relative to the iteration's start, without overlapping checks or catch-up.
  */
-static void finish_iteration(
+static void end_iteration(
   MonitorHost *host, const bool success, const uint64_t now_ms
 ) {
   const MonitorSnapshot old_snapshot = atomic_get_snapshot(host);
@@ -664,16 +986,25 @@ static void finish_iteration(
   uint64_t new_lag_ms;
   uint64_t new_lag_bytes;
   uint64_t new_lsn;
+  uint32_t new_timeline;
+  uint32_t master_timeline = 0;
   bool reached_dead_threshold = false;
 
   if (success && host->iter_data_ready) {
     host->failed_connections = 0;
     host->handshake_failures = 0;
     host->next_error_log_at_ms = 0;
+    if (!host->iter_new_status.master) {
+      master_timeline = measure_replica_lags(host);
+      host->replica_commit_age_ms = host->iter_commit_age_ms;
+      host->replica_timeline = host->iter_timeline;
+    }
     new_status = host->iter_new_status;
     new_lag_ms = host->iter_new_lag_ms;
     new_lag_bytes = host->iter_new_lag_bytes;
     new_lsn = host->iter_new_lsn;
+    new_timeline = new_status.master ? host->master_timeline
+                                     : host->iter_timeline;
   } else {
     host->failed_connections++;
     // Only a connection opened by this check can have cost a handshake; a
@@ -695,6 +1026,7 @@ static void finish_iteration(
     new_lag_ms = old_lag_ms;
     new_lag_bytes = old_lag_bytes;
     new_lsn = old_snapshot.lsn;
+    new_timeline = old_snapshot.timeline;
     close_conn(host);
   }
 
@@ -704,14 +1036,160 @@ static void finish_iteration(
             .lag_ms = new_lag_ms,
             .lag_bytes = new_lag_bytes,
             .lsn = new_lsn,
+            .timeline = new_timeline,
           }
   );
   log_changes(
     host, new_status, old_status, new_lag_ms, old_lag_ms, new_lag_bytes,
     old_lag_bytes, reached_dead_threshold
   );
+  if (success && host->iter_data_ready && !new_status.master) {
+    log_timeline_changes(
+      host, new_status, old_status, host->iter_timeline, master_timeline
+    );
+  }
 
   poll_state_idle(host, now_ms);
+}
+
+void mark_replicas_on_other_timelines(const MonitorHost *master) {
+  // `master` is not selected yet, so reference_master() would still see the
+  // previous master. It becomes the reference at once: should it be lost
+  // before any replica check ends, the reference must not fall back to the
+  // master before it, whose timeline a replica left on the abandoned history
+  // matches.
+  if (master != nullptr && master->has_master_wal) {
+    reference_master_host = master;
+  }
+  const MonitorHost *reference = reference_master_host;
+  if (reference == nullptr) {
+    return;
+  }
+  save_reference_master_timeline(reference->master_timeline);
+  for (unsigned int i = 0; i < host_count; i++) {
+    MonitorHost *host = &monitor_host_list[i];
+    const MonitorSnapshot snapshot = atomic_get_snapshot(host);
+    const MonitorStatus status = snapshot.status;
+    if (
+      !status.alive || status.master || status.timeline_mismatch ||
+      !timelines_differ(host->replica_timeline, reference->master_timeline)
+    ) {
+      continue;
+    }
+    // The bound of a master check on the replica's own timeline no longer
+    // applies; the commit age is at least the published time lag.
+    MonitorSnapshot marked = snapshot;
+    marked.status.timeline_mismatch = true;
+    marked.lag_ms = host->replica_commit_age_ms;
+    marked.lag_bytes = UINT64_MAX;
+    publish_monitor_snapshot(host, marked);
+    log_changes(
+      host, marked.status, status, marked.lag_ms, snapshot.lag_ms,
+      marked.lag_bytes, snapshot.lag_bytes, false
+    );
+    log_timeline_changes(
+      host, marked.status, status, host->replica_timeline,
+      reference->master_timeline
+    );
+  }
+}
+
+uint64_t master_wait_ends_at_ms(const MonitorHost *host) {
+  // The check succeeds, so the next one is due one sleep_ms after its start.
+  return min_ms(
+    host->iter_deadline_ms,
+    host->iter_started_at_ms + (uint64_t)parameters.sleep_ms
+  );
+}
+
+/**
+ * True when a check of the selected master that is in progress, or starts
+ * before the wait would end, may bound the time lag of `host`, a replica
+ * whose result has been read, below what is measured now:
+ * - a check in progress started later than the master's latest check;
+ * - a due check of a master with a working connection starts in the next
+ *   pass of the loop, after the replica's result;
+ * - the master's next check also starts after it, which matters when the
+ *   latest check started before the replica's result but gives no bound,
+ *   as the replica is ahead of it or the master had unwritten WAL. The
+ *   replica may have replayed WAL that the master wrote without commits
+ *   after its check. This check is waited for only while the commit age
+ *   exceeds the time since the latest check started: no commit has been
+ *   replayed since then, and a shorter commit age needs no bound.
+ * The master's last check must have succeeded, so that a master that hangs
+ * delays no replica. A replica with WAL left to replay never waits: any
+ * later master position is further ahead. Nor does a replica known to be on
+ * another timeline than the master's: no bound applies to it.
+ */
+static bool master_check_may_help(
+  const MonitorHost *host, const uint64_t now_ms
+) {
+  const MonitorHost *master = usable_master(host);
+  if (
+    host->iter_new_status.master || master == nullptr ||
+    timelines_differ(host->iter_timeline, master->master_timeline) ||
+    max_lsn(master->master_wal_lsn, host->iter_receiver_end_lsn) >
+      host->iter_new_lsn
+  ) {
+    return false;
+  }
+  const uint64_t time_lag_ms = measured_time_lag_ms(host);
+  const uint64_t observed_at_ms = host->iter_observed_at_ms;
+  if (master->poll_state != HOST_POLL_IDLE) {
+    return time_lag_ms > elapsed_ms(master->iter_started_at_ms, observed_at_ms);
+  }
+  if (
+    needs_new_connection(master) ||
+    master->next_poll_at_ms >= master_wait_ends_at_ms(host)
+  ) {
+    return false;
+  }
+  if (master->next_poll_at_ms <= now_ms) {
+    return time_lag_ms > 0;
+  }
+  const uint64_t check_started_at_ms = master->master_wal_check_started_at_ms;
+  return master->has_master_wal && check_started_at_ms <= observed_at_ms &&
+         time_lag_ms > observed_at_ms - check_started_at_ms;
+}
+
+/**
+ * True when `host`, a replica whose result has been read, should wait for
+ * a check of the selected master. Without waiting, the time lag of a
+ * replica whose result arrives just before the master's would be bounded by
+ * the master's previous check, up to sleep_ms older. The wait never outlasts
+ * the replica's deadline or delays its next check.
+ */
+static bool waits_for_master_check(
+  const MonitorHost *host, const uint64_t now_ms
+) {
+  return now_ms < master_wait_ends_at_ms(host) &&
+         master_check_may_help(host, now_ms);
+}
+
+void finish_master_waits(const uint64_t now_ms) {
+  for (unsigned int i = 0; i < host_count; i++) {
+    MonitorHost *host = &monitor_host_list[i];
+    if (
+      host->poll_state == HOST_POLL_MASTER_WAIT &&
+      !waits_for_master_check(host, now_ms)
+    ) {
+      // The replica's own result arrived in time: the check succeeds.
+      end_iteration(host, true, now_ms);
+    }
+  }
+}
+
+/**
+ * Ends the iteration of `host`. When it is the selected master's check,
+ * the replicas waiting for it measure their lags with its result at once.
+ */
+static void finish_iteration(
+  MonitorHost *host, const bool success, const uint64_t now_ms
+) {
+  end_iteration(host, success, now_ms);
+  if (host == get_master_monitor_host()) {
+    finish_master_waits(now_ms);
+  }
 }
 
 static bool consume_input(MonitorHost *host, const uint64_t now_ms) {
@@ -722,33 +1200,61 @@ static bool consume_input(MonitorHost *host, const uint64_t now_ms) {
   return true;
 }
 
-static bool retry_without_wal_receiver(
+/** Logs the switch to the fallback query that `host` uses now. */
+static void log_query_fallback(const MonitorHost *host) {
+  if (host->query_fallback == QUERY_WITHOUT_WAL_RECEIVER) {
+    pg_status_log(
+      PG_STATUS_LOG_WARNING, "monitor",
+      "PostgreSQL permission denied host=%s sqlstate=42501; "
+      "retrying poll without WAL receiver statistics for 5 minutes or until "
+      "reconnect; "
+      "for more complete byte lag measurements and the replica's timeline, "
+      "check SELECT on pg_catalog.pg_stat_wal_receiver and EXECUTE on "
+      "pg_catalog.pg_stat_get_wal_receiver(); pg_read_all_stats privileges "
+      "are also needed to expose latest_end_lsn and received_tli",
+      host->host
+    );
+    return;
+  }
+  pg_status_log(
+    PG_STATUS_LOG_WARNING, "monitor",
+    "PostgreSQL permission denied host=%s sqlstate=42501; "
+    "retrying poll without WAL receiver statistics and control file "
+    "functions for 5 minutes or until reconnect; "
+    "the timeline of a replica is unknown then, so after a failover a "
+    "replica left on the abandoned WAL history meets min_lsn and byte lag "
+    "thresholds unless the request passes timeline; check EXECUTE on "
+    "pg_catalog.pg_control_checkpoint() and "
+    "pg_catalog.pg_control_recovery()",
+    host->host
+  );
+}
+
+/**
+ * True when the result is a permission error and the check is to be
+ * retried with the next fallback query, after its results are drained.
+ */
+static bool retry_with_query_fallback(
   MonitorHost *host, const PGresult *res, const uint64_t now_ms
 ) {
   if (
-    host->wal_receiver_disabled || PQresultStatus(res) != PGRES_FATAL_ERROR ||
+    host->query_fallback == QUERY_WITHOUT_WAL_RECEIVER_AND_CONTROL_FILE ||
+    PQresultStatus(res) != PGRES_FATAL_ERROR ||
     !is_equal_strings(PQresultErrorField(res, PG_DIAG_SQLSTATE), "42501")
   ) {
     return false;
   }
 
   // SQLSTATE identifies insufficient_privilege without depending on the
-  // server's message language. If another required object is denied, the
-  // query without the receiver will still fail and count as a failed poll.
-  host->wal_receiver_disabled = true;
-  host->wal_receiver_retry_at_ms = now_ms + WAL_RECEIVER_RETRY_MS;
-  host->iter_retry_without_wal_receiver = true;
-  pg_status_log(
-    PG_STATUS_LOG_WARNING, "monitor",
-    "PostgreSQL permission denied host=%s sqlstate=42501; "
-    "retrying poll without WAL receiver statistics for 5 minutes or until "
-    "reconnect; "
-    "for more complete byte lag measurements, check SELECT on "
-    "pg_catalog.pg_stat_wal_receiver and EXECUTE on "
-    "pg_catalog.pg_stat_get_wal_receiver(); pg_read_all_stats privileges "
-    "are also needed to expose latest_end_lsn",
-    host->host
-  );
+  // server's message language, but not the object denied, so each retry
+  // leaves out more. PostgreSQL checks EXECUTE on every function of the
+  // query, also in a CASE branch that is not taken, so the error can come
+  // from a function that the host's role makes unnecessary. If the last
+  // variant is denied too, the check fails.
+  host->query_fallback++;
+  host->query_fallback_expires_at_ms = now_ms + QUERY_FALLBACK_MS;
+  host->iter_retry_with_query_fallback = true;
+  log_query_fallback(host);
   return true;
 }
 
@@ -767,10 +1273,10 @@ static void read_step(MonitorHost *host, const uint64_t now_ms) {
   while (PQisBusy(host->conn) == 0) {
     PGresult *res = PQgetResult(host->conn);
     if (res == nullptr) {
-      if (host->iter_retry_without_wal_receiver) {
+      if (host->iter_retry_with_query_fallback) {
         // libpq requires draining the previous query through NULL before
         // sending another one. Keep the original iteration deadline.
-        host->iter_retry_without_wal_receiver = false;
+        host->iter_retry_with_query_fallback = false;
         if (!send_query(host, now_ms)) {
           finish_iteration(host, false, now_ms);
           return;
@@ -778,12 +1284,19 @@ static void read_step(MonitorHost *host, const uint64_t now_ms) {
         poll_state_query_send(host);
         return;
       }
+      if (host->iter_data_ready && waits_for_master_check(host, now_ms)) {
+        // The connection has no query in flight, so the socket stays out of
+        // poll() until the master's check ends or the deadline passes.
+        host->poll_state = HOST_POLL_MASTER_WAIT;
+        host->poll_events = 0;
+        return;
+      }
       finish_iteration(host, host->iter_data_ready, now_ms);
       return;
     }
     if (
-      !host->iter_data_ready && !host->iter_retry_without_wal_receiver &&
-      !retry_without_wal_receiver(host, res, now_ms)
+      !host->iter_data_ready && !host->iter_retry_with_query_fallback &&
+      !retry_with_query_fallback(host, res, now_ms)
     ) {
       host->iter_data_ready = parse_result(host, res, now_ms);
     }
@@ -935,13 +1448,22 @@ static void reset_iter_state(MonitorHost *host, const uint64_t now_ms) {
   host->iter_opened_connection = false;
   host->iter_tls_started = false;
   host->iter_data_ready = false;
-  host->iter_retry_without_wal_receiver = false;
+  host->iter_retry_with_query_fallback = false;
   host->iter_new_status = (MonitorStatus){
     .alive = false, .master = false, .possible_dead = true
   };
   host->iter_new_lag_ms = 0;
   host->iter_new_lag_bytes = 0;
   host->iter_new_lsn = 0;
+  host->iter_commit_age_ms = 0;
+  host->iter_receiver_end_lsn = 0;
+  host->iter_query_sent_at_ms = 0;
+  host->iter_observed_at_ms = 0;
+  host->iter_timeline = 0;
+  host->iter_upstream_known = false;
+  host->iter_master_timeline = 0;
+  host->iter_master_lsn = 0;
+  host->iter_time_lag_bound_ms = UINT64_MAX;
   host->iter_deadline_ms = now_ms + parameters.query_timeout_ms;
 }
 
@@ -983,6 +1505,7 @@ void advance_host_poll(MonitorHost *host, const uint64_t now_ms) {
     case HOST_POLL_QUERY_READ:
       read_step(host, now_ms);
       return;
+    case HOST_POLL_MASTER_WAIT:
     case HOST_POLL_IDLE:
       return;
   }

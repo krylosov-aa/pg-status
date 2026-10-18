@@ -8,6 +8,16 @@ _PERMISSION_SQL = (
     "select has_table_privilege('fallback_monitor', "
     "'pg_catalog.pg_stat_wal_receiver', 'select')"
 )
+# The timeline of a replica that the control file shows.
+_CONTROL_FILE_TIMELINE_SQL = (
+    "select greatest("
+    "(select timeline_id from pg_catalog.pg_control_checkpoint()), "
+    "(select min_recovery_end_timeline "
+    "from pg_catalog.pg_control_recovery()))"
+)
+_MONITOR_QUERY_SQL = (
+    "select query from pg_stat_activity where usename='fallback_monitor'"
+)
 
 
 def test_receiver_permissions_recover_after_reconnection(
@@ -47,6 +57,19 @@ def test_receiver_permissions_recover_after_reconnection(
                     "retrying poll without WAL receiver statistics" in logs
                 ),
             )
+            # The fallback keeps the control file functions, so the
+            # replica's timeline is still known: a replica left on another
+            # WAL history can be excluded, and a request's timeline can
+            # match.
+            timeline = postgres.sql("replica-1", _CONTROL_FILE_TIMELINE_SQL)
+            waiter.until(
+                "replica on its control file timeline",
+                lambda: monitor.text(f"/replica?timeline={timeline}"),
+                lambda host: host == "postgres-replica-1",
+            )
+            assert "control file functions" not in security.logs(
+                "restricted"
+            )
 
             # Act
             postgres.sql(
@@ -70,11 +93,7 @@ def test_receiver_permissions_recover_after_reconnection(
             # Assert
             waiter.until(
                 "full receiver query after reconnect",
-                lambda: postgres.sql(
-                    "replica-1",
-                    "select query from pg_stat_activity "
-                    "where usename='fallback_monitor'",
-                ),
+                lambda: postgres.sql("replica-1", _MONITOR_QUERY_SQL),
                 lambda query: "from pg_catalog.pg_stat_wal_receiver" in query,
             )
             assert monitor.status("postgres-replica-1")["alive"] is True
